@@ -550,7 +550,7 @@ AgeCare implementa múltiples capas de seguridad siguiendo el enfoque **DevSecOp
 
 **AgeCare** · Capstone APT122 · Grupo 1 · Sección 003D
 
-Ingeniería en Informática · Sede San Andrés · **Duoc UC** · 2025–2026
+Ingeniería en Informática · Sede San Andrés · **Duoc UC** · 2026
 
 *Cuidando a quienes cuidaron de nosotros* 💙
 

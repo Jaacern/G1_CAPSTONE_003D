@@ -268,15 +268,15 @@ El proyecto sigue el **modelo de desarrollo en Cascada (Waterfall)**, elegido po
 | Actividad | **Fase 1 (S1-S4)** | | | | **Fase 2 (S5-S16)** | | | | | | | | | | | | **Fase 3 (S17-S18)** | |
 |-----------|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
 | | **1** | **2** | **3** | **4** | **5** | **6** | **7** | **8** | **9** | **10** | **11** | **12** | **13** | **14** | **15** | **16** | **17** | **18** |
-| **Análisis y ERS (Requisitos)** | 🟩 | 🟩 | 🟩 | | | | | | | | | | | | | | | |
+| **Análisis y ERS (Requisitos)** | 🟦 | 🟦 | 🟦 | | | | | | | | | | | | | | | |
 | **Diseño de Arquitectura y UML** | | | | 🟩 | 🟩 | 🟩 | | | | | | | | | | | | |
-| **Implementación: Backend e IA** | | | | | | | � | � | � | � | � | | | | | | | |
-| **Implementación: Frontend Flutter** | | | | | | | | | | | | � | � | � | | | | |
-| **Plan de Pruebas y Certificación** | | | | | | | | | | | | | | | � | � | | |
-| **Empaquetado Docker y Despliegue** | | | | | | | | | | | | | | | | | � | |
-| **Elaboración de Evidencias (Documental)** | 🟩 | | | 🟩 | | | | | 🟩 | | | | | | � | | 🟩 | � |
+| **Implementación: Backend e IA** | | | | | | | 🟨 | 🟨 | 🟨 | 🟨 | 🟨 | | | | | | | |
+| **Implementación: Frontend Flutter** | | | | | | | | | | | | 🟧 | 🟧 | 🟧 | | | | |
+| **Plan de Pruebas y Certificación** | | | | | | | | | | | | | | | 🟥 | 🟥 | | |
+| **Empaquetado Docker y Despliegue** | | | | | | | | | | | | | | | | | 🟪 | |
+| **Elaboración de Evidencias (Documental)** | 🟫 | | | 🟫 | | | | | 🟫 | | | | | | 🟫 | | 🟫 | 🟫 |
 
-**Leyenda:** � Actividad activa en esa semana
+**Leyenda:** 🟦 Análisis y ERS &nbsp;·&nbsp; 🟩 Diseño de Arquitectura y UML &nbsp;·&nbsp; 🟨 Implementación Backend e IA &nbsp;·&nbsp; 🟧 Implementación Frontend Flutter &nbsp;·&nbsp; 🟥 Pruebas y Certificación &nbsp;·&nbsp; 🟪 Empaquetado y Despliegue &nbsp;·&nbsp; 🟫 Elaboración de Evidencias
 
 ---
 
@@ -550,7 +550,7 @@ AgeCare implementa múltiples capas de seguridad siguiendo el enfoque **DevSecOp
 
 **AgeCare** · Capstone APT122 · Grupo 1 · Sección 003D
 
-Ingeniería en Informática · Sede San Andrés · **Duoc UC** · 2024–2025
+Ingeniería en Informática · Sede San Andrés · **Duoc UC** · 2025–2026
 
 *Cuidando a quienes cuidaron de nosotros* 💙
 

@@ -50,13 +50,13 @@ Chile enfrenta un acelerado proceso de envejecimiento poblacional. Según proyec
 
 Hoy en día, el cuidado de adultos mayores se caracteriza por:
 
-| Problema | Impacto |
-|----------|---------|
-| 🔴 Fragmentación de información clínica | Retrasos en respuesta ante emergencias |
-| 🔴 Falta de coordinación entre familia y cuidadores | Errores en medicación y seguimiento |
-| 🔴 Ausencia de monitoreo continuo a distancia | Incidentes no detectados a tiempo |
-| 🔴 Interfaces tecnológicas poco accesibles para adultos mayores | Baja adopción de herramientas digitales |
-| 🔴 Inexistencia de un canal unificado de comunicación | Información dispersa en llamadas, mensajes y papeles |
+| 🔴 Problema | 🟢 Impacto |
+|------------|-----------|
+| 🔴 Fragmentación de información clínica | 🟢 Retrasos en respuesta ante emergencias |
+| 🔴 Falta de coordinación entre familia y cuidadores | 🟢 Errores en medicación y seguimiento |
+| 🔴 Ausencia de monitoreo continuo a distancia | 🟢 Incidentes no detectados a tiempo |
+| 🔴 Interfaces tecnológicas poco accesibles para adultos mayores | 🟢 Baja adopción de herramientas digitales |
+| 🔴 Inexistencia de un canal unificado de comunicación | 🟢 Información dispersa en llamadas, mensajes y papeles |
 
 ### Relevancia sociosanitaria
 
@@ -265,26 +265,18 @@ El proyecto sigue el **modelo de desarrollo en Cascada (Waterfall)**, elegido po
 
 > Duración total del proyecto: **18 semanas**
 
-| Actividad | S1 | S2 | S3 | S4 | S5 | S6 | S7 | S8 | S9 | S10 | S11 | S12 | S13 | S14 | S15 | S16 | S17 | S18 |
-|-----------|----|----|----|----|----|----|----|----|----|----|-----|-----|-----|-----|-----|-----|-----|-----|
-| 📋 Análisis y Requisitos (ERS) | 🟦 | 🟦 | 🟦 | | | | | | | | | | | | | | | |
-| 📐 Diseño de Arquitectura | | | | 🟩 | 🟩 | 🟩 | | | | | | | | | | | | |
-| 🗄️ Modelo de Datos (ER PostgreSQL) | | | | 🟩 | 🟩 | 🟩 | | | | | | | | | | | | |
-| 📊 Diagramas UML | | | | | 🟩 | 🟩 | | | | | | | | | | | | |
-| ⚙️ Implementación Backend (FastAPI) | | | | | | | 🟨 | 🟨 | 🟨 | 🟨 | 🟨 | | | | | | | |
-| 🤖 Integración IA / LLMs | | | | | | | | 🟨 | 🟨 | 🟨 | 🟨 | | | | | | | |
-| 🧾 OCR Recetas Médicas | | | | | | | | | 🟨 | 🟨 | 🟨 | | | | | | | |
-| 📡 Simulador Wearable | | | | | | | 🟨 | 🟨 | 🟨 | | | | | | | | | |
-| 📱 Implementación Flutter (Apps) | | | | | | | | | | | | 🟧 | 🟧 | 🟧 | | | | |
-| 🎵 Módulo "Director Musical" | | | | | | | | | | | | | 🟧 | 🟧 | | | | |
-| 🧪 Pruebas Unitarias e Integración | | | | | | | | | | | | | | | 🟥 | 🟥 | | |
-| 🔒 Pruebas de Seguridad | | | | | | | | | | | | | | | | 🟥 | | |
-| 🐳 Docker + docker-compose | | | | | | | | | | | | | | | | | 🟪 | |
-| ☁️ Despliegue Azure Container Apps | | | | | | | | | | | | | | | | | 🟪 | 🟪 |
-| 📖 Manual Técnico y Documentación | | | | | | | | | | | | | | | | | 🟪 | 🟪 |
-| 🎤 Presentación a Comisión | | | | | | | | | | | | | | | | | | 🟪 |
+| Actividad | **Fase 1 (S1-S4)** | | | | **Fase 2 (S5-S16)** | | | | | | | | | | | | **Fase 3 (S17-S18)** | |
+|-----------|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| | **1** | **2** | **3** | **4** | **5** | **6** | **7** | **8** | **9** | **10** | **11** | **12** | **13** | **14** | **15** | **16** | **17** | **18** |
+| **Análisis y ERS (Requisitos)** | 🟩 | 🟩 | 🟩 | | | | | | | | | | | | | | | |
+| **Diseño de Arquitectura y UML** | | | | 🟩 | 🟩 | 🟩 | | | | | | | | | | | | |
+| **Implementación: Backend e IA** | | | | | | | � | � | � | � | � | | | | | | | |
+| **Implementación: Frontend Flutter** | | | | | | | | | | | | � | � | � | | | | |
+| **Plan de Pruebas y Certificación** | | | | | | | | | | | | | | | � | � | | |
+| **Empaquetado Docker y Despliegue** | | | | | | | | | | | | | | | | | � | |
+| **Elaboración de Evidencias (Documental)** | 🟩 | | | 🟩 | | | | | 🟩 | | | | | | � | | 🟩 | � |
 
-**Leyenda:** 🟦 Análisis · 🟩 Diseño · 🟨 Backend/IA · 🟧 Frontend · 🟥 Pruebas · 🟪 Despliegue
+**Leyenda:** � Actividad activa en esa semana
 
 ---
 

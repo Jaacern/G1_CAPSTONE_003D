@@ -17,6 +17,8 @@
 **Capstone APT122 · PTY4614 · Grupo 1 · Sección 003D**
 **Ingeniería en Informática — Sede San Andrés · Duoc UC**
 
+<sub>¿Quieres entender el contexto académico detrás de este proyecto? → [Visita nuestra Wiki](https://github.com/Jaacern/G1_CAPSTONE_003D/wiki)</sub>
+
 </div>
 
 ---

@@ -1,6 +1,8 @@
 <div align="center">
 
-<img src="https://duoc.cl/wp-content/uploads/2021/07/Logo-DuocUC.png" alt="Duoc UC Logo" width="220"/>
+<img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRBUB5NxN49OL9L-_ZM5faV-gPJEJonlr7K1WY057Dq&s=10" alt="Alloxtentric Logo" width="160"/>
+&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="https://thumb.wikimedia.org/wikipedia/commons/thumb/a/aa/Logo_DuocUC.svg/3840px-Logo_DuocUC.svg.png" alt="Duoc UC Logo" width="220"/>
 
 # 🩺 AgeCare
 ### Plataforma Digital Integral de Cuidado de Adultos Mayores
@@ -66,7 +68,7 @@ La descoordinación en el ecosistema de cuidado retarda la toma de decisiones cr
 
 **AgeCare** es una plataforma digital integral de cuidado de adultos mayores, compuesta por:
 
-- 📱 **Aplicaciones móviles** para Familias, Cuidadores y el propio Adulto Mayor
+- 📱 **Aplicaciones móviles** para Familias, Cuidadores, Médicos y el propio Adulto Mayor
 - 🖥️ **Panel web administrativo** para gestión clínica centralizada
 - 🤖 **Asistente IA generativa** para soporte clínico contextualizado
 - 📡 **Telemetría de signos vitales** en tiempo real desde wearables
@@ -77,18 +79,18 @@ La descoordinación en el ecosistema de cuidado retarda la toma de decisiones cr
 ### Roles de usuario
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    AgeCare Platform                  │
-├──────────────┬──────────────────┬────────────────────┤
-│  👴 Adulto   │  👩‍⚕️ Cuidador/a  │  👨‍👩‍👧 Familiar      │
-│   Mayor      │                  │                    │
-│              │                  │                    │
-│ • Dictado voz│ • Historial      │ • Monitoreo remoto │
-│ • Recordato- │   clínico        │ • Alertas críticas │
-│   rios       │ • Gestión meds   │ • Dashboard        │
-│ • Dir. Musical│ • Reportes      │ • Comunicación     │
-│ • Alertas    │ • Alertas        │ • OCR recetas      │
-└──────────────┴──────────────────┴────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                          AgeCare Platform                            │
+├──────────────┬──────────────────┬────────────────────┬──────────────┤
+│  👴 Adulto   │  👩‍⚕️ Cuidador/a  │  👨‍👩‍👧 Familiar      │  🩺 Médico   │
+│   Mayor      │                  │                    │              │
+│              │                  │                    │              │
+│ • Dictado voz│ • Historial      │ • Monitoreo remoto │ • Historial  │
+│ • Recordato- │   clínico        │ • Alertas críticas │   clínico    │
+│   rios       │ • Gestión meds   │ • Dashboard        │ • Recetas    │
+│ • Dir. Musical│ • Reportes     │ • Comunicación     │ • Evolución  │
+│ • Alertas    │ • Alertas        │ • OCR recetas      │ • Indicadores│
+└──────────────┴──────────────────┴────────────────────┴──────────────┘
 ```
 
 ---
@@ -97,7 +99,7 @@ La descoordinación en el ecosistema de cuidado retarda la toma de decisiones cr
 
 ### Objetivo General
 
-> Desarrollar y desplegar la plataforma **AgeCare** para centralizar el monitoreo de salud, alertas y coordinación clínica entre familiares, cuidadores y el adulto mayor, garantizando seguridad de datos y optimizando tiempos de reacción ante eventos críticos de salud.
+> Desarrollar y desplegar la plataforma **AgeCare** para centralizar el monitoreo de salud, alertas y coordinación clínica entre familiares, cuidadores, médicos y el adulto mayor, garantizando seguridad de datos y optimizando tiempos de reacción ante eventos críticos de salud.
 
 ### Objetivos Específicos
 
@@ -528,7 +530,7 @@ AgeCare implementa múltiples capas de seguridad siguiendo el enfoque **DevSecOp
 | 🔑 **JWT** | Autenticación stateless con tokens firmados |
 | 🔒 **Cifrado E2E** | Cifrado de extremo a extremo en comunicaciones |
 | 🛡️ **DevSecOps** | Análisis de seguridad integrado en el pipeline CI/CD |
-| 🏥 **RBAC** | Control de acceso basado en roles (Familiar / Cuidador / Admin) |
+| 🏥 **RBAC** | Control de acceso basado en roles (Familiar / Cuidador / Médico / Admin) |
 | 📋 **Auditoría** | Registro de acciones críticas sobre datos clínicos |
 | ☁️ **Azure Security** | Configuración de seguridad a nivel de infraestructura cloud |
 
@@ -562,6 +564,6 @@ Ingeniería en Informática · Sede San Andrés · **Duoc UC** · 2024–2025
 
 ---
 
-<img src="https://duoc.cl/wp-content/uploads/2021/07/Logo-DuocUC.png" alt="Duoc UC" width="120"/>
+<img src="https://thumb.wikimedia.org/wikipedia/commons/thumb/a/aa/Logo_DuocUC.svg/3840px-Logo_DuocUC.svg.png" alt="Duoc UC" width="120"/>
 
 </div>

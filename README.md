@@ -70,9 +70,9 @@ Redactado y mantenido por el equipo de ingeniería del proyecto:
 
 | Integrante | Rol |
 |-----------|-----|
-| **Javier Cerna Chávez** | Tech Lead · DevSecOps · Seguridad de la Información (CISO) |
-| **Benjamín Camus Jara** | Arquitecto de Datos · Data Engineer |
-| **Juan Pablo Mora Rosales** | Administrador de Base de Datos (DBA) · Requisitos No Funcionales |
+| **Javier Cerna Chávez** | Tech Lead |
+| **Benjamín Camus Jara** | Data Engineer |
+| **Juan Pablo Mora Rosales** | Administrador de Base de Datos (DBA) |
 
 Todos los integrantes son estudiantes de **Ingeniería en Informática** (Sede San Andrés · Duoc UC).
 Asignatura: **PTY4614 Capstone** · Código **APT122** · Sección **003D**.

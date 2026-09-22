@@ -11,11 +11,36 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # Los .sql se ejecutan automáticamente SOLO la primera vez
+      # que se crea el volumen pgdata (en orden alfabético).
+      - ./sql:/docker-entrypoint-initdb.d:ro,Z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
+    networks: [agecare-net]
+
+  api:
+    build: ./api
+    container_name: agecare-api
+    environment:
+      # La API se conecta a la BD por el nombre de servicio de la red interna.
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-cambiar-en-produccion}
+    ports:
+      # 0.0.0.0 = accesible desde otras máquinas de la red local (para que el
+      # frontend de un compañero pueda probar). Solo la API se expone; la BD
+      # (5432) y pgadmin (5050) siguen restringidos a 127.0.0.1 por seguridad.
+      - "0.0.0.0:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
     networks: [agecare-net]
 

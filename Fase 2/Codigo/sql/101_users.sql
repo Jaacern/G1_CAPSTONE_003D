@@ -28,7 +28,7 @@ CREATE UNIQUE INDEX ux_users_email_lower ON users (lower(email));
 
 --el update_at se mantiene solo ais cada vez que una fila se actualice, antes de guardarla
 --se pondra el update_at en la hora que se actualizo
-CREATE TRIGGER tg_users_update_at
+CREATE TRIGGER tg_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW
     EXECUTE FUNCTION set_updated_at();

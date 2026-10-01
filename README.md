@@ -87,7 +87,7 @@ El proyecto se organiza en **fases**, con revisión documental entre cada una. C
 |:----:|-------------|:------:|
 | 1 | Definición del proyecto | Entrega formativa |
 | 2 | Diseño | En progreso |
-| 3 | Implementación (backend) | Pendiente |
+| 3 | Implementación (backend) | En progreso |
 | 4 | Implementación (frontend) | Pendiente |
 | 5 | Pruebas y calidad | Pendiente |
 | 6 | Despliegue y cierre | Pendiente |

@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgeCare · Test Client</title>
+<script>
+  // If served from /test, set base so relative asset paths resolve correctly.
+  // When opened as a local file (file://) this is a no-op.
+  (function(){
+    var base = document.createElement('base');
+    var p = window.location.pathname;
+    base.href = (p.startsWith('/test') ? '/test/' : './');
+    document.currentScript.parentNode.insertBefore(base, document.currentScript);
+  })();
+</script>
+<style>
+  :root {
+    --bg:#eef1f5; --frame:#fff; --ink:#1f2733; --ink-soft:#5b6573; --ink-faint:#97a0ad;
+    --line:#e2e6ec; --line-strong:#cfd5dd; --surface:#f6f8fb; --surface-2:#eef2f7;
+    --brand:#3b6fd4; --brand-soft:#e7eefb;
+    --ok:#2e9e6b; --ok-bg:#e6f5ed;
+    --warn:#d99211; --warn-bg:#fbf2dd;
+    --danger:#d6453c; --danger-bg:#fbe6e4;
+    --radius:14px; --shadow:0 8px 32px rgba(31,39,51,.13);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;}
+
+  /* ── Layout ── */
+  .layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh;}
+  @media(max-width:768px){.layout{grid-template-columns:1fr;}  .sidebar{display:none;}}
+
+  /* ── Sidebar ── */
+  .sidebar{background:var(--frame);border-right:1px solid var(--line);padding:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;}
+  .sidebar-logo{padding:20px 18px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;}
+  .sidebar-logo img{height:36px;width:auto;}
+  .sidebar-logo span{font-size:13px;font-weight:700;color:var(--brand);}
+  .sidebar-nav{padding:10px 0;flex:1;}
+  .nav-group{padding:6px 14px 4px;font-size:10px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin-top:8px;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;font-size:13px;font-weight:500;color:var(--ink-soft);cursor:pointer;border-radius:0;transition:background .12s;}
+  .nav-item:hover{background:var(--surface-2);color:var(--ink);}
+  .nav-item.active{background:var(--brand-soft);color:var(--brand);font-weight:700;}
+  .nav-item .ic{font-size:15px;width:18px;text-align:center;}
+  .sidebar-user{padding:14px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-faint);}
+  .sidebar-user .name{font-weight:700;color:var(--ink);font-size:13px;}
+  .sidebar-user .role-badge{display:inline-block;padding:2px 8px;border-radius:20px;background:var(--brand-soft);color:var(--brand);font-size:10px;font-weight:700;margin-left:6px;}
+  .logout-btn{width:100%;margin-top:8px;padding:8px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;font-size:12px;color:var(--ink-soft);cursor:pointer;text-align:center;}
+  .logout-btn:hover{background:var(--danger-bg);color:var(--danger);border-color:#f3c9c5;}
+
+  /* ── Main area ── */
+  .main{padding:28px 28px 60px;overflow-y:auto;}
+  @media(max-width:768px){.main{padding:16px 14px 40px;}}
+
+  /* ── Header bar ── */
+  .main-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:gap;}
+  .main-header h1{font-size:22px;font-weight:800;letter-spacing:-.02em;}
+  .main-header .sub{font-size:13px;color:var(--ink-faint);margin-top:2px;}
+  .header-actions{display:flex;gap:10px;align-items:center;}
+
+  /* ── Phone frame for wireframes ── */
+  .phone-preview{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:28px;}
+  .phone{width:380px;max-width:100%;height:720px;background:var(--frame);border-radius:38px;box-shadow:var(--shadow);position:relative;overflow:hidden;border:1px solid var(--line-strong);display:flex;flex-direction:column;flex-shrink:0;}
+  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:24px;background:#0c0f14;border-radius:0 0 14px 14px;z-index:60;}
+  .statusbar{height:28px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;font-size:11px;font-weight:600;flex-shrink:0;}
+  .phone-wrap{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+
+  /* ── Cards ── */
+  .card{background:var(--frame);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:16px;}
+  .card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .card-head h2{font-size:16px;font-weight:700;}
+  .card-head .badge{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700;}
+  .badge-ok{background:var(--ok-bg);color:var(--ok);}
+  .badge-warn{background:var(--warn-bg);color:var(--warn);}
+  .badge-danger{background:var(--danger-bg);color:var(--danger);}
+  .badge-info{background:var(--brand-soft);color:var(--brand);}
+
+  /* ── Forms ── */
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-size:12px;font-weight:600;color:var(--ink-soft);}
+  .field input,.field select,.field textarea{padding:9px 12px;border:1px solid var(--line-strong);border-radius:9px;font-size:13px;color:var(--ink);background:var(--frame);outline:none;transition:border .15s;}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--brand);}
+  .field textarea{resize:vertical;min-height:70px;}
+
+  /* ── Buttons ── */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:0;transition:filter .12s;}
+  .btn:hover{filter:brightness(.95);}
+  .btn:active{filter:brightness(.9);}
+  .btn-primary{background:var(--brand);color:#fff;}
+  .btn-secondary{background:var(--surface-2);color:var(--ink);border:1px solid var(--line);}
+  .btn-danger{background:var(--danger);color:#fff;}
+  .btn-ok{background:var(--ok);color:#fff;}
+  .btn-warn{background:var(--warn);color:#fff;}
+  .btn-sm{padding:6px 12px;font-size:12px;}
+  .btn-full{width:100%;}
+  .btn-group{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+
+  /* ── Response viewer ── */
+  .response-area{background:#0f1318;border-radius:10px;padding:14px;font-size:12px;font-family:"SF Mono","Fira Mono",monospace;color:#c9d1d9;overflow:auto;max-height:320px;white-space:pre-wrap;word-break:break-all;margin-top:14px;min-height:48px;}
+  .response-area.ok{border-left:3px solid var(--ok);}
+  .response-area.err{border-left:3px solid var(--danger);}
+  .response-area.empty{color:var(--ink-faint);font-style:italic;font-family:inherit;font-size:13px;}
+
+  /* ── Tabs ── */
+  .tabs{display:flex;gap:4px;background:var(--surface-2);padding:4px;border-radius:11px;margin-bottom:18px;flex-wrap:wrap;}
+  .tab{flex:1;min-width:80px;text-align:center;padding:8px 12px;font-size:12.5px;font-weight:600;color:var(--ink-soft);border-radius:8px;cursor:pointer;white-space:nowrap;}
+  .tab.active{background:var(--frame);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.08);}
+  .tabpane{display:none;}
+  .tabpane.active{display:block;}
+
+  /* ── Token display ── */
+  .token-box{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:10px 13px;font-size:11px;font-family:monospace;word-break:break-all;color:var(--ink-soft);margin-top:6px;position:relative;}
+  .copy-btn{position:absolute;top:6px;right:8px;font-size:10px;padding:3px 8px;border-radius:5px;cursor:pointer;background:var(--brand-soft);color:var(--brand);border:0;font-weight:700;}
+
+  /* ── Dashboard tiles ── */
+  .dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:20px;}
+  .dash-tile{background:var(--frame);border:1px solid var(--line);border-radius:var(--radius);padding:16px;}
+  .dash-tile .val{font-size:28px;font-weight:800;margin:6px 0;}
+  .dash-tile .lbl{font-size:11px;font-weight:600;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.04em;}
+  .dash-tile .sub{font-size:12px;color:var(--ink-soft);margin-top:4px;}
+
+  /* ── Alert list ── */
+  .alert-item{display:flex;gap:12px;padding:13px 0;border-bottom:1px solid var(--line);}
+  .alert-item:last-child{border-bottom:0;}
+  .alert-ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+  .sev-critical{background:var(--danger-bg);color:var(--danger);}
+  .sev-warning{background:var(--warn-bg);color:var(--warn);}
+  .sev-info{background:var(--brand-soft);color:var(--brand);}
+  .alert-title{font-size:13px;font-weight:700;}
+  .alert-sub{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .alert-time{font-size:10.5px;color:var(--ink-faint);margin-top:4px;}
+
+  /* ── Vital cards ── */
+  .vital-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:16px;}
+  .vital-card{background:var(--frame);border:1px solid var(--line);border-radius:12px;padding:13px;}
+  .vital-card .name{font-size:11px;color:var(--ink-soft);font-weight:600;}
+  .vital-card .val{font-size:22px;font-weight:800;margin:5px 0 2px;}
+  .vital-card .val small{font-size:12px;font-weight:600;color:var(--ink-faint);}
+  .vital-card .in-range{font-size:10.5px;}
+  .vital-card.ok-card{border-color:var(--ok);}
+  .vital-card.warn-card{border-color:var(--warn);}
+  .vital-card.danger-card{border-color:var(--danger);}
+
+  /* ── Patient cards ── */
+  .patient-card{display:flex;align-items:center;gap:14px;padding:14px;background:var(--frame);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:10px;cursor:pointer;transition:background .12s;}
+  .patient-card:hover{background:var(--surface-2);}
+  .patient-card.selected{border-color:var(--brand);background:var(--brand-soft);}
+  .avatar{width:40px;height:40px;border-radius:50%;background:var(--brand-soft);color:var(--brand);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0;}
+  .patient-name{font-weight:700;font-size:14px;}
+  .patient-meta{font-size:11.5px;color:var(--ink-faint);margin-top:2px;}
+  .status-pill{margin-left:auto;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;}
+  .status-ok{background:var(--ok-bg);color:var(--ok);}
+  .status-warning{background:var(--warn-bg);color:var(--warn);}
+  .status-attention{background:var(--danger-bg);color:var(--danger);}
+
+  /* ── Login screen ── */
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:20px;}
+  .login-box{background:var(--frame);border-radius:20px;box-shadow:var(--shadow);padding:36px 32px;width:100%;max-width:400px;}
+  .login-logo{text-align:center;margin-bottom:28px;}
+  .login-logo img{height:52px;width:auto;}
+  .login-logo h2{font-size:20px;font-weight:800;margin-top:10px;letter-spacing:-.02em;}
+  .login-logo p{font-size:13px;color:var(--ink-soft);margin-top:4px;}
+  .demo-hint{background:var(--brand-soft);border:1px solid #d4e0f7;border-radius:10px;padding:12px 14px;margin-bottom:20px;}
+  .demo-hint p{font-size:12.5px;color:var(--ink);line-height:1.6;}
+  .demo-hint strong{color:var(--brand);}
+
+  /* ── Spinner ── */
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading{opacity:.6;pointer-events:none;}
+
+  /* ── Misc ── */
+  .sep{height:1px;background:var(--line);margin:16px 0;}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .muted{font-size:12.5px;color:var(--ink-soft);}
+  .faint{font-size:11.5px;color:var(--ink-faint);}
+  .pill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;}
+  .section-label{font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:18px 0 10px;}
+  .tag-input{background:var(--surface-2);border:1px dashed var(--line-strong);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--ink-soft);}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th{text-align:left;padding:8px 10px;font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;border-bottom:1px solid var(--line);}
+  td{padding:9px 10px;border-bottom:1px solid var(--line);}
+  tr:last-child td{border-bottom:0;}
+
+  /* ── Mobile header ── */
+  .mobile-header{display:none;background:var(--frame);border-bottom:1px solid var(--line);padding:12px 16px;align-items:center;gap:12px;}
+  @media(max-width:768px){.mobile-header{display:flex;}}
+  .mobile-header img{height:28px;}
+  .mobile-header .page-title{font-size:15px;font-weight:700;}
+  #mobile-menu-btn{margin-left:auto;font-size:20px;cursor:pointer;color:var(--ink-soft);}
+
+  /* ── Wireframe tab ── */
+  .wf-frame{border:1px solid var(--line);border-radius:12px;overflow:hidden;width:100%;height:700px;}
+
+  /* ── TEST banner on top ── */
+  .test-banner{background:linear-gradient(135deg,#3b6fd4,#2455b3);color:#fff;padding:10px 24px;display:flex;align-items:center;gap:14px;font-size:13px;}
+  .test-banner a{color:rgba(255,255,255,.85);text-decoration:none;font-weight:600;padding:5px 12px;border:1px solid rgba(255,255,255,.4);border-radius:7px;font-size:12px;}
+  .test-banner a:hover{background:rgba(255,255,255,.15);}
+
+  /* scrollbar */
+  ::-webkit-scrollbar{width:6px;height:6px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN SCREEN ===================== -->
+<div id="login-screen" class="login-wrap">
+  <div class="login-box">
+    <div class="login-logo">
+      <img src="agecare-logo-propuesta-3.jpg" alt="AgeCare" onerror="this.style.display='none';document.getElementById('logo-text').style.display='block'" id="login-logo-img">
+      <div id="logo-text" style="display:none;font-size:26px;font-weight:900;color:var(--brand);">AgeCare</div>
+      <h2>Test Client</h2>
+      <p>Interfaz de prueba conectada a la API en vivo</p>
+    </div>
+
+    <div class="demo-hint">
+      <p><strong>Datos de demostración:</strong><br>
+      👤 Familiar (Javier Cerna): <strong>ja.cernac@duocuc.cl</strong><br>
+      👩‍⚕️ Cuidadora (Rosa Medina): <strong>rosa@cuidados.cl</strong><br>
+      🔑 Contraseña ambos: <strong>demo1234</strong><br>
+      🏥 Paciente: <strong>Elena Rosales</strong>
+      </p>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="field">
+        <label>Correo electrónico</label>
+        <input type="email" id="login-email" value="ja.cernac@duocuc.cl" placeholder="email@ejemplo.com">
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input type="password" id="login-password" value="demo1234" placeholder="contraseña">
+      </div>
+      <button class="btn btn-primary btn-full" id="login-btn" onclick="doLogin()">
+        Iniciar sesión
+      </button>
+      <button class="btn btn-secondary btn-full" onclick="loginAs('rosa@cuidados.cl')">
+        Entrar como Rosa (Cuidadora)
+      </button>
+    </div>
+
+    <div class="response-area empty" id="login-response">La respuesta de la API aparecerá aquí…</div>
+  </div>
+</div>
+
+<!-- ===================== APP SHELL ===================== -->
+<div id="app-shell" style="display:none;">
+
+  <!-- TEST banner -->
+  <div class="test-banner">
+    <span>🧪 <strong>AgeCare Test Client</strong> — conectado a <code>agecare-api.javiercerna.dev</code></span>
+    <a href="/docs" target="_blank">📖 Swagger Docs</a>
+    <a href="Wireframe_Familiar_v1.html" target="_blank">🖼 Wireframe</a>
+  </div>
+
+  <!-- Mobile header -->
+  <div class="mobile-header">
+    <img src="agecare-logo-propuesta-3.jpg" alt="AgeCare" height="28" onerror="this.style.display='none'">
+    <span class="page-title" id="mobile-page-title">Dashboard</span>
+    <span id="mobile-menu-btn">☰</span>
+  </div>
+
+  <div class="layout">
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <img src="agecare-logo-propuesta-3.jpg" alt="AgeCare" onerror="this.style.display='none';this.nextSibling.style.fontWeight='900';this.nextSibling.style.fontSize='20px'">
+        <span>Test Client</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-group">General</div>
+        <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard">
+          <span class="ic">🏠</span> Dashboard
+        </div>
+        <div class="nav-item" onclick="showPage('patients')" id="nav-patients">
+          <span class="ic">👵</span> Pacientes
+        </div>
+        <div class="nav-item" onclick="showPage('alerts')" id="nav-alerts">
+          <span class="ic">🔔</span> Alertas
+        </div>
+
+        <div class="nav-group">Paciente activo</div>
+        <div class="nav-item" onclick="showPage('summary')" id="nav-summary">
+          <span class="ic">📊</span> Resumen del día
+        </div>
+        <div class="nav-item" onclick="showPage('vitals')" id="nav-vitals">
+          <span class="ic">❤️</span> Vitales
+        </div>
+        <div class="nav-item" onclick="showPage('medications')" id="nav-medications">
+          <span class="ic">💊</span> Medicamentos
+        </div>
+
+        <div class="nav-group">Cuenta</div>
+        <div class="nav-item" onclick="showPage('profile')" id="nav-profile">
+          <span class="ic">👤</span> Mi perfil
+        </div>
+        <div class="nav-item" onclick="showPage('notif-settings')" id="nav-notif-settings">
+          <span class="ic">⚙️</span> Notificaciones
+        </div>
+
+        <div class="nav-group">Wireframes</div>
+        <div class="nav-item" onclick="showPage('wf-familiar')" id="nav-wf-familiar">
+          <span class="ic">📱</span> Vista Familiar
+        </div>
+        <div class="nav-item" onclick="showPage('wf-suite')" id="nav-wf-suite">
+          <span class="ic">📱</span> Suite 3 roles
+        </div>
+
+        <div class="nav-group">Auth & Debug</div>
+        <div class="nav-item" onclick="showPage('auth-debug')" id="nav-auth-debug">
+          <span class="ic">🔐</span> Auth / Tokens
+        </div>
+      </nav>
+
+      <div class="sidebar-user">
+        <div class="row">
+          <span class="name" id="sb-username">—</span>
+          <span class="role-badge" id="sb-role">—</span>
+        </div>
+        <div class="faint" id="sb-email" style="margin-top:2px;">—</div>
+        <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <!-- ── MAIN ── -->
+    <main class="main" id="main-content">
+
+      <!-- ===== DASHBOARD ===== -->
+      <div class="tabpane active" id="page-dashboard">
+        <div class="main-header">
+          <div>
+            <h1>Dashboard</h1>
+            <div class="sub">Resumen de todos tus pacientes</div>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-primary btn-sm" onclick="loadDashboard()">🔄 Refrescar</button>
+          </div>
+        </div>
+
+        <div class="dash-grid" id="dash-tiles">
+          <div class="dash-tile"><div class="lbl">Pacientes</div><div class="val" id="dash-patients-count">—</div><div class="sub">registrados</div></div>
+          <div class="dash-tile"><div class="lbl">Alertas activas</div><div class="val" id="dash-alerts-count">—</div><div class="sub">pendientes</div></div>
+          <div class="dash-tile"><div class="lbl">Semáforo</div><div class="val" id="dash-wellbeing" style="font-size:20px;">—</div><div class="sub">estado general</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Mis pacientes</h2><span class="badge badge-info" id="dash-patient-badge">—</span></div>
+          <div id="dash-patient-list"><div class="faint">Cargando…</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Tablero API <code style="font-size:11px;">/users/me/dashboard</code></h2></div>
+          <div class="response-area empty" id="dash-response">Presiona Refrescar para cargar datos…</div>
+        </div>
+      </div>
+
+      <!-- ===== PATIENTS ===== -->
+      <div class="tabpane" id="page-patients">
+        <div class="main-header">
+          <div><h1>Pacientes</h1><div class="sub">Gestión del círculo de cuidado</div></div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab active" onclick="switchTab(this,'patients-list-tab')">📋 Lista</div>
+          <div class="tab" onclick="switchTab(this,'patients-create-tab')">➕ Crear paciente</div>
+          <div class="tab" onclick="switchTab(this,'patients-members-tab')">👥 Miembros</div>
+          <div class="tab" onclick="switchTab(this,'patients-invite-tab')">📨 Invitar</div>
+          <div class="tab" onclick="switchTab(this,'patients-wearable-tab')">⌚ Wearable</div>
+        </div>
+
+        <div class="tabpane active" id="patients-list-tab">
+          <div class="btn-group" style="margin-bottom:14px;"><button class="btn btn-primary btn-sm" onclick="loadPatients()">🔄 Cargar pacientes (GET /api/v1/patients)</button></div>
+          <div id="patient-list-container"><div class="faint">Presiona el botón para cargar.</div></div>
+          <div class="response-area empty" id="patients-list-response"></div>
+        </div>
+
+        <div class="tabpane" id="patients-create-tab">
+          <div class="card">
+            <div class="card-head"><h2>Crear paciente</h2><span class="badge badge-info">POST /api/v1/patients</span></div>
+            <div class="form-grid">
+              <div class="field"><label>Nombre(s)</label><input id="p-first-name" value="María" placeholder="Nombre(s)"></div>
+              <div class="field"><label>Apellido(s)</label><input id="p-last-name" value="González" placeholder="Apellido(s)"></div>
+              <div class="field"><label>Fecha de nacimiento</label><input type="date" id="p-birth" value="1948-06-15"></div>
+              <div class="field"><label>Sexo</label>
+                <select id="p-sex"><option value="female">female</option><option value="male">male</option><option value="other">other</option></select>
+              </div>
+              <div class="field"><label>Condiciones (separadas por coma)</label><input id="p-conditions" value="hipertension,diabetes_tipo_2" placeholder="hipertension,diabetes_tipo_2"></div>
+            </div>
+            <div class="btn-group"><button class="btn btn-primary" onclick="createPatient()">Crear paciente</button></div>
+          </div>
+          <div class="response-area empty" id="patients-create-response"></div>
+        </div>
+
+        <div class="tabpane" id="patients-members-tab">
+          <div class="card">
+            <div class="card-head"><h2>Miembros del paciente</h2><span class="badge badge-info">GET /api/v1/patients/{id}/members</span></div>
+            <div class="form-grid">
+              <div class="field"><label>Patient ID</label><input id="members-pid" placeholder="uuid del paciente"></div>
+            </div>
+            <div class="btn-group"><button class="btn btn-primary btn-sm" onclick="loadMembers()">Cargar miembros</button></div>
+          </div>
+          <div id="members-container"></div>
+          <div class="response-area empty" id="members-response"></div>
+        </div>
+
+        <div class="tabpane" id="patients-invite-tab">
+          <div class="card">
+            <div class="card-head"><h2>Crear invitación</h2><span class="badge badge-info">POST /api/v1/patients/{id}/invitations</span></div>
+            <div class="form-grid">
+              <div class="field"><label>Patient ID</label><input id="invite-pid" placeholder="uuid del paciente"></div>
+              <div class="field"><label>Rol</label>
+                <select id="invite-role"><option value="family">family</option><option value="caregiver">caregiver</option><option value="doctor">doctor</option><option value="elder">elder</option></select>
+              </div>
+              <div class="field"><label>Email (opcional)</label><input type="email" id="invite-email" placeholder="correo@ejemplo.com"></div>
+            </div>
+            <div class="btn-group"><button class="btn btn-primary" onclick="createInvitation()">Generar invitación</button></div>
+          </div>
+          <div class="response-area empty" id="invite-response"></div>
+        </div>
+
+        <div class="tabpane" id="patients-wearable-tab">
+          <div class="card">
+            <div class="card-head"><h2>Vincular wearable</h2><span class="badge badge-info">POST /api/v1/patients/{id}/wearable</span></div>
+            <div class="form-grid">
+              <div class="field"><label>Patient ID</label><input id="wear-pid" placeholder="uuid del paciente"></div>
+              <div class="field"><label>Serial</label><input id="wear-serial" value="SIM-000002" placeholder="SIM-000001"></div>
+              <div class="field"><label>Modelo</label><input id="wear-model" value="AgeCare Band v1" placeholder="AgeCare Band v1"></div>
+            </div>
+            <div class="btn-group">
+              <button class="btn btn-primary" onclick="linkWearable()">Vincular</button>
+              <button class="btn btn-secondary" onclick="wearableStatus()">Ver estado</button>
+            </div>
+          </div>
+          <div class="response-area empty" id="wearable-response"></div>
+        </div>
+      </div>
+
+      <!-- ===== ALERTS ===== -->
+      <div class="tabpane" id="page-alerts">
+        <div class="main-header">
+          <div><h1>Centro de alertas</h1><div class="sub">Todas las alertas de tus pacientes</div></div>
+          <div class="header-actions"><button class="btn btn-primary btn-sm" onclick="loadAlerts()">🔄 Cargar</button></div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab active" onclick="switchTab(this,'alerts-list-tab');filterAlerts('active')">🔴 Activas</div>
+          <div class="tab" onclick="switchTab(this,'alerts-ack-tab');filterAlerts('acknowledged')">🟡 Atendidas</div>
+          <div class="tab" onclick="switchTab(this,'alerts-resolved-tab');filterAlerts('resolved')">🟢 Resueltas</div>
+          <div class="tab" onclick="switchTab(this,'alerts-all-tab');filterAlerts('all')">📋 Todas</div>
+          <div class="tab" onclick="switchTab(this,'alerts-action-tab')">⚡ Acciones</div>
+        </div>
+
+        <div class="tabpane active" id="alerts-list-tab">
+          <div id="alerts-container"><div class="faint">Presiona Cargar para ver alertas.</div></div>
+          <div class="response-area empty" id="alerts-response"></div>
+        </div>
+        <div class="tabpane" id="alerts-ack-tab">
+          <div id="alerts-ack-container"><div class="faint">Cargando…</div></div>
+        </div>
+        <div class="tabpane" id="alerts-resolved-tab">
+          <div id="alerts-resolved-container"><div class="faint">Cargando…</div></div>
+        </div>
+        <div class="tabpane" id="alerts-all-tab">
+          <div id="alerts-all-container"><div class="faint">Cargando…</div></div>
+        </div>
+
+        <div class="tabpane" id="alerts-action-tab">
+          <div class="card">
+            <div class="card-head"><h2>Acciones sobre alerta</h2></div>
+            <div class="form-grid">
+              <div class="field"><label>Alert ID</label><input id="alert-action-id" placeholder="uuid de la alerta"></div>
+              <div class="field"><label>Nota de resolución (opcional)</label><input id="alert-note" placeholder="Nota…"></div>
+            </div>
+            <div class="btn-group">
+              <button class="btn btn-warn" onclick="acknowledgeAlert()">Marcar atendida (9.2)</button>
+              <button class="btn btn-ok" onclick="resolveAlert()">Resolver (9.3)</button>
+            </div>
+          </div>
+          <div class="response-area empty" id="alert-action-response"></div>
+        </div>
+      </div>
+
+      <!-- ===== SUMMARY ===== -->
+      <div class="tabpane" id="page-summary">
+        <div class="main-header">
+          <div><h1>Resumen del día</h1><div class="sub" id="summary-patient-name">Selecciona un paciente</div></div>
+          <div class="header-actions"><button class="btn btn-primary btn-sm" onclick="loadSummary()">🔄 Cargar</button></div>
+        </div>
+
+        <div id="summary-semaforo" class="card" style="text-align:center;padding:24px;">
+          <div style="font-size:48px;" id="semaforo-icon">⏳</div>
+          <div style="font-size:20px;font-weight:800;margin-top:8px;" id="semaforo-text">—</div>
+          <div style="font-size:13px;color:var(--ink-soft);margin-top:6px;" id="semaforo-reasons">Presiona Cargar</div>
+        </div>
+
+        <div class="section-label">Vitales más recientes</div>
+        <div class="vital-grid" id="summary-vitals"></div>
+
+        <div class="section-label">Medicamentos hoy</div>
+        <div id="summary-meds" class="card"></div>
+
+        <div class="section-label">Alertas activas</div>
+        <div id="summary-alerts" class="card"></div>
+
+        <div class="response-area empty" id="summary-response"></div>
+      </div>
+
+      <!-- ===== VITALS ===== -->
+      <div class="tabpane" id="page-vitals">
+        <div class="main-header">
+          <div><h1>Vitales</h1><div class="sub">Lecturas y series históricas</div></div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab active" onclick="switchTab(this,'vitals-latest-tab')">📍 Últimos</div>
+          <div class="tab" onclick="switchTab(this,'vitals-series-tab')">📈 Serie</div>
+          <div class="tab" onclick="switchTab(this,'vitals-manual-tab')">✍️ Manual</div>
+          <div class="tab" onclick="switchTab(this,'vitals-batch-tab')">📦 Lote</div>
+          <div class="tab" onclick="switchTab(this,'vitals-thresholds-tab')">⚙️ Umbrales</div>
+        </div>
+
+        <div class="tabpane active" id="vitals-latest-tab">
+          <div class="btn-group" style="margin-bottom:14px;"><button class="btn btn-primary btn-sm" onclick="loadLatestVitals()">Cargar últimos vitales</button></div>
+          <div class="vital-grid" id="vitals-latest-grid"></div>
+          <div class="response-area empty" id="vitals-latest-response"></div>
+        </div>
+
+        <div class="tabpane" id="vitals-series-tab">
+          <div class="card">
+            <div class="card-head"><h2>Serie histórica</h2><span class="badge badge-info">GET /vitals?type=…</span></div>
+            <div class="form-grid">
+              <div class="field"><label>Tipo</label>
+                <select id="series-type">
+                  <option value="heart_rate">heart_rate</option>
+                  <option value="spo2">spo2</option>
+                  <option value="steps">steps</option>
+                  <option value="sleep">sleep</option>
+                  <option value="blood_pressure">blood_pressure</option>
+                  <option value="temperature">temperature</option>
+                  <option value="glucose">glucose</option>
+                </select>
+              </div>
+              <div class="field"><label>Desde</label><input type="date" id="series-from"></div>
+              <div class="field"><label>Hasta</label><input type="date" id="series-to"></div>
+              <div class="field"><label>Granularidad</label>
+                <select id="series-gran">
+                  <option value="day">day</option>
+                  <option value="hour">hour</option>
+                  <option value="week">week</option>
+                  <option value="raw">raw</option>
+                </select>
+              </div>
+            </div>
+            <div class="btn-group"><button class="btn btn-primary" onclick="loadSeries()">Consultar serie</button></div>
+          </div>
+          <div class="response-area empty" id="vitals-series-response"></div>
+        </div>
+
+        <div class="tabpane" id="vitals-manual-tab">
+          <div class="card">
+            <div class="card-head"><h2>Registrar vital manual</h2><span class="badge badge-info">POST /vitals/manual</span></div>
+            <div class="tag-input" style="margin-bottom:12px;">⚠️ Solo para cuidadoras (role=caregiver). Javier (familiar) recibirá 403.</div>
+            <div class="form-grid">
+              <div class="field"><label>Tipo</label>
+                <select id="manual-type">
+                  <option value="heart_rate">heart_rate</option>
+                  <option value="spo2">spo2</option>
+                  <option value="blood_pressure">blood_pressure</option>
+                  <option value="temperature">temperature</option>
+                  <option value="glucose">glucose</option>
+                </select>
+              </div>
+              <div class="field"><label>Valor</label><input type="number" id="manual-value" value="72" step="0.1"></div>
+              <div class="field"><label>Valor secundario (solo blood_pressure)</label><input type="number" id="manual-value2" placeholder="80" step="0.1"></div>
+              <div class="field"><label>Nota</label><input id="manual-note" placeholder="Nota opcional…"></div>
+            </div>
+            <div class="btn-group"><button class="btn btn-primary" onclick="ingestManual()">Registrar</button></div>
+          </div>
+          <div class="response-area empty" id="vitals-manual-response"></div>
+        </div>
+
+        <div class="tabpane" id="vitals-batch-tab">
+          <div class="card">
+            <div class="card-head"><h2>Ingesta por lote (wearable)</h2><span class="badge badge-info">POST /vitals/batch</span></div>
+            <div class="muted" style="margin-bottom:12px;">Envía 3 lecturas de frecuencia cardíaca simuladas.</div>
+            <div class="btn-group"><button class="btn btn-primary" onclick="ingestBatch()">Enviar lote simulado</button></div>
+          </div>
+          <div class="response-area empty" id="vitals-batch-response"></div>
+        </div>
+
+        <div class="tabpane" id="vitals-thresholds-tab">
+          <div class="card">
+            <div class="card-head"><h2>Umbrales</h2><span class="badge badge-info">GET + PUT</span></div>
+            <div class="btn-group" style="margin-bottom:14px;"><button class="btn btn-secondary btn-sm" onclick="loadThresholds()">Cargar umbrales actuales</button></div>
+            <div id="thresholds-container"></div>
+            <div class="sep"></div>
+            <div class="section-label">Actualizar umbral</div>
+            <div class="form-grid">
+              <div class="field"><label>Tipo</label>
+                <select id="thr-type">
+                  <option value="heart_rate">heart_rate</option>
+                  <option value="spo2">spo2</option>
+                  <option value="steps">steps</option>
+                  <option value="sleep">sleep</option>
+                </select>
+              </div>
+              <div class="field"><label>Mínimo</label><input type="number" id="thr-min" placeholder="50"></div>
+              <div class="field"><label>Máximo</label><input type="number" id="thr-max" placeholder="110"></div>
+            </div>
+            <div class="btn-group"><button class="btn btn-warn" onclick="setThreshold()">Actualizar umbral (PUT)</button></div>
+          </div>
+          <div class="response-area empty" id="thresholds-response"></div>
+        </div>
+      </div>
+
+      <!-- ===== MEDICATIONS ===== -->
+      <div class="tabpane" id="page-medications">
+        <div class="main-header">
+          <div><h1>Medicamentos</h1><div class="sub">Plan y adherencia</div></div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab active" onclick="switchTab(this,'meds-list-tab')">💊 Plan</div>
+          <div class="tab" onclick="switchTab(this,'meds-doses-tab')">📅 Dosis del día</div>
+          <div class="tab" onclick="switchTab(this,'meds-adherence-tab')">📊 Adherencia</div>
+          <div class="tab" onclick="switchTab(this,'meds-create-tab')">➕ Crear</div>
+        </div>
+
+        <div class="tabpane active" id="meds-list-tab">
+          <div class="btn-group" style="margin-bottom:14px;"><button class="btn btn-primary btn-sm" onclick="loadMedications()">Cargar plan (GET /medications)</button></div>
+          <div id="meds-list-container"></div>
+          <div class="response-area empty" id="meds-list-response"></div>
+        </div>
+
+        <div class="tabpane" id="meds-doses-tab">
+          <div class="card">
+            <div class="card-head"><h2>Dosis del día</h2><span class="badge badge-info">GET /doses</span></div>
+            <div class="form-grid">
+              <div class="field"><label>Fecha (vacío = hoy)</label><input type="date" id="doses-date"></div>
+            </div>
+            <div class="btn-group"><button class="btn btn-primary btn-sm" onclick="loadDoses()">Cargar dosis</button></div>
+          </div>
+          <div id="doses-container"></div>
+          <div class="sep"></div>
+          <div class="section-label">Registrar administración</div>
+          <div class="card">
+            <div class="tag-input" style="margin-bottom:12px;">⚠️ Registrar dosis requiere role=caregiver.</div>
+            <div class="form-grid">
+              <div class="field"><label>Dose ID</label><input id="dose-log-id" placeholder="uuid de la dosis"></div>
+              <div class="field"><label>Estado</label>
+                <select id="dose-log-status">
+                  <option value="taken">taken</option>
+                  <option value="missed">missed</option>
+                  <option value="postponed">postponed</option>
+                </select>
+              </div>
+              <div class="field"><label>Motivo (requerido para missed)</label><input id="dose-log-reason" placeholder="motivo…"></div>
+            </div>
+            <div class="btn-group"><button class="btn btn-warn" onclick="logDose()">Registrar dosis</button></div>
+          </div>
+          <div class="response-area empty" id="doses-response"></div>
+        </div>
+
+        <div class="tabpane" id="meds-adherence-tab">
+          <div class="card">
+            <div class="card-head"><h2>Adherencia</h2><span class="badge badge-info">GET /adherence</span></div>
+            <div class="form-grid">
+              <div class="field"><label>Desde</label><input type="date" id="adh-from"></div>
+              <div class="field"><label>Hasta</label><input type="date" id="adh-to"></div>
+            </div>
+            <div class="btn-group"><button class="btn btn-primary btn-sm" onclick="loadAdherence()">Cargar adherencia</button></div>
+          </div>
+          <div id="adherence-container"></div>
+          <div class="response-area empty" id="adherence-response"></div>
+        </div>
+
+        <div class="tabpane" id="meds-create-tab">
+          <div class="card">
+            <div class="tag-input" style="margin-bottom:12px;">⚠️ Crear medicamentos requiere role=caregiver o doctor.</div>
+            <div class="card-head"><h2>Crear medicamento</h2><span class="badge badge-info">POST /medications</span></div>
+            <div class="form-grid">
+              <div class="field"><label>Nombre</label><input id="med-name" value="Aspirina" placeholder="nombre del medicamento"></div>
+              <div class="field"><label>Dosis</label><input id="med-dose" value="100 mg" placeholder="100 mg"></div>
+              <div class="field"><label>Horarios (JSON)</label><input id="med-times" value='["08:00","20:00"]' placeholder='["08:00"]'></div>
+              <div class="field"><label>Fecha inicio</label><input type="date" id="med-start"></div>
+              <div class="field"><label>Instrucciones</label><input id="med-instructions" placeholder="Con comida…"></div>
+            </div>
+            <div class="btn-group"><button class="btn btn-primary" onclick="createMedication()">Crear medicamento</button></div>
+          </div>
+          <div class="response-area empty" id="meds-create-response"></div>
+        </div>
+      </div>
+
+      <!-- ===== PROFILE ===== -->
+      <div class="tabpane" id="page-profile">
+        <div class="main-header">
+          <div><h1>Mi perfil</h1><div class="sub">Datos de tu cuenta</div></div>
+          <div class="header-actions"><button class="btn btn-primary btn-sm" onclick="loadProfile()">🔄 Cargar</button></div>
+        </div>
+        <div class="card">
+          <div id="profile-data"><div class="faint">Presiona Cargar.</div></div>
+          <div class="sep"></div>
+          <div class="section-label">Actualizar perfil (PATCH /users/me)</div>
+          <div class="form-grid">
+            <div class="field"><label>Nombre(s)</label><input id="patch-first-name" placeholder="Nombre(s)"></div>
+            <div class="field"><label>Apellido(s)</label><input id="patch-last-name" placeholder="Apellido(s)"></div>
+            <div class="field"><label>Teléfono</label><input id="patch-phone" placeholder="+56912345678"></div>
+          </div>
+          <div class="btn-group"><button class="btn btn-primary" onclick="patchProfile()">Guardar cambios</button></div>
+        </div>
+        <div class="response-area empty" id="profile-response"></div>
+      </div>
+
+      <!-- ===== NOTIF SETTINGS ===== -->
+      <div class="tabpane" id="page-notif-settings">
+        <div class="main-header">
+          <div><h1>Notificaciones</h1><div class="sub">Preferencias de alertas</div></div>
+          <div class="header-actions"><button class="btn btn-primary btn-sm" onclick="loadNotifSettings()">🔄 Cargar</button></div>
+        </div>
+        <div id="notif-settings-container" class="card"><div class="faint">Presiona Cargar.</div></div>
+        <div class="response-area empty" id="notif-response"></div>
+      </div>
+
+      <!-- ===== WIREFRAME FAMILIAR ===== -->
+      <div class="tabpane" id="page-wf-familiar">
+        <div class="main-header"><div><h1>Wireframe · Vista Familiar</h1><div class="sub">Diseño navegable</div></div></div>
+        <iframe class="wf-frame" src="Wireframe_Familiar_v1.html" title="Wireframe Familiar"></iframe>
+      </div>
+
+      <!-- ===== WIREFRAME SUITE ===== -->
+      <div class="tabpane" id="page-wf-suite">
+        <div class="main-header"><div><h1>Wireframe · Suite 3 roles</h1><div class="sub">Familiar · Cuidadora · Adulto mayor</div></div></div>
+        <iframe class="wf-frame" src="Wireframe_Suite_v1.html" title="Wireframe Suite"></iframe>
+      </div>
+
+      <!-- ===== AUTH DEBUG ===== -->
+      <div class="tabpane" id="page-auth-debug">
+        <div class="main-header"><div><h1>Auth & Tokens</h1><div class="sub">Debug de sesión</div></div></div>
+
+        <div class="card">
+          <div class="card-head"><h2>Sesión actual</h2></div>
+          <div class="section-label">Access Token (Bearer)</div>
+          <div class="token-box" id="debug-access-token">—<button class="copy-btn" onclick="copyToken('access')">Copiar</button></div>
+          <div class="section-label" style="margin-top:12px;">Refresh Token</div>
+          <div class="token-box" id="debug-refresh-token">—<button class="copy-btn" onclick="copyToken('refresh')">Copiar</button></div>
+          <div class="section-label" style="margin-top:12px;">Usuario actual</div>
+          <pre id="debug-user" style="font-size:12px;color:var(--ink-soft);white-space:pre-wrap;">—</pre>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Rotar token</h2><span class="badge badge-info">POST /auth/refresh</span></div>
+          <div class="btn-group"><button class="btn btn-secondary" onclick="refreshTokens()">Rotar tokens</button></div>
+          <div class="response-area empty" id="refresh-response"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Recuperar contraseña (stub)</h2><span class="badge badge-info">POST /auth/password/recovery</span></div>
+          <div class="form-grid">
+            <div class="field"><label>Email</label><input id="recovery-email" placeholder="correo@ejemplo.com"></div>
+          </div>
+          <div class="btn-group"><button class="btn btn-secondary" onclick="passwordRecovery()">Enviar (siempre 202)</button></div>
+          <div class="response-area empty" id="recovery-response"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>SOS de prueba</h2><span class="badge badge-danger">POST /patients/{id}/sos</span></div>
+          <div class="tag-input" style="margin-bottom:12px;">⚠️ Solo role=caregiver o elder puede disparar SOS.</div>
+          <div class="form-grid">
+            <div class="field"><label>Patient ID</label><input id="sos-pid" placeholder="uuid del paciente"></div>
+            <div class="field"><label>Nota</label><input id="sos-note" placeholder="Descripción de la emergencia…"></div>
+          </div>
+          <div class="btn-group"><button class="btn btn-danger" onclick="triggerSos()">🚨 Disparar SOS</button></div>
+          <div class="response-area empty" id="sos-response"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- JAVASCRIPT                                                    -->
+<!-- ============================================================ -->
+<script>
+const API = 'https://agecare-api.javiercerna.dev';
+let _token = '';
+let _refreshToken = '';
+let _currentUser = null;
+let _activePatientId = '';
+let _currentAlertStatus = 'active';
+
+// ── Storage helpers ──────────────────────────────────────────────
+function saveSession(access, refresh, user) {
+  _token = access;
+  _refreshToken = refresh;
+  _currentUser = user;
+  localStorage.setItem('ac_access', access);
+  localStorage.setItem('ac_refresh', refresh);
+  localStorage.setItem('ac_user', JSON.stringify(user));
+}
+function loadSession() {
+  _token = localStorage.getItem('ac_access') || '';
+  _refreshToken = localStorage.getItem('ac_refresh') || '';
+  const u = localStorage.getItem('ac_user');
+  _currentUser = u ? JSON.parse(u) : null;
+  return !!_token;
+}
+function clearSession() {
+  _token = ''; _refreshToken = ''; _currentUser = null;
+  localStorage.removeItem('ac_access');
+  localStorage.removeItem('ac_refresh');
+  localStorage.removeItem('ac_user');
+}
+
+// ── Fetch wrapper ────────────────────────────────────────────────
+async function api(method, path, body, respEl) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' }
+  };
+  if (_token) opts.headers['Authorization'] = 'Bearer ' + _token;
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const r = await fetch(API + path, opts);
+    let data;
+    const ct = r.headers.get('content-type') || '';
+    if (ct.includes('json')) data = await r.json();
+    else { data = { status: r.status, text: await r.text() }; }
+    if (respEl) showResponse(respEl, data, r.ok);
+    return { ok: r.ok, status: r.status, data };
+  } catch(e) {
+    if (respEl) showResponse(respEl, { error: e.message }, false);
+    return { ok: false, status: 0, data: null };
+  }
+}
+
+function showResponse(elId, data, ok) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.className = 'response-area ' + (ok ? 'ok' : 'err');
+  el.textContent = JSON.stringify(data, null, 2);
+}
+
+// ── UI helpers ───────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.tabpane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const page = document.getElementById('page-' + name);
+  if (page) page.classList.add('active');
+  const nav = document.getElementById('nav-' + name);
+  if (nav) nav.classList.add('active');
+  document.getElementById('mobile-page-title').textContent =
+    nav ? nav.textContent.trim() : name;
+}
+function switchTab(el, paneId) {
+  const parent = el.closest('.tabs').parentElement;
+  parent.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  parent.querySelectorAll('.tabpane').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  const pane = document.getElementById(paneId);
+  if (pane) pane.classList.add('active');
+}
+function setLoading(btnEl, loading) {
+  if (loading) {
+    btnEl._orig = btnEl.innerHTML;
+    btnEl.innerHTML = '<span class="spinner"></span>';
+    btnEl.classList.add('loading');
+  } else {
+    btnEl.innerHTML = btnEl._orig || btnEl.innerHTML;
+    btnEl.classList.remove('loading');
+  }
+}
+function updateSidebarUser() {
+  if (!_currentUser) return;
+  document.getElementById('sb-username').textContent = _currentUser.full_name || '—';
+  document.getElementById('sb-email').textContent = _currentUser.email || '';
+  const role = _currentUser.memberships?.[0]?.role || 'user';
+  document.getElementById('sb-role').textContent = role;
+  // Pre-fill patient IDs if memberships available
+  if (_currentUser.memberships?.length) {
+    const pid = _currentUser.memberships[0].patient_id;
+    _activePatientId = pid;
+    document.getElementById('summary-patient-name').textContent =
+      _currentUser.memberships[0].patient_name || '';
+    ['members-pid','invite-pid','wear-pid','sos-pid'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && !el.value) el.value = pid;
+    });
+  }
+}
+
+// ── AUTH ─────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pw = document.getElementById('login-password').value;
+  const btn = document.getElementById('login-btn');
+  setLoading(btn, true);
+  const res = await api('POST', '/api/v1/auth/login', { email, password: pw }, 'login-response');
+  setLoading(btn, false);
+  if (res.ok && res.data.access_token) {
+    saveSession(res.data.access_token, res.data.refresh_token, res.data.user);
+    enterApp();
+  }
+}
+function loginAs(email) {
+  document.getElementById('login-email').value = email;
+  document.getElementById('login-password').value = 'demo1234';
+  doLogin();
+}
+function enterApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-shell').style.display = 'block';
+  updateSidebarUser();
+  setDefaultDates();
+  loadDashboard();
+}
+async function doLogout() {
+  if (_refreshToken) {
+    await api('POST', '/api/v1/auth/logout', { refresh_token: _refreshToken });
+  }
+  clearSession();
+  document.getElementById('app-shell').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-response').textContent = 'Sesión cerrada.';
+  document.getElementById('login-response').className = 'response-area empty';
+}
+async function refreshTokens() {
+  const res = await api('POST', '/api/v1/auth/refresh', { refresh_token: _refreshToken }, 'refresh-response');
+  if (res.ok) {
+    _token = res.data.access_token;
+    _refreshToken = res.data.refresh_token;
+    localStorage.setItem('ac_access', _token);
+    localStorage.setItem('ac_refresh', _refreshToken);
+    document.getElementById('debug-access-token').childNodes[0].textContent = _token;
+    document.getElementById('debug-refresh-token').childNodes[0].textContent = _refreshToken;
+  }
+}
+async function passwordRecovery() {
+  const email = document.getElementById('recovery-email').value || _currentUser?.email;
+  await api('POST', '/api/v1/auth/password/recovery', { email }, 'recovery-response');
+}
+function copyToken(type) {
+  const t = type === 'access' ? _token : _refreshToken;
+  navigator.clipboard.writeText(t).catch(() => {});
+}
+
+// ── DASHBOARD ────────────────────────────────────────────────────
+async function loadDashboard() {
+  // Patients list
+  const pRes = await api('GET', '/api/v1/patients', null, null);
+  if (pRes.ok) {
+    const items = pRes.data.items || [];
+    document.getElementById('dash-patients-count').textContent = items.length;
+    document.getElementById('dash-patient-badge').textContent = items.length + ' pacientes';
+    const container = document.getElementById('dash-patient-list');
+    if (items.length === 0) {
+      container.innerHTML = '<div class="faint">No tienes pacientes registrados.</div>';
+    } else {
+      container.innerHTML = items.map(p => `
+        <div class="patient-card ${_activePatientId === p.patient_id ? 'selected' : ''}"
+             onclick="selectPatient('${p.patient_id}','${p.full_name}')">
+          <div class="avatar">${p.full_name.charAt(0)}</div>
+          <div>
+            <div class="patient-name">${p.full_name}</div>
+            <div class="patient-meta">Rol: ${p.role}</div>
+          </div>
+          <span class="status-pill status-${p.wellbeing_status}">${statusLabel(p.wellbeing_status)}</span>
+        </div>`).join('');
+      if (!_activePatientId) selectPatient(items[0].patient_id, items[0].full_name);
+    }
+  }
+  // Dashboard API
+  const dRes = await api('GET', '/api/v1/users/me/dashboard', null, 'dash-response');
+  if (dRes.ok) {
+    const items = dRes.data.items || [];
+    const alertsCount = items.reduce((acc, i) => acc + i.active_alerts_count, 0);
+    document.getElementById('dash-alerts-count').textContent = alertsCount;
+    const statuses = items.map(i => i.wellbeing_status);
+    const worst = statuses.includes('attention') ? '🔴 Atención'
+                : statuses.includes('warning')   ? '🟡 Regular'
+                : '🟢 Bien';
+    document.getElementById('dash-wellbeing').textContent = worst;
+  }
+  // Update token debug
+  document.getElementById('debug-access-token').childNodes[0].textContent = _token;
+  document.getElementById('debug-refresh-token').childNodes[0].textContent = _refreshToken;
+  document.getElementById('debug-user').textContent = JSON.stringify(_currentUser, null, 2);
+}
+function selectPatient(pid, name) {
+  _activePatientId = pid;
+  document.getElementById('summary-patient-name').textContent = name;
+  document.querySelectorAll('.patient-card').forEach(c => c.classList.remove('selected'));
+  // pre-fill patient fields
+  ['members-pid','invite-pid','wear-pid','sos-pid'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = pid;
+  });
+  loadDashboard();
+}
+function statusLabel(s) {
+  return s === 'ok' ? '✅ Bien' : s === 'warning' ? '⚠️ Regular' : s === 'attention' ? '🔴 Atención' : s;
+}
+
+// ── PATIENTS ─────────────────────────────────────────────────────
+async function loadPatients() {
+  const res = await api('GET', '/api/v1/patients', null, 'patients-list-response');
+  if (res.ok) {
+    const items = res.data.items || [];
+    const c = document.getElementById('patient-list-container');
+    c.innerHTML = items.length === 0
+      ? '<div class="faint">Sin pacientes.</div>'
+      : items.map(p => `
+          <div class="patient-card" onclick="selectPatient('${p.patient_id}','${p.full_name}')">
+            <div class="avatar">${p.full_name.charAt(0)}</div>
+            <div><div class="patient-name">${p.full_name}</div>
+            <div class="patient-meta">${p.patient_id}</div></div>
+            <span class="status-pill status-${p.wellbeing_status}">${p.role}</span>
+          </div>`).join('');
+  }
+}
+async function createPatient() {
+  const conditions = document.getElementById('p-conditions').value
+    .split(',').map(s => s.trim()).filter(Boolean);
+  await api('POST', '/api/v1/patients', {
+    first_name: document.getElementById('p-first-name').value,
+    last_name:  document.getElementById('p-last-name').value,
+    birth_date: document.getElementById('p-birth').value,
+    sex: document.getElementById('p-sex').value,
+    conditions
+  }, 'patients-create-response');
+}
+async function loadMembers() {
+  const pid = document.getElementById('members-pid').value || _activePatientId;
+  const res = await api('GET', `/api/v1/patients/${pid}/members`, null, 'members-response');
+  if (res.ok) {
+    const {members, pending_invitations} = res.data;
+    document.getElementById('members-container').innerHTML = `
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-head"><h2>Miembros activos</h2></div>
+        <table>
+          <tr><th>Nombre</th><th>Email</th><th>Rol</th></tr>
+          ${(members||[]).map(m=>`<tr><td>${m.full_name}</td><td>${m.email}</td><td>${m.role}</td></tr>`).join('')}
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Invitaciones pendientes</h2></div>
+        <table>
+          <tr><th>Email</th><th>Rol</th><th>Expira</th></tr>
+          ${(pending_invitations||[]).map(i=>`<tr><td>${i.email}</td><td>${i.role}</td><td>${i.expires_at?.slice(0,10)}</td></tr>`).join('')}
+        </table>
+      </div>`;
+  }
+}
+async function createInvitation() {
+  const pid = document.getElementById('invite-pid').value || _activePatientId;
+  const email = document.getElementById('invite-email').value;
+  const body = { role: document.getElementById('invite-role').value };
+  if (email) body.email = email;
+  await api('POST', `/api/v1/patients/${pid}/invitations`, body, 'invite-response');
+}
+async function linkWearable() {
+  const pid = document.getElementById('wear-pid').value || _activePatientId;
+  await api('POST', `/api/v1/patients/${pid}/wearable`, {
+    serial_number: document.getElementById('wear-serial').value,
+    model: document.getElementById('wear-model').value
+  }, 'wearable-response');
+}
+async function wearableStatus() {
+  const pid = document.getElementById('wear-pid').value || _activePatientId;
+  await api('GET', `/api/v1/patients/${pid}/wearable/status`, null, 'wearable-response');
+}
+
+// ── ALERTS ───────────────────────────────────────────────────────
+async function loadAlerts() {
+  filterAlerts(_currentAlertStatus);
+}
+async function filterAlerts(status) {
+  _currentAlertStatus = status;
+  const targetMap = {
+    active: 'alerts-container',
+    acknowledged: 'alerts-ack-container',
+    resolved: 'alerts-resolved-container',
+    all: 'alerts-all-container'
+  };
+  const res = await api('GET', `/api/v1/users/me/alerts?status=${status}&page_size=50`, null, 'alerts-response');
+  if (res.ok) {
+    const container = document.getElementById(targetMap[status] || 'alerts-container');
+    const items = res.data.items || [];
+    if (items.length === 0) {
+      container.innerHTML = '<div class="faint" style="padding:12px;">Sin alertas en este estado.</div>';
+      return;
+    }
+    container.innerHTML = `<div class="card"><div class="faint" style="margin-bottom:10px;">Total: ${res.data.total} · No leídas: ${res.data.unread_count}</div>` +
+      items.map(a => `
+        <div class="alert-item">
+          <div class="alert-ic sev-${a.severity}">${alertIcon(a.type)}</div>
+          <div style="flex:1">
+            <div class="alert-title">${a.title}</div>
+            <div class="alert-sub">${a.detail || ''}</div>
+            <div class="alert-time">${a.patient_name} · ${a.type} · ${a.status} · ${a.created_at?.slice(0,16)}</div>
+            <div style="margin-top:6px;font-size:11px;color:var(--ink-faint);font-family:monospace;">${a.alert_id}</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="fillAlertId('${a.alert_id}')">Seleccionar</button>
+        </div>`).join('') + '</div>';
+  }
+}
+function alertIcon(type) {
+  return {fall:'⚡',vital_out_of_range:'📈',missed_dose:'💊',sos:'🚨',wearable_offline:'📡'}[type] || '🔔';
+}
+function fillAlertId(id) {
+  document.getElementById('alert-action-id').value = id;
+  showPage('alerts');
+  // Switch to actions tab
+  const tabs = document.querySelectorAll('#page-alerts .tab');
+  tabs.forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#page-alerts .tabpane').forEach(p => p.classList.remove('active'));
+  if (tabs[4]) tabs[4].classList.add('active');
+  document.getElementById('alerts-action-tab').classList.add('active');
+}
+async function acknowledgeAlert() {
+  const id = document.getElementById('alert-action-id').value.trim();
+  if (!id) return alert('Ingresa un Alert ID');
+  await api('POST', `/api/v1/alerts/${id}/acknowledge`, {}, 'alert-action-response');
+}
+async function resolveAlert() {
+  const id = document.getElementById('alert-action-id').value.trim();
+  if (!id) return alert('Ingresa un Alert ID');
+  await api('POST', `/api/v1/alerts/${id}/resolve`,
+    { resolution_note: document.getElementById('alert-note').value || null },
+    'alert-action-response');
+}
+
+// ── SUMMARY ──────────────────────────────────────────────────────
+async function loadSummary() {
+  const pid = _activePatientId;
+  if (!pid) { alert('Selecciona un paciente primero'); return; }
+  const res = await api('GET', `/api/v1/patients/${pid}/summary/today`, null, 'summary-response');
+  if (!res.ok) return;
+  const d = res.data;
+  // Semaforo
+  const icons = { ok:'🟢', warning:'🟡', attention:'🔴' };
+  const labels = { ok:'Bien', warning:'Regular', attention:'Requiere atención' };
+  document.getElementById('semaforo-icon').textContent = icons[d.wellbeing_status] || '⏳';
+  document.getElementById('semaforo-text').textContent = labels[d.wellbeing_status] || d.wellbeing_status;
+  document.getElementById('semaforo-reasons').textContent =
+    d.status_reasons?.join(' · ') || 'Sin alertas activas';
+  // Vitals
+  const vg = document.getElementById('summary-vitals');
+  vg.innerHTML = (d.latest_vitals || []).map(v => `
+    <div class="vital-card ${v.in_range ? 'ok-card' : 'warn-card'}">
+      <div class="name">${v.type}</div>
+      <div class="val">${v.value} <small>${v.unit}</small></div>
+      <div class="in-range" style="color:${v.in_range?'var(--ok)':'var(--warn)'}">${v.in_range?'✅ En rango':'⚠️ Fuera de rango'}</div>
+    </div>`).join('') || '<div class="faint">Sin lecturas</div>';
+  // Meds
+  const m = d.medications_today;
+  document.getElementById('summary-meds').innerHTML = `
+    <div class="row" style="gap:20px;flex-wrap:wrap;">
+      <div><div style="font-size:22px;font-weight:800;">${m.taken}</div><div class="faint">tomadas</div></div>
+      <div><div style="font-size:22px;font-weight:800;color:var(--danger);">${m.missed}</div><div class="faint">omitidas</div></div>
+      <div><div style="font-size:22px;font-weight:800;color:var(--warn);">${m.pending}</div><div class="faint">pendientes</div></div>
+    </div>
+    ${m.next_dose ? `<div class="faint" style="margin-top:10px;">Próxima dosis: ${m.next_dose.slice(11,16)}</div>` : ''}`;
+  // Active alerts
+  const al = document.getElementById('summary-alerts');
+  if (!d.active_alerts || d.active_alerts.length === 0) {
+    al.innerHTML = '<div class="faint">Sin alertas activas 🎉</div>';
+  } else {
+    al.innerHTML = d.active_alerts.map(a => `
+      <div class="alert-item">
+        <div class="alert-ic sev-${a.severity}">${alertIcon(a.type)}</div>
+        <div><div class="alert-title">${a.title}</div>
+        <div class="alert-sub">${a.detail||''}</div></div>
+      </div>`).join('');
+  }
+}
+
+// ── VITALS ───────────────────────────────────────────────────────
+async function loadLatestVitals() {
+  const pid = _activePatientId;
+  if (!pid) { alert('Selecciona un paciente'); return; }
+  const res = await api('GET', `/api/v1/patients/${pid}/vitals/latest`, null, 'vitals-latest-response');
+  if (res.ok) {
+    const grid = document.getElementById('vitals-latest-grid');
+    const items = res.data.items || [];
+    grid.innerHTML = items.map(v => `
+      <div class="vital-card ${v.in_range ? '' : 'warn-card'}">
+        <div class="name">${v.type}</div>
+        <div class="val">${v.value} <small>${v.unit}</small></div>
+        <div class="faint">${v.measured_at?.slice(0,16)}</div>
+        <div class="in-range" style="color:${v.in_range?'var(--ok)':'var(--warn)'};font-size:11px;">${v.in_range?'✅':'⚠️'} ${v.in_range?'en rango':'fuera de rango'}</div>
+      </div>`).join('') || '<div class="faint">Sin lecturas disponibles</div>';
+  }
+}
+async function loadSeries() {
+  const pid = _activePatientId;
+  if (!pid) { alert('Selecciona un paciente'); return; }
+  const type = document.getElementById('series-type').value;
+  const from = document.getElementById('series-from').value;
+  const to   = document.getElementById('series-to').value;
+  const gran = document.getElementById('series-gran').value;
+  await api('GET',
+    `/api/v1/patients/${pid}/vitals?type=${type}&date_from=${from}&date_to=${to}&granularity=${gran}`,
+    null, 'vitals-series-response');
+}
+async function ingestManual() {
+  const pid = _activePatientId;
+  if (!pid) { alert('Selecciona un paciente'); return; }
+  const type = document.getElementById('manual-type').value;
+  const body = {
+    type,
+    value: parseFloat(document.getElementById('manual-value').value),
+    note: document.getElementById('manual-note').value || null
+  };
+  const v2 = document.getElementById('manual-value2').value;
+  if (v2 && type === 'blood_pressure') body.value_secondary = parseFloat(v2);
+  await api('POST', `/api/v1/patients/${pid}/vitals/manual`, body, 'vitals-manual-response');
+}
+async function ingestBatch() {
+  const pid = _activePatientId;
+  if (!pid) { alert('Selecciona un paciente'); return; }
+  const now = new Date();
+  const readings = [1,2,3].map(i => ({
+    type: 'heart_rate',
+    value: 65 + Math.round(Math.random()*15),
+    measured_at: new Date(now - i*300000).toISOString()
+  }));
+  await api('POST', `/api/v1/patients/${pid}/vitals/batch`, { readings }, 'vitals-batch-response');
+}
+async function loadThresholds() {
+  const pid = _activePatientId;
+  if (!pid) { alert('Selecciona un paciente'); return; }
+  const res = await api('GET', `/api/v1/patients/${pid}/vitals/thresholds`, null, 'thresholds-response');
+  if (res.ok) {
+    const items = res.data.items || [];
+    document.getElementById('thresholds-container').innerHTML = `
+      <table><tr><th>Tipo</th><th>Mínimo</th><th>Máximo</th><th>Actualizado</th></tr>
+      ${items.map(t=>`<tr><td><strong>${t.type}</strong></td><td>${t.min_value ?? '—'}</td><td>${t.max_value ?? '—'}</td><td>${t.updated_at?.slice(0,10)||'—'}</td></tr>`).join('')}
+      </table>`;
+  }
+}
+async function setThreshold() {
+  const pid = _activePatientId;
+  if (!pid) { alert('Selecciona un paciente'); return; }
+  const type = document.getElementById('thr-type').value;
+  const body = {};
+  const minV = document.getElementById('thr-min').value;
+  const maxV = document.getElementById('thr-max').value;
+  if (minV) body.min_value = parseFloat(minV);
+  if (maxV) body.max_value = parseFloat(maxV);
+  await api('PUT', `/api/v1/patients/${pid}/vitals/thresholds/${type}`, body, 'thresholds-response');
+}
+
+// ── MEDICATIONS ──────────────────────────────────────────────────
+async function loadMedications() {
+  const pid = _activePatientId;
+  if (!pid) { alert('Selecciona un paciente'); return; }
+  const res = await api('GET', `/api/v1/patients/${pid}/medications`, null, 'meds-list-response');
+  if (res.ok) {
+    const items = res.data.items || [];
+    document.getElementById('meds-list-container').innerHTML = items.length === 0
+      ? '<div class="faint">Sin medicamentos activos.</div>'
+      : `<table>
+          <tr><th>Nombre</th><th>Dosis</th><th>Horarios</th><th>Activo</th></tr>
+          ${items.map(m=>`<tr>
+            <td><strong>${m.name}</strong></td>
+            <td>${m.dose}</td>
+            <td>${(m.times||[]).join(', ')}</td>
+            <td>${m.is_active ? '✅' : '❌'}</td>
+          </tr>`).join('')}
+        </table>`;
+  }
+}
+async function loadDoses() {
+  const pid = _activePatientId;
+  if (!pid) { alert('Selecciona un paciente'); return; }
+  const date = document.getElementById('doses-date').value;
+  const url = date
+    ? `/api/v1/patients/${pid}/doses?date=${date}`
+    : `/api/v1/patients/${pid}/doses`;
+  const res = await api('GET', url, null, 'doses-response');
+  if (res.ok) {
+    const items = res.data.items || [];
+    document.getElementById('doses-container').innerHTML = items.length === 0
+      ? '<div class="faint" style="padding:12px;">Sin dosis para esta fecha.</div>'
+      : `<div class="card"><table>
+          <tr><th>Medicamento</th><th>Dosis</th><th>Hora</th><th>Estado</th><th>ID</th></tr>
+          ${items.map(d=>`<tr>
+            <td>${d.medication_name}</td>
+            <td>${d.dose}</td>
+            <td>${d.scheduled_at?.slice(11,16)}</td>
+            <td>${doseStatusBadge(d.status)}</td>
+            <td><button class="btn btn-secondary btn-sm" style="font-size:10px;" onclick="document.getElementById('dose-log-id').value='${d.dose_id}'"
+              title="${d.dose_id}">Seleccionar</button></td>
+          </tr>`).join('')}
+        </table></div>`;
+  }
+}
+function doseStatusBadge(s) {
+  const m = {taken:'✅ Tomada',missed:'❌ Omitida',pending:'⏳ Pendiente',skipped:'⏭️ Saltada',postponed:'⏸️ Pospuesta'};
+  return m[s] || s;
+}
+async function logDose() {
+  const doseId = document.getElementById('dose-log-id').value.trim();
+  if (!doseId) { alert('Selecciona una dosis primero'); return; }
+  const status = document.getElementById('dose-log-status').value;
+  const body = { status, reason: document.getElementById('dose-log-reason').value || null };
+  await api('POST', `/api/v1/doses/${doseId}/log`, body, 'doses-response');
+}
+async function loadAdherence() {
+  const pid = _activePatientId;
+  if (!pid) { alert('Selecciona un paciente'); return; }
+  const from = document.getElementById('adh-from').value;
+  const to   = document.getElementById('adh-to').value;
+  const res = await api('GET',
+    `/api/v1/patients/${pid}/adherence?date_from=${from}&date_to=${to}`,
+    null, 'adherence-response');
+  if (res.ok) {
+    const d = res.data;
+    document.getElementById('adherence-container').innerHTML = `
+      <div class="dash-grid" style="margin-bottom:16px;">
+        <div class="dash-tile"><div class="lbl">Adherencia global</div><div class="val">${d.adherence_pct}%</div></div>
+        <div class="dash-tile"><div class="lbl">Tomadas</div><div class="val" style="color:var(--ok);">${d.taken}</div></div>
+        <div class="dash-tile"><div class="lbl">Omitidas</div><div class="val" style="color:var(--danger);">${d.missed}</div></div>
+      </div>`;
+  }
+}
+async function createMedication() {
+  const pid = _activePatientId;
+  if (!pid) { alert('Selecciona un paciente'); return; }
+  let times;
+  try { times = JSON.parse(document.getElementById('med-times').value); }
+  catch { times = ['08:00']; }
+  await api('POST', `/api/v1/patients/${pid}/medications`, {
+    name: document.getElementById('med-name').value,
+    dose: document.getElementById('med-dose').value,
+    times,
+    start_date: document.getElementById('med-start').value,
+    instructions: document.getElementById('med-instructions').value || null
+  }, 'meds-create-response');
+}
+
+// ── PROFILE ──────────────────────────────────────────────────────
+async function loadProfile() {
+  const res = await api('GET', '/api/v1/users/me', null, 'profile-response');
+  if (res.ok) {
+    const u = res.data;
+    document.getElementById('profile-data').innerHTML = `
+      <div class="form-grid">
+        <div class="field"><label>Nombre</label><input value="${u.full_name||''}" disabled></div>
+        <div class="field"><label>Email</label><input value="${u.email||''}" disabled></div>
+        <div class="field"><label>Teléfono</label><input value="${u.phone||'—'}" disabled></div>
+        <div class="field"><label>Idioma</label><input value="${u.locale||'es'}" disabled></div>
+      </div>
+      <div class="section-label">Membresías</div>
+      <table>
+        <tr><th>Paciente</th><th>Rol</th><th>ID Paciente</th></tr>
+        ${(u.memberships||[]).map(m=>`<tr><td>${m.patient_name}</td><td>${m.role}</td><td style="font-size:10px;font-family:monospace;">${m.patient_id}</td></tr>`).join('')}
+      </table>`;
+    document.getElementById('patch-first-name').value = u.first_name || '';
+    document.getElementById('patch-last-name').value  = u.last_name  || '';
+    document.getElementById('patch-phone').value = u.phone || '';
+  }
+}
+async function patchProfile() {
+  const body = {};
+  const firstName = document.getElementById('patch-first-name')?.value;
+  const lastName  = document.getElementById('patch-last-name')?.value;
+  const phone = document.getElementById('patch-phone').value;
+  if (firstName) body.first_name = firstName;
+  if (lastName)  body.last_name  = lastName;
+  if (phone) body.phone = phone;
+  const res = await api('PATCH', '/api/v1/users/me', body, 'profile-response');
+  if (res.ok) { _currentUser = res.data; updateSidebarUser(); }
+}
+
+// ── NOTIF SETTINGS ───────────────────────────────────────────────
+async function loadNotifSettings() {
+  const res = await api('GET', '/api/v1/users/me/notification-settings', null, 'notif-response');
+  if (res.ok) {
+    const items = res.data.items || [];
+    document.getElementById('notif-settings-container').innerHTML =
+      '<div class="card-head"><h2>Preferencias</h2><span class="badge badge-info">GET + PUT</span></div>' +
+      items.map(i => `
+        <div class="row" style="padding:10px 0;border-bottom:1px solid var(--line);justify-content:space-between;">
+          <div>
+            <div style="font-size:13px;font-weight:600;">${i.alert_type}</div>
+            ${i.is_locked ? '<div class="faint">🔒 No se puede desactivar</div>' : ''}
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:${i.is_locked?'not-allowed':'pointer'}">
+            <input type="checkbox" ${i.push_enabled?'checked':''} ${i.is_locked?'disabled':''}
+              onchange="saveNotifSetting('${i.alert_type}',this.checked)">
+            <span style="font-size:13px;">${i.push_enabled ? '🔔 Activado' : '🔕 Desactivado'}</span>
+          </label>
+        </div>`).join('');
+  }
+}
+async function saveNotifSetting(type, enabled) {
+  const res = await api('PUT', '/api/v1/users/me/notification-settings',
+    { items: [{ alert_type: type, push_enabled: enabled }] }, 'notif-response');
+  if (!res.ok) loadNotifSettings(); // revert
+}
+
+// ── SOS ──────────────────────────────────────────────────────────
+async function triggerSos() {
+  const pid = document.getElementById('sos-pid').value || _activePatientId;
+  if (!pid) { alert('Ingresa un patient ID'); return; }
+  if (!confirm('¿Confirmas disparar una alerta SOS? Esto crea una alerta crítica en la BD.')) return;
+  await api('POST', `/api/v1/patients/${pid}/sos`,
+    { note: document.getElementById('sos-note').value || null }, 'sos-response');
+}
+
+// ── Utils ────────────────────────────────────────────────────────
+function setDefaultDates() {
+  const today = new Date().toISOString().slice(0,10);
+  const week  = new Date(Date.now() - 7*864e5).toISOString().slice(0,10);
+  const month = new Date(Date.now() - 30*864e5).toISOString().slice(0,10);
+  ['series-from','adh-from'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.value) el.value = month;
+  });
+  ['series-to','adh-to'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.value) el.value = today;
+  });
+  const ms = document.getElementById('med-start');
+  if (ms && !ms.value) ms.value = today;
+}
+
+// ── Boot ─────────────────────────────────────────────────────────
+(function init() {
+  if (loadSession()) {
+    enterApp();
+  }
+})();
+</script>
+</body>
+</html>

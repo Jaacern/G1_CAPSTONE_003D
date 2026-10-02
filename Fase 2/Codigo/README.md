@@ -195,7 +195,7 @@ Flujo de prueba:
 # 1. Login (guarda el token)
 TOKEN=$(curl -s -X POST http://127.0.0.1:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"juan@duocuc.cl","password":"demo1234"}' \
+  -d '{"email":"ja.cernac@duocuc.cl","password":"demo1234"}' \
   | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
 
 # 2. Usar el token en llamadas protegidas
@@ -232,7 +232,7 @@ todos los usuarios de prueba es `demo1234`.**
 
 | Correo               | Rol        | Descripción                          |
 |----------------------|------------|--------------------------------------|
-| `juan@duocuc.cl`     | family     | Familiar administrador (owner)       |
+| `ja.cernac@duocuc.cl` | family     | Familiar administrador (Javier Cerna)|
 | `rosa@cuidados.cl`   | caregiver  | Cuidadora                            |
 
 **Paciente de demostración:** Elena Rosales
@@ -313,7 +313,7 @@ Todas las rutas cuelgan de `/api/v1`.
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"juan@duocuc.cl","password":"demo1234"}'
+  -d '{"email":"ja.cernac@duocuc.cl","password":"demo1234"}'
 ```
 
 ### Módulo 4 — Pacientes y onboarding (`patients`)

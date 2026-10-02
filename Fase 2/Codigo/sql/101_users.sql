@@ -1,23 +1,32 @@
 -- AgeCare — Bloque 1: Identidad y acceso
 
 
+-- AgeCare — Bloque 1: Identidad y acceso
+-- Corrección 2FN: full_name dividido en first_name + last_name (1FN: atomicidad).
+-- full_name se mantiene como columna GENERATED para compatibilidad con la API v1.
+
 CREATE TABLE users(
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    email varchar (254) NOT NULL,
+    id            uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
+    email         varchar(254) NOT NULL,
     password_hash varchar(255) NOT NULL,
-    full_name varchar(120) NOT NULL,
-    phone varchar(16),
-    avatar_url text,
-    locale varchar(5) NOT NULL DEFAULT 'es',
-    is_active boolean NOT NULL DEFAULT true,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_At timestamptz NOT NULL DEFAULT now(),
-    deleted_at timestamptz,
+    first_name    varchar(60)  NOT NULL,
+    last_name     varchar(60)  NOT NULL,
+    -- Columna generada: solo lectura, compatible con la API y búsquedas de texto.
+    full_name     varchar(121) GENERATED ALWAYS AS (first_name || ' ' || last_name) STORED,
+    phone         varchar(16),
+    avatar_url    text,
+    locale        varchar(5)   NOT NULL DEFAULT 'es',
+    is_active     boolean      NOT NULL DEFAULT true,
+    created_at    timestamptz  NOT NULL DEFAULT now(),
+    updated_at    timestamptz  NOT NULL DEFAULT now(),
+    deleted_at    timestamptz,
 
     CONSTRAINT ck_users_locale
         CHECK (locale IN ('es', 'en')),
-        CONSTRAINT ck_users_full_name_min
-            CHECK (char_length(full_name) >= 2)
+    CONSTRAINT ck_users_first_name_min
+        CHECK (char_length(first_name) >= 1),
+    CONSTRAINT ck_users_last_name_min
+        CHECK (char_length(last_name) >= 1)
 );
 
 -- Un mismo correo no puede usarse dos veces, aunque se escriba distinto en mayúsculas.
@@ -26,8 +35,8 @@ CREATE TABLE users(
 CREATE UNIQUE INDEX ux_users_email_lower ON users (lower(email));
 
 
---el update_at se mantiene solo ais cada vez que una fila se actualice, antes de guardarla
---se pondra el update_at en la hora que se actualizo
+-- updated_at se mantiene solo: cada vez que una fila se actualice,
+-- antes de guardarla se pondrá updated_at en la hora de la modificación.
 CREATE TRIGGER tg_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW

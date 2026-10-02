@@ -1,13 +1,9 @@
 """Módulo 5: Vitals y resumen del día / semáforo (endpoints 5.1–5.8).
 
-Alineado con la Especificación de Endpoints v1. Trabaja sobre las tablas
-existentes: vital_readings (particionada por mes), vital_thresholds,
-scheduled_doses y alerts. SQL crudo con text() y SQLAlchemy async, sin ORM.
-
-Notas de alcance para este hito:
-- El motor de alertas es un componente aparte: la ingesta de lecturas NO
-  dispara alertas todavía, por eso alerts_triggered / alert_triggered van en 0.
-- No existe tabla de observaciones aún, por lo que last_observation es null.
+Cambios 2FN aplicados:
+- UNITS dict eliminado: la unidad se lee desde vital_types.unit (fuente única de verdad).
+- scheduled_doses ya no tiene patient_id: las consultas hacen JOIN medications.
+- alerts.update_at → updated_at (typo corregido en BD).
 """
 import json
 import uuid
@@ -27,57 +23,51 @@ router = APIRouter(prefix="/api/v1", tags=["vitals"])
 
 
 # --------------------------------------------------------------------------
-# Enums y constantes
+# Enums
 # --------------------------------------------------------------------------
 class VitalType(str, Enum):
-    heart_rate = "heart_rate"
-    spo2 = "spo2"
-    sleep = "sleep"
-    steps = "steps"
+    heart_rate    = "heart_rate"
+    spo2          = "spo2"
+    sleep         = "sleep"
+    steps         = "steps"
     sedentary_min = "sedentary_min"
-    fall_event = "fall_event"
-    blood_pressure = "blood_pressure"
-    temperature = "temperature"
-    glucose = "glucose"
+    fall_event    = "fall_event"
+    blood_pressure= "blood_pressure"
+    temperature   = "temperature"
+    glucose       = "glucose"
 
 
 class ManualVitalType(str, Enum):
     """Subconjunto de tipos que la cuidadora puede registrar a mano (5.2)."""
-
     blood_pressure = "blood_pressure"
-    temperature = "temperature"
-    glucose = "glucose"
-    heart_rate = "heart_rate"
-    spo2 = "spo2"
+    temperature    = "temperature"
+    glucose        = "glucose"
+    heart_rate     = "heart_rate"
+    spo2           = "spo2"
 
 
 class Granularity(str, Enum):
-    raw = "raw"
+    raw  = "raw"
     hour = "hour"
-    day = "day"
+    day  = "day"
     week = "week"
 
 
-# Unidad de presentación por tipo de signo vital.
-UNITS: dict[str, str] = {
-    "heart_rate": "bpm",
-    "spo2": "%",
-    "sleep": "h",
-    "steps": "pasos",
-    "sedentary_min": "min",
-    "fall_event": "",
-    "blood_pressure": "mmHg",
-    "temperature": "°C",
-    "glucose": "mg/dL",
+# UNITS dict eliminado: la unidad ahora viene de vital_types.unit (tabla catálogo).
+# Se mantiene un fallback en memoria para no romper si la BD no está disponible
+# durante tests unitarios sin BD.
+_UNITS_FALLBACK: dict[str, str] = {
+    "heart_rate": "bpm", "spo2": "%", "sleep": "h", "steps": "pasos",
+    "sedentary_min": "min", "fall_event": "", "blood_pressure": "mmHg",
+    "temperature": "°C", "glucose": "mg/dL",
 }
 
-MAX_BATCH = 500
+MAX_BATCH      = 500
 MAX_RANGE_DAYS = 92
 
-# date_trunc admite estos valores directamente; 'raw' se maneja aparte.
 _TRUNC_UNIT = {
     Granularity.hour: "hour",
-    Granularity.day: "day",
+    Granularity.day:  "day",
     Granularity.week: "week",
 }
 
@@ -191,12 +181,23 @@ class DashboardOut(BaseModel):
 # Helpers
 # --------------------------------------------------------------------------
 def _in_range(value: float, min_value, max_value) -> bool:
-    """True si value está dentro de [min_value, max_value]. Sin umbral -> True."""
     if min_value is not None and value < float(min_value):
         return False
     if max_value is not None and value > float(max_value):
         return False
     return True
+
+
+async def _get_unit(db: AsyncSession, vital_type: str) -> str:
+    """Lee la unidad desde vital_types (catálogo normalizado).
+    Cae al fallback en memoria si la fila no existe."""
+    row = (
+        await db.execute(
+            text("SELECT unit FROM vital_types WHERE code = :code"),
+            {"code": vital_type},
+        )
+    ).first()
+    return row[0] if row else _UNITS_FALLBACK.get(vital_type, "")
 
 
 async def _load_thresholds_map(db: AsyncSession, patient_id: str) -> dict[str, dict]:
@@ -243,7 +244,7 @@ async def _latest_items(db: AsyncSession, patient_id: str) -> list[LatestItem]:
             LatestItem(
                 type=r["type"],
                 value=float(r["value"]),
-                unit=UNITS.get(r["type"], ""),
+                unit=await _get_unit(db, r["type"]),
                 measured_at=r["measured_at"],
                 in_range=in_range,
             )
@@ -279,16 +280,18 @@ async def _active_alerts(db: AsyncSession, patient_id: str) -> list[dict]:
 
 
 async def _medications_today(db: AsyncSession, patient_id: str) -> MedicationsToday:
-    """Conteo de dosis de hoy por estado + próxima dosis pending de hoy."""
+    """Conteo de dosis de hoy por estado + próxima dosis pending.
+    scheduled_doses no tiene patient_id → JOIN medications."""
     counts = (
         await db.execute(
             text(
                 """
-                SELECT status, count(*) AS n
-                FROM scheduled_doses
-                WHERE patient_id = :pid
-                  AND scheduled_at::date = current_date
-                GROUP BY status
+                SELECT sd.status, count(*) AS n
+                FROM scheduled_doses sd
+                JOIN medications m ON m.id = sd.medication_id
+                WHERE m.patient_id = :pid
+                  AND sd.scheduled_at::date = current_date
+                GROUP BY sd.status
                 """
             ),
             {"pid": patient_id},
@@ -300,12 +303,13 @@ async def _medications_today(db: AsyncSession, patient_id: str) -> MedicationsTo
         await db.execute(
             text(
                 """
-                SELECT scheduled_at
-                FROM scheduled_doses
-                WHERE patient_id = :pid
-                  AND status = 'pending'
-                  AND scheduled_at::date = current_date
-                ORDER BY scheduled_at ASC
+                SELECT sd.scheduled_at
+                FROM scheduled_doses sd
+                JOIN medications m ON m.id = sd.medication_id
+                WHERE m.patient_id = :pid
+                  AND sd.status = 'pending'
+                  AND sd.scheduled_at::date = current_date
+                ORDER BY sd.scheduled_at ASC
                 LIMIT 1
                 """
             ),
@@ -559,7 +563,7 @@ async def get_series(
 
     return SeriesOut(
         type=type.value,
-        unit=UNITS.get(type.value, ""),
+        unit=await _get_unit(db, type.value),
         points=points,
         threshold=threshold,
     )

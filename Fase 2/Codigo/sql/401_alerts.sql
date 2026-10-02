@@ -18,7 +18,7 @@ resolved_at timestamptz,
 resolution_note varchar(500),
 escalated_at timestamptz,
 created_at timestamptz NOT NULL DEFAULT now(),
-update_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now(),
 
 CONSTRAINT fk_alerts_patient
     FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
@@ -70,11 +70,13 @@ CREATE TRIGGER tg_alerts_updated_at
 
 COMMENT ON TABLE  alerts IS
     'Alertas generadas por el sistema. Pilar central del producto: caída, vital fuera de rango, dosis no administrada, SOS y wearable sin datos.';
+COMMENT ON COLUMN alerts.updated_at IS
+    'Última modificación. Columna renombrada de update_at (typo corregido): el trigger tg_alerts_updated_at la mantiene actualizada en cada UPDATE.';
 COMMENT ON COLUMN alerts.acknowledged_at IS
     'Momento en que alguien atendió la alerta. NO está en el Anexo A: se agrega porque sin ella es imposible medir el tiempo de respuesta que exigen el ticket AGE-508 y el objetivo específico de Fase 1.';
 COMMENT ON COLUMN alerts.dedup_key IS
     'Identifica la condición que originó la alerta (ej. spo2_low). Permite no repetir alertas por la misma causa dentro de 30 minutos (RF-46, AGE-501). La ventana de tiempo la evalúa el motor; la base aporta el índice.';
 COMMENT ON COLUMN alerts.payload IS
-    'Datos que originaron la alerta: la lectura fuera de rango, la dosis omitida, etc. Sin estructura fija porque varía según el tipo.';
+    'Datos que originaron la alerta (lectura fuera de rango, dosis omitida, etc.). Se mantiene como jsonb de forma INTENCIONAL: la estructura varía según el tipo de alerta (patrón de atributos variables). Normalizarlo exigiría una tabla de detalle por cada tipo, lo que no aporta integridad porque estos datos no se consultan ni se cruzan: solo se muestran al abrir la alerta. Excepción documentada a 1FN.';
 COMMENT ON COLUMN alerts.escalated_at IS
     'Momento en que se escaló a los siguientes contactos por falta de atención (RF-52). NULL = no escalada.';

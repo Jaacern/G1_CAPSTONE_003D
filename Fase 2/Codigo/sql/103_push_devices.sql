@@ -48,3 +48,6 @@ CREATE TRIGGER tg_push_devices_updated_at
     BEFORE UPDATE ON push_devices
     FOR EACH ROW
     EXECUTE FUNCTION set_updated_at();
+
+COMMENT ON COLUMN push_devices.updated_at IS
+    'Última modificación. Trigger tg_push_devices_updated_at agregado en corrección 2FN: faltaba en la versión original.';

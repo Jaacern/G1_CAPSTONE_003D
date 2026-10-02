@@ -44,6 +44,22 @@ services:
     restart: unless-stopped
     networks: [agecare-net]
 
+  cloudflared:
+    image: docker.io/cloudflare/cloudflared:latest
+    container_name: agecare-cloudflared
+    # user root: en Podman rootless equivale a tu usuario del host, así el
+    # contenedor puede LEER el cert.pem y las credenciales (permisos 0400).
+    user: root
+    # Ejecuta el túnel con nombre usando el config.yml y las credenciales
+    # montadas desde ~/.cloudflared del host.
+    command: tunnel --config /home/nonroot/.cloudflared/config.yml run
+    volumes:
+      - ${HOME}/.cloudflared:/home/nonroot/.cloudflared:ro,Z
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks: [agecare-net]
+
   pgadmin:
     image: dpage/pgadmin4:9
     container_name: agecare-pgadmin

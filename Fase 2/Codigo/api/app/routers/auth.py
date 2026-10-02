@@ -100,6 +100,8 @@ async def _load_memberships(db: AsyncSession, user_id: str) -> list[dict]:
 class UserOut(BaseModel):
     user_id: str
     full_name: str
+    first_name: str
+    last_name: str
     email: str
     phone: str | None = None
     avatar_url: str | None = None
@@ -114,7 +116,8 @@ class MembershipOut(BaseModel):
 
 
 class RegisterIn(BaseModel):
-    full_name: str = Field(min_length=2, max_length=120)
+    first_name: str = Field(min_length=1, max_length=60)
+    last_name:  str = Field(min_length=1, max_length=60)
     email: EmailStr
     password: str
     phone: str | None = None
@@ -168,7 +171,8 @@ class ResetIn(BaseModel):
 
 
 class ProfilePatchIn(BaseModel):
-    full_name: str | None = Field(default=None, min_length=2, max_length=120)
+    first_name: str | None = Field(default=None, min_length=1, max_length=60)
+    last_name:  str | None = Field(default=None, min_length=1, max_length=60)
     phone: str | None = None
     avatar_url: str | None = None
     locale: str | None = None
@@ -239,15 +243,16 @@ async def register(payload: RegisterIn, db: AsyncSession = Depends(get_db)):
     await db.execute(
         text(
             """
-            INSERT INTO users (id, email, password_hash, full_name, phone, locale)
-            VALUES (:id, :email, :ph, :fn, :phone, :locale)
+            INSERT INTO users (id, email, password_hash, first_name, last_name, phone, locale)
+            VALUES (:id, :email, :ph, :fn, :ln, :phone, :locale)
             """
         ),
         {
             "id": user_id,
             "email": payload.email,
             "ph": hash_password(payload.password),
-            "fn": payload.full_name,
+            "fn": payload.first_name,
+            "ln": payload.last_name,
             "phone": payload.phone,
             "locale": payload.locale,
         },
@@ -298,7 +303,8 @@ async def login(payload: LoginIn, db: AsyncSession = Depends(get_db)):
         await db.execute(
             text(
                 """
-                SELECT id, email, password_hash, full_name, phone, avatar_url, locale
+                SELECT id, email, password_hash, first_name, last_name, full_name,
+                       phone, avatar_url, locale
                 FROM users
                 WHERE lower(email) = lower(:email)
                   AND is_active = true
@@ -325,6 +331,8 @@ async def login(payload: LoginIn, db: AsyncSession = Depends(get_db)):
         refresh_token=refresh,
         user=UserOut(
             user_id=str(user["id"]),
+            first_name=user["first_name"],
+            last_name=user["last_name"],
             full_name=user["full_name"],
             email=user["email"],
             phone=user["phone"],
@@ -473,7 +481,8 @@ async def get_me(
         await db.execute(
             text(
                 """
-                SELECT id, email, full_name, phone, avatar_url, locale
+                SELECT id, email, first_name, last_name, full_name,
+                       phone, avatar_url, locale
                 FROM users WHERE id = :uid
                 """
             ),
@@ -483,6 +492,8 @@ async def get_me(
     memberships = await _load_memberships(db, user.user_id)
     return UserOut(
         user_id=str(row["id"]),
+        first_name=row["first_name"],
+        last_name=row["last_name"],
         full_name=row["full_name"],
         email=row["email"],
         phone=row["phone"],

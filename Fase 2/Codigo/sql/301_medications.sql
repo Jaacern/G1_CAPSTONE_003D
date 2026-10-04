@@ -9,7 +9,13 @@ CREATE TABLE medications (
     id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     patient_id      uuid        NOT NULL,
     name            varchar(120) NOT NULL,
-    dose            varchar(60)  NOT NULL,
+    -- Análisis de realidad: la dosis es cantidad + unidad, no un texto libre.
+    -- Separarlas permite validar, comparar y (a futuro) calcular equivalencias.
+    -- dose_text queda como presentación generada para la interfaz.
+    dose_amount     numeric(8,2) NOT NULL,
+    dose_unit       varchar(20)  NOT NULL,
+    dose_text       varchar(60)  GENERATED ALWAYS AS
+                        (trim(to_char(dose_amount, 'FM999999990.##')) || ' ' || dose_unit) STORED,
     instructions    text,
     start_date      date         NOT NULL,
     end_date        date,
@@ -28,7 +34,11 @@ CREATE TABLE medications (
     CONSTRAINT ck_medications_grace
         CHECK (grace_window_min BETWEEN 5 AND 720),
     CONSTRAINT ck_medications_name_min
-        CHECK (char_length(name) >= 2)
+        CHECK (char_length(name) >= 2),
+    CONSTRAINT ck_medications_dose_amount
+        CHECK (dose_amount > 0),
+    CONSTRAINT ck_medications_dose_unit
+        CHECK (dose_unit IN ('mg','g','ml','mcg','UI','gotas','comprimido','cápsula','puff','parche'))
 );
 
 -- Plan vigente de un paciente (endpoint 6.2) y el job generador de dosis.
@@ -42,6 +52,12 @@ CREATE TRIGGER tg_medications_updated_at
 
 COMMENT ON TABLE  medications IS
     'Plan de medicamentos: QUÉ se administra y CON QUÉ FRECUENCIA. Las tomas concretas se materializan en scheduled_doses. Los horarios y días viven en medication_times y medication_days (1FN).';
+COMMENT ON COLUMN medications.dose_amount IS
+    'Cantidad numérica de la dosis (p. ej. 50). Separada de la unidad para poder validar y comparar; antes era un varchar "50 mg" no computable.';
+COMMENT ON COLUMN medications.dose_unit IS
+    'Unidad de la dosis: mg | g | ml | mcg | UI | gotas | comprimido | cápsula | puff | parche.';
+COMMENT ON COLUMN medications.dose_text IS
+    'Presentación generada (dose_amount + dose_unit) para la interfaz. Solo lectura.';
 COMMENT ON COLUMN medications.grace_window_min IS
     'Minutos de tolerancia tras la hora programada antes de marcar la dosis como omitida y alertar (Anexo B).';
 COMMENT ON COLUMN medications.prescribed_by IS

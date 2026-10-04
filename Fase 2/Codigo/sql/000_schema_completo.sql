@@ -3,12 +3,9 @@
 -- Proyecto APT - Capstone PTY4614 - DUOC UC
 -- PostgreSQL 16 - Modelo relacional normalizado hasta 2FN
 --
--- Este archivo consolida los 17 scripts de esquema del directorio sql/ en el
--- orden correcto de dependencias de claves foraneas. Equivale a ejecutar los
--- archivos numerados por separado. El seed de demostracion (900_seed_dev.sql)
--- se mantiene aparte y se ejecuta al final si se desea cargar datos de prueba.
---
--- Generado a partir de: 001, 101-106, 200-203, 301-302, 401-405.
+-- Consolida los scripts de esquema del directorio sql/ en orden de
+-- dependencias de claves foraneas. El seed (900_seed_dev.sql) va aparte.
+-- 24 tablas de negocio + funciones y triggers.
 -- ============================================================================
 
 
@@ -471,6 +468,153 @@ COMMENT ON COLUMN invitations.revoked_at IS
 
 
 -- ============================================================================
+-- Fuente: 107_audit_log.sql
+-- ============================================================================
+-- AgeCare — Bloque 1: Identidad y acceso
+-- Tabla transversal: audit_log (depende de users y patients)
+--
+-- Análisis de realidad (RNF-14 "Trazabilidad clínica"):
+--   En un sistema de salud, el dato clínico no basta con guardarse: debe poder
+--   responder QUIÉN hizo QUÉ, SOBRE QUÉ y CUÁNDO, de forma inmutable. Sin esto,
+--   un UPDATE puede alterar una dosis o un umbral sin dejar rastro del valor
+--   anterior, lo que es inaceptable cuando hay responsabilidad sobre un paciente.
+--
+--   Esta tabla es APPEND-ONLY: nunca se actualiza ni se borra. Registra tanto
+--   accesos de lectura a expedientes (RNF-14) como cambios de estado sensibles
+--   (p. ej. registrar/editar una dosis, resolver una alerta). La inmutabilidad
+--   se refuerza con un trigger que bloquea UPDATE y DELETE.
+
+CREATE TABLE audit_log (
+    id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    -- Quién ejecutó la acción. SET NULL si la cuenta se elimina: el hecho
+    -- auditado no desaparece aunque el usuario ya no exista.
+    actor_user_id uuid,
+    -- Acción realizada: verbo normalizado del dominio.
+    action      varchar(40) NOT NULL,
+    -- Entidad afectada (tabla lógica) y su identificador.
+    entity_type varchar(40) NOT NULL,
+    entity_id   uuid,
+    -- Paciente sobre cuyo expediente ocurrió la acción (si aplica), para
+    -- reconstruir "quién accedió al expediente de X".
+    patient_id  uuid,
+    -- Estado anterior y nuevo, para cambios (jsonb de atributos variables:
+    -- aquí el jsonb es intencional, es un registro de auditoría heterogéneo).
+    old_value   jsonb,
+    new_value   jsonb,
+    -- Contexto técnico de la petición.
+    ip_address  inet,
+    user_agent  varchar(300),
+    created_at  timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT fk_audit_log_actor
+        FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT fk_audit_log_patient
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE SET NULL,
+    CONSTRAINT ck_audit_log_action
+        CHECK (action IN (
+            'view_record','create','update','delete',
+            'dose_log','alert_ack','alert_resolve','sos_trigger',
+            'threshold_update','member_add','member_remove','login'
+        ))
+);
+
+-- Reconstruir el historial de acceso a un expediente (RNF-14).
+CREATE INDEX ix_audit_log_patient
+    ON audit_log (patient_id, created_at DESC);
+
+-- Auditar la actividad de un usuario.
+CREATE INDEX ix_audit_log_actor
+    ON audit_log (actor_user_id, created_at DESC);
+
+-- Inmutabilidad: la auditoría no se edita ni se borra.
+CREATE OR REPLACE FUNCTION audit_log_block_mutation()
+RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'audit_log es inmutable: no se permite % ', TG_OP;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER tg_audit_log_no_update
+    BEFORE UPDATE OR DELETE ON audit_log
+    FOR EACH ROW
+    EXECUTE FUNCTION audit_log_block_mutation();
+
+COMMENT ON TABLE  audit_log IS
+    'Registro inmutable (append-only) de accesos y cambios sobre datos clínicos. Cumple RNF-14 (trazabilidad clínica). Un trigger bloquea UPDATE y DELETE: la evidencia de auditoría no se puede alterar.';
+COMMENT ON COLUMN audit_log.actor_user_id IS
+    'Quién ejecutó la acción. ON DELETE SET NULL: el hecho auditado sobrevive a la cuenta.';
+COMMENT ON COLUMN audit_log.action IS
+    'Verbo del dominio: view_record (lectura de expediente), dose_log, alert_ack, etc.';
+COMMENT ON COLUMN audit_log.old_value IS
+    'Estado anterior del recurso en un cambio. jsonb INTENCIONAL: la auditoría registra entidades heterogéneas.';
+COMMENT ON COLUMN audit_log.new_value IS
+    'Estado nuevo del recurso en un cambio.';
+
+
+-- ============================================================================
+-- Fuente: 108_system_parameters.sql
+-- ============================================================================
+-- AgeCare — Bloque 1: Identidad y acceso
+-- Tabla transversal: system_parameters (depende de users para updated_by)
+--
+-- Análisis de realidad:
+--   Varios umbrales de negocio estaban implícitos en el código del worker
+--   (p. ej. "2 horas sin datos del wearable", "30 minutos de deduplicación de
+--   alertas", "4 horas máximo de postergación"). Un parámetro de negocio NO
+--   debe vivir solo en el código: debe ser configurable, auditable y versionable
+--   sin un redespliegue. Esta tabla centraliza esos valores como fuente única.
+--
+--   Es un catálogo clave-valor tipado. El valor se guarda como texto y la columna
+--   value_type indica cómo interpretarlo, de modo que la tabla sirva para enteros,
+--   intervalos o banderas sin cambiar su estructura.
+
+CREATE TABLE system_parameters (
+    key          varchar(60)  PRIMARY KEY,
+    value        varchar(120) NOT NULL,
+    value_type   varchar(20)  NOT NULL DEFAULT 'int',
+    description  varchar(300) NOT NULL,
+    updated_by   uuid,
+    updated_at   timestamptz  NOT NULL DEFAULT now(),
+
+    CONSTRAINT fk_system_parameters_user
+        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT ck_system_parameters_type
+        CHECK (value_type IN ('int','minutes','hours','decimal','bool','text'))
+);
+
+CREATE TRIGGER tg_system_parameters_updated_at
+    BEFORE UPDATE ON system_parameters
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
+
+-- Valores por defecto: los umbrales que antes estaban hardcodeados.
+INSERT INTO system_parameters (key, value, value_type, description) VALUES
+    ('wearable_offline_minutes', '120', 'minutes',
+     'Minutos sin sincronizar tras los cuales el wearable se considera sin datos y se genera alerta wearable_offline (Anexo B).'),
+    ('alert_dedup_minutes', '30', 'minutes',
+     'Ventana en la que no se repite una alerta por la misma condición (dedup_key).'),
+    ('dose_postpone_max_hours', '4', 'hours',
+     'Máximo de horas que una toma puede posponerse respecto de su hora programada.'),
+    ('alert_escalation_minutes', '15', 'minutes',
+     'Minutos sin atención tras los cuales una alerta crítica escala a los siguientes contactos (RF-52).'),
+    ('session_access_minutes', '30', 'minutes',
+     'Vigencia del access token (RNF-11).'),
+    ('session_refresh_days', '30', 'int',
+     'Vigencia del refresh token rotatorio (RNF-11).'),
+    ('invitation_ttl_days', '7', 'int',
+     'Vigencia de una invitación al círculo de cuidado.'),
+    ('file_link_ttl_minutes', '15', 'minutes',
+     'Vigencia de los enlaces firmados de subida/descarga de archivos (RNF-13).');
+
+COMMENT ON TABLE  system_parameters IS
+    'Catálogo clave-valor de parámetros de negocio configurables (umbrales de alertas, vigencias de tokens, ventanas de tiempo). Centraliza valores que antes vivían en el código; configurables y auditables sin redespliegue.';
+COMMENT ON COLUMN system_parameters.value_type IS
+    'Interpretación del valor: int | minutes | hours | decimal | bool | text.';
+COMMENT ON COLUMN system_parameters.updated_by IS
+    'Último administrador que modificó el parámetro. Trazabilidad del cambio de configuración.';
+
+
+-- ============================================================================
 -- Fuente: 200_vital_types.sql
 -- ============================================================================
 -- AgeCare — Bloque 2: Vitals y wearable
@@ -621,7 +765,14 @@ CREATE TABLE vital_readings (
         CHECK (source IN ('wearable','manual')),
     -- value_secondary solo es válido para blood_pressure
     CONSTRAINT ck_vital_readings_secondary
-        CHECK (value_secondary IS NULL OR type = 'blood_pressure')
+        CHECK (value_secondary IS NULL OR type = 'blood_pressure'),
+    -- Cordura de datos: ningún signo vital humano es negativo y hay un techo
+    -- físicamente imposible. Los umbrales clínicos finos por paciente viven en
+    -- vital_thresholds; este CHECK solo evita basura evidente (p. ej. FC = 9000).
+    CONSTRAINT ck_vital_readings_value_sane
+        CHECK (value >= 0 AND value <= 100000),
+    CONSTRAINT ck_vital_readings_secondary_sane
+        CHECK (value_secondary IS NULL OR (value_secondary >= 0 AND value_secondary <= 100000))
 
 ) PARTITION BY RANGE (measured_at);
 
@@ -736,6 +887,62 @@ COMMENT ON COLUMN vital_thresholds.updated_by IS
 
 
 -- ============================================================================
+-- Fuente: 204_wellbeing_snapshots.sql
+-- ============================================================================
+-- AgeCare — Bloque 2: Vitals y wearable
+-- Tabla: wellbeing_snapshots
+--
+-- Análisis de realidad:
+--   El indicador diario de bienestar (semáforo: ok | warning | attention) se
+--   calcula a partir de vitals, adherencia y eventos del día. Si solo se calcula
+--   "al vuelo" al consultarlo, el expediente NO puede reconstruir cómo estuvo el
+--   paciente en el pasado: la pregunta "¿cómo estuvo mamá la semana pasada?" queda
+--   sin respuesta histórica.
+--
+--   Esta tabla persiste una fotografía diaria del semáforo por paciente. Un job
+--   la calcula al cierre de cada día (y puede recalcular el día en curso). Da
+--   soporte real al "expediente histórico" que promete el producto y a la
+--   analítica de tendencias de bienestar.
+
+CREATE TABLE wellbeing_snapshots (
+    id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    patient_id    uuid        NOT NULL,
+    snapshot_date date        NOT NULL,
+    status        varchar(12) NOT NULL,
+    -- Motivos legibles que explican el estado (p. ej. "SpO2 bajo el mínimo",
+    -- "1 dosis omitida"). jsonb INTENCIONAL: lista de razones heterogéneas que
+    -- solo se muestran, no se consultan ni se cruzan.
+    reasons       jsonb       NOT NULL DEFAULT '[]'::jsonb,
+    -- Conteos que respaldan el cálculo, para auditar cómo se llegó al estado.
+    vitals_out_of_range smallint NOT NULL DEFAULT 0,
+    doses_missed        smallint NOT NULL DEFAULT 0,
+    active_alerts       smallint NOT NULL DEFAULT 0,
+    computed_at   timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT fk_wellbeing_snapshots_patient
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+    -- Una fotografía por paciente y día: recalcular el mismo día actualiza la fila.
+    CONSTRAINT uq_wellbeing_snapshots_day
+        UNIQUE (patient_id, snapshot_date),
+    CONSTRAINT ck_wellbeing_snapshots_status
+        CHECK (status IN ('ok','warning','attention')),
+    CONSTRAINT ck_wellbeing_snapshots_reasons_array
+        CHECK (jsonb_typeof(reasons) = 'array')
+);
+
+-- Serie histórica del semáforo de un paciente (tendencia de bienestar).
+CREATE INDEX ix_wellbeing_snapshots_patient
+    ON wellbeing_snapshots (patient_id, snapshot_date DESC);
+
+COMMENT ON TABLE  wellbeing_snapshots IS
+    'Fotografía diaria del semáforo de bienestar por paciente (ok | warning | attention). Historiza un indicador que de otro modo se perdería al calcularse al vuelo, dando soporte al expediente histórico y a la analítica de tendencias.';
+COMMENT ON COLUMN wellbeing_snapshots.reasons IS
+    'Motivos legibles del estado del día. jsonb INTENCIONAL: lista de razones que solo se muestran.';
+COMMENT ON COLUMN wellbeing_snapshots.vitals_out_of_range IS
+    'Conteo de vitales fuera de rango ese día; respalda y audita el cálculo del estado.';
+
+
+-- ============================================================================
 -- Fuente: 301_medications.sql
 -- ============================================================================
 -- AgeCare — Bloque 3: Medicación
@@ -749,7 +956,13 @@ CREATE TABLE medications (
     id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     patient_id      uuid        NOT NULL,
     name            varchar(120) NOT NULL,
-    dose            varchar(60)  NOT NULL,
+    -- Análisis de realidad: la dosis es cantidad + unidad, no un texto libre.
+    -- Separarlas permite validar, comparar y (a futuro) calcular equivalencias.
+    -- dose_text queda como presentación generada para la interfaz.
+    dose_amount     numeric(8,2) NOT NULL,
+    dose_unit       varchar(20)  NOT NULL,
+    dose_text       varchar(60)  GENERATED ALWAYS AS
+                        (trim(to_char(dose_amount, 'FM999999990.##')) || ' ' || dose_unit) STORED,
     instructions    text,
     start_date      date         NOT NULL,
     end_date        date,
@@ -768,7 +981,11 @@ CREATE TABLE medications (
     CONSTRAINT ck_medications_grace
         CHECK (grace_window_min BETWEEN 5 AND 720),
     CONSTRAINT ck_medications_name_min
-        CHECK (char_length(name) >= 2)
+        CHECK (char_length(name) >= 2),
+    CONSTRAINT ck_medications_dose_amount
+        CHECK (dose_amount > 0),
+    CONSTRAINT ck_medications_dose_unit
+        CHECK (dose_unit IN ('mg','g','ml','mcg','UI','gotas','comprimido','cápsula','puff','parche'))
 );
 
 -- Plan vigente de un paciente (endpoint 6.2) y el job generador de dosis.
@@ -782,6 +999,12 @@ CREATE TRIGGER tg_medications_updated_at
 
 COMMENT ON TABLE  medications IS
     'Plan de medicamentos: QUÉ se administra y CON QUÉ FRECUENCIA. Las tomas concretas se materializan en scheduled_doses. Los horarios y días viven en medication_times y medication_days (1FN).';
+COMMENT ON COLUMN medications.dose_amount IS
+    'Cantidad numérica de la dosis (p. ej. 50). Separada de la unidad para poder validar y comparar; antes era un varchar "50 mg" no computable.';
+COMMENT ON COLUMN medications.dose_unit IS
+    'Unidad de la dosis: mg | g | ml | mcg | UI | gotas | comprimido | cápsula | puff | parche.';
+COMMENT ON COLUMN medications.dose_text IS
+    'Presentación generada (dose_amount + dose_unit) para la interfaz. Solo lectura.';
 COMMENT ON COLUMN medications.grace_window_min IS
     'Minutos de tolerancia tras la hora programada antes de marcar la dosis como omitida y alertar (Anexo B).';
 COMMENT ON COLUMN medications.prescribed_by IS
@@ -856,6 +1079,12 @@ CREATE TABLE scheduled_doses (
     medication_id uuid        NOT NULL,
     scheduled_at  timestamptz NOT NULL,
     status        varchar(10) NOT NULL DEFAULT 'pending',
+    -- Análisis de realidad: tres momentos DISTINTOS que no deben confundirse.
+    --   scheduled_at   = cuándo DEBÍA administrarse la dosis (planificado).
+    --   administered_at= cuándo REALMENTE se administró al paciente (hecho clínico).
+    --   logged_at      = cuándo la cuidadora lo REGISTRÓ en la app (acto administrativo).
+    -- Permite distinguir "se dio a tiempo pero se registró tarde" de "se dio tarde".
+    administered_at timestamptz,
     logged_by     uuid,
     logged_at     timestamptz,
     reason        varchar(200),
@@ -883,6 +1112,12 @@ CREATE TABLE scheduled_doses (
     -- Confirmar o descartar requiere registro de quién y cuándo
     CONSTRAINT ck_scheduled_doses_logged_status
         CHECK (status NOT IN ('taken','skipped') OR logged_at IS NOT NULL),
+    -- Una dosis administrada debe tener la hora real de administración.
+    CONSTRAINT ck_scheduled_doses_administered
+        CHECK (status <> 'taken' OR administered_at IS NOT NULL),
+    -- No se puede administrar una dosis antes de que estuviera programada.
+    CONSTRAINT ck_scheduled_doses_admin_order
+        CHECK (administered_at IS NULL OR administered_at >= scheduled_at),
     -- Posponer exige nueva hora
     CONSTRAINT ck_scheduled_doses_postponed
         CHECK (status <> 'postponed' OR postponed_until IS NOT NULL),
@@ -916,6 +1151,14 @@ COMMENT ON TABLE  scheduled_doses IS
     'Tomas concretas generadas a partir del plan (medications + medication_times + medication_days). Existen ANTES de ocurrir, lo que permite registrar ausencias y calcular adherencia: sin estas filas no habría denominador.';
 COMMENT ON COLUMN scheduled_doses.status IS
     'pending | taken | skipped | postponed | missed.';
+COMMENT ON COLUMN scheduled_doses.scheduled_at IS
+    'Momento en que la dosis DEBÍA administrarse (planificado por el job según el plan).';
+COMMENT ON COLUMN scheduled_doses.administered_at IS
+    'Momento REAL de administración al paciente (hecho clínico). Distinto de logged_at: una dosis puede darse a las 08:00 y registrarse a las 23:00. Base para medir puntualidad real, no solo adherencia administrativa.';
+COMMENT ON COLUMN scheduled_doses.logged_at IS
+    'Momento en que la cuidadora REGISTRÓ la dosis en la app (acto administrativo). Junto con logged_by da trazabilidad y responsabilidad del registro.';
+COMMENT ON COLUMN scheduled_doses.logged_by IS
+    'Usuario que registró la dosis. Es la rendición de cuentas del acto: el sistema no puede validar la administración física, pero sí dejar evidencia inmutable de quién la declaró y cuándo.';
 COMMENT ON COLUMN scheduled_doses.reason IS
     'Motivo de la omisión. Obligatorio cuando el estado es skipped (RF-29).';
 COMMENT ON COLUMN scheduled_doses.postponed_until IS
@@ -1108,7 +1351,11 @@ COMMENT ON CONSTRAINT ck_notification_settings_critical_locked ON notification_s
 CREATE TABLE emergency_contacts (
 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 patient_id uuid NOT NULL,
-full_name varchar(120) NOT NULL,
+-- 1FN y coherencia con users/patients: nombre y apellido son atributos distintos.
+-- full_name queda como columna GENERATED para presentación y compatibilidad.
+first_name varchar(60) NOT NULL,
+last_name  varchar(60) NOT NULL,
+full_name  varchar(121) GENERATED ALWAYS AS (first_name || ' ' || last_name) STORED,
 relationship  varchar(40),
 phone varchar(16)  NOT NULL,
 escalation_order smallint NOT NULL DEFAULT 1,
@@ -1119,6 +1366,10 @@ deleted_at timestamptz,
 
 CONSTRAINT fk_emergency_contacts_patient
     FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+CONSTRAINT ck_emergency_contacts_first_name
+    CHECK (char_length(first_name) >= 1),
+CONSTRAINT ck_emergency_contacts_last_name
+    CHECK (char_length(last_name) >= 1),
 CONSTRAINT ck_emergency_contacts_order
     CHECK (escalation_order BETWEEN 1 AND 10),
 CONSTRAINT ck_emergency_contacts_phone
@@ -1179,4 +1430,68 @@ COMMENT ON COLUMN sos_events.latitude IS
     'Ubicación al momento del SOS. No está en el Anexo A, pero la app la captura: el pubspec.yaml incluye geolocator con el comentario "ubicación para SOS".';
 COMMENT ON COLUMN sos_events.triggered_by IS
     'Quién lo activó: cuidadora o el propio adulto mayor (RF-51). ON DELETE SET NULL: el evento queda en el expediente.';
+
+
+-- ============================================================================
+-- Fuente: 501_subscriptions.sql
+-- ============================================================================
+-- AgeCare — Bloque 5: Negocio (freemium)
+-- Tabla: subscriptions
+--
+-- Análisis de negocio (RF-73, objetivo de conversión del modelo freemium):
+--   El documento de negocio promete un modelo freemium con conversión a Premium.
+--   Sin una tabla que modele el estado de suscripción, el objetivo "10% de
+--   conversión" no es medible ni el requisito RF-73 ("bloquear funciones de pago
+--   sin suscripción vigente") es implementable: no habría contra qué validar.
+--
+--   La suscripción pertenece a un USUARIO (la cuidadora en v1, extensible a
+--   familiar). Una fila representa un período de suscripción; el historial se
+--   conserva (no se borra al expirar) para analítica de retención y churn.
+
+CREATE TABLE subscriptions (
+    id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id       uuid        NOT NULL,
+    plan          varchar(20) NOT NULL,
+    status        varchar(20) NOT NULL DEFAULT 'active',
+    started_at    timestamptz NOT NULL DEFAULT now(),
+    -- Fin del período vigente. NULL mientras esté activa sin fecha de corte.
+    current_period_end timestamptz,
+    cancelled_at  timestamptz,
+    -- Referencia opaca a la pasarela de pago (no se guardan datos de tarjeta).
+    provider_ref  varchar(120),
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    updated_at    timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT fk_subscriptions_user
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT ck_subscriptions_plan
+        CHECK (plan IN ('free','premium')),
+    CONSTRAINT ck_subscriptions_status
+        CHECK (status IN ('active','past_due','cancelled','expired')),
+    -- Cancelar exige marca de tiempo de cancelación.
+    CONSTRAINT ck_subscriptions_cancelled_pair
+        CHECK (status <> 'cancelled' OR cancelled_at IS NOT NULL)
+);
+
+-- Suscripción vigente de un usuario (la consulta de RF-73 al bloquear premium).
+-- Un solo registro ACTIVO por usuario; el historial de períodos cerrados se conserva.
+CREATE UNIQUE INDEX ux_subscriptions_active_user
+    ON subscriptions (user_id) WHERE status = 'active';
+
+CREATE INDEX ix_subscriptions_user
+    ON subscriptions (user_id, created_at DESC);
+
+CREATE TRIGGER tg_subscriptions_updated_at
+    BEFORE UPDATE ON subscriptions
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
+
+COMMENT ON TABLE  subscriptions IS
+    'Suscripciones del modelo freemium (RF-73). Da soporte a la validación de acceso a funciones de pago y a la métrica de conversión del plan de negocio. Conserva el historial de períodos para analítica de retención.';
+COMMENT ON COLUMN subscriptions.plan IS
+    'free | premium. El adulto mayor nunca paga; en v1 la suscripción aplica a la cuidadora.';
+COMMENT ON COLUMN subscriptions.status IS
+    'active | past_due | cancelled | expired. Solo una activa por usuario (índice parcial).';
+COMMENT ON COLUMN subscriptions.provider_ref IS
+    'Referencia opaca a la pasarela de pago. NO se almacenan datos de tarjeta (cumplimiento PCI).';
 

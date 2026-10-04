@@ -2,7 +2,11 @@
 CREATE TABLE emergency_contacts (
 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 patient_id uuid NOT NULL,
-full_name varchar(120) NOT NULL,
+-- 1FN y coherencia con users/patients: nombre y apellido son atributos distintos.
+-- full_name queda como columna GENERATED para presentación y compatibilidad.
+first_name varchar(60) NOT NULL,
+last_name  varchar(60) NOT NULL,
+full_name  varchar(121) GENERATED ALWAYS AS (first_name || ' ' || last_name) STORED,
 relationship  varchar(40),
 phone varchar(16)  NOT NULL,
 escalation_order smallint NOT NULL DEFAULT 1,
@@ -13,6 +17,10 @@ deleted_at timestamptz,
 
 CONSTRAINT fk_emergency_contacts_patient
     FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+CONSTRAINT ck_emergency_contacts_first_name
+    CHECK (char_length(first_name) >= 1),
+CONSTRAINT ck_emergency_contacts_last_name
+    CHECK (char_length(last_name) >= 1),
 CONSTRAINT ck_emergency_contacts_order
     CHECK (escalation_order BETWEEN 1 AND 10),
 CONSTRAINT ck_emergency_contacts_phone

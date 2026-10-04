@@ -107,14 +107,14 @@ INSERT INTO vital_readings (patient_id, type, value, measured_at, source) VALUES
 -- ---------------------------------------------------------------
 -- 5. Medicamentos (sin times/days_of_week JSON)
 -- ---------------------------------------------------------------
-INSERT INTO medications (id, patient_id, name, dose, instructions, start_date, grace_window_min) VALUES
+INSERT INTO medications (id, patient_id, name, dose_amount, dose_unit, instructions, start_date, grace_window_min) VALUES
   ('77777777-7777-4777-8777-777777777777',
    '33333333-3333-4333-8333-333333333333',
-   'Losartán', '50 mg', 'Con un vaso de agua, antes de comer.',
+   'Losartán', 50, 'mg', 'Con un vaso de agua, antes de comer.',
    CURRENT_DATE - 60, 60),
   ('88888888-8888-4888-8888-888888888888',
    '33333333-3333-4333-8333-333333333333',
-   'Metformina', '850 mg', 'Durante las comidas para evitar malestar.',
+   'Metformina', 850, 'mg', 'Durante las comidas para evitar malestar.',
    CURRENT_DATE - 60, 45);
 
 -- Horarios de toma (medication_times — normalizado 1FN)
@@ -149,14 +149,20 @@ WITH slots AS (
     WHERE EXTRACT(isodow FROM d::date) = md.day_of_week
 )
 INSERT INTO scheduled_doses
-    (medication_id, scheduled_at, status, logged_by, logged_at, reason)
+    (medication_id, scheduled_at, status, administered_at, logged_by, logged_at, reason)
 SELECT medication_id, scheduled_at,
        CASE WHEN scheduled_at > now()  THEN 'pending'
             WHEN r < 0.86              THEN 'taken'
             WHEN r < 0.93              THEN 'skipped'
             ELSE                            'missed' END,
+       -- administered_at: hora real de administración, solo para 'taken'.
+       -- Simula que se dio poco después de lo programado (0-20 min).
+       CASE WHEN scheduled_at <= now() AND r < 0.86
+            THEN scheduled_at + (random() * 20 || ' minutes')::interval END,
+       -- logged_by: quién registró (taken o skipped: r < 0.93).
        CASE WHEN scheduled_at <= now() AND r < 0.93
             THEN '22222222-2222-4222-8222-222222222222'::uuid END,
+       -- logged_at: cuándo se registró (algo después de administrar).
        CASE WHEN scheduled_at <= now() AND r < 0.93
             THEN scheduled_at + (random() * 25 || ' minutes')::interval END,
        CASE WHEN scheduled_at <= now() AND r >= 0.86 AND r < 0.93
@@ -295,7 +301,35 @@ INSERT INTO notification_settings (user_id, alert_type, push_enabled) VALUES
   ('22222222-2222-4222-8222-222222222222', 'missed_dose',        true),
   ('22222222-2222-4222-8222-222222222222', 'wearable_offline',   true);
 
-INSERT INTO emergency_contacts (patient_id, full_name, relationship, phone, escalation_order) VALUES
-  ('33333333-3333-4333-8333-333333333333', 'Javier Cerna',  'Hijo',      '+56912345678', 1),
-  ('33333333-3333-4333-8333-333333333333', 'Rosa Medina',   'Cuidadora', '+56987654321', 2),
-  ('33333333-3333-4333-8333-333333333333', 'SAMU',          'Emergencia','+56961313131', 3);
+INSERT INTO emergency_contacts (patient_id, first_name, last_name, relationship, phone, escalation_order) VALUES
+  ('33333333-3333-4333-8333-333333333333', 'Javier', 'Cerna',  'Hijo',      '+56912345678', 1),
+  ('33333333-3333-4333-8333-333333333333', 'Rosa',   'Medina', 'Cuidadora', '+56987654321', 2),
+  ('33333333-3333-4333-8333-333333333333', 'SAMU', 'Servicio de Urgencia', 'Emergencia','+56961313131', 3);
+
+-- ---------------------------------------------------------------
+-- 10. Suscripción freemium (Rosa, cuidadora)
+-- ---------------------------------------------------------------
+INSERT INTO subscriptions (user_id, plan, status, current_period_end) VALUES
+  ('22222222-2222-4222-8222-222222222222', 'premium', 'active', now() + interval '25 days');
+
+-- ---------------------------------------------------------------
+-- 11. Historial del semáforo de bienestar (últimos 7 días de Elena)
+-- ---------------------------------------------------------------
+-- Fotografía diaria del semáforo: en su mayoría 'ok', con un día 'warning'
+-- (dosis omitida) y un día 'attention' (vital fuera de rango), para que la
+-- serie histórica tenga variación demostrable.
+INSERT INTO wellbeing_snapshots
+    (patient_id, snapshot_date, status, reasons, vitals_out_of_range, doses_missed, active_alerts)
+SELECT '33333333-3333-4333-8333-333333333333',
+       (CURRENT_DATE - g)::date,
+       CASE WHEN g = 3 THEN 'attention'
+            WHEN g = 1 THEN 'warning'
+            ELSE            'ok' END,
+       CASE WHEN g = 3 THEN '["Frecuencia cardíaca sobre el máximo"]'::jsonb
+            WHEN g = 1 THEN '["1 dosis omitida"]'::jsonb
+            ELSE            '[]'::jsonb END,
+       CASE WHEN g = 3 THEN 1 ELSE 0 END,
+       CASE WHEN g = 1 THEN 1 ELSE 0 END,
+       CASE WHEN g = 3 THEN 1 ELSE 0 END
+FROM generate_series(0, 6) g
+ON CONFLICT (patient_id, snapshot_date) DO NOTHING;

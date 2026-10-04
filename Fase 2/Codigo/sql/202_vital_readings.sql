@@ -43,7 +43,14 @@ CREATE TABLE vital_readings (
         CHECK (source IN ('wearable','manual')),
     -- value_secondary solo es válido para blood_pressure
     CONSTRAINT ck_vital_readings_secondary
-        CHECK (value_secondary IS NULL OR type = 'blood_pressure')
+        CHECK (value_secondary IS NULL OR type = 'blood_pressure'),
+    -- Cordura de datos: ningún signo vital humano es negativo y hay un techo
+    -- físicamente imposible. Los umbrales clínicos finos por paciente viven en
+    -- vital_thresholds; este CHECK solo evita basura evidente (p. ej. FC = 9000).
+    CONSTRAINT ck_vital_readings_value_sane
+        CHECK (value >= 0 AND value <= 100000),
+    CONSTRAINT ck_vital_readings_secondary_sane
+        CHECK (value_secondary IS NULL OR (value_secondary >= 0 AND value_secondary <= 100000))
 
 ) PARTITION BY RANGE (measured_at);
 

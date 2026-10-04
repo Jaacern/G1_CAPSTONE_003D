@@ -24,7 +24,8 @@ router = APIRouter(prefix="/api/v1", tags=["medications"])
 # --------------------------------------------------------------------------
 class MedicationCreateIn(BaseModel):
     name:             str = Field(min_length=2, max_length=120)
-    dose:             str = Field(min_length=1, max_length=60)
+    dose_amount:      float = Field(gt=0)
+    dose_unit:        str = Field(min_length=1, max_length=20)
     instructions:     str | None = None
     times:            list[str] = Field(min_length=1, max_length=8)   # ["HH:MM", ...]
     days_of_week:     list[int] | None = None                          # 1–7, None = todos
@@ -42,7 +43,8 @@ class MedicationCreateOut(BaseModel):
 
 class MedicationPatchIn(BaseModel):
     name:             str | None = Field(default=None, min_length=2, max_length=120)
-    dose:             str | None = Field(default=None, min_length=1, max_length=60)
+    dose_amount:      float | None = Field(default=None, gt=0)
+    dose_unit:        str | None = Field(default=None, min_length=1, max_length=20)
     instructions:     str | None = None
     times:            list[str] | None = Field(default=None, min_length=1, max_length=8)
     days_of_week:     list[int] | None = None
@@ -54,7 +56,9 @@ class MedicationPatchIn(BaseModel):
 class MedicationItem(BaseModel):
     medication_id: str
     name:          str
-    dose:          str
+    dose:          str          # presentación: dose_text (dose_amount + dose_unit)
+    dose_amount:   float
+    dose_unit:     str
     instructions:  str | None = None
     times:         list[str]
     days_of_week:  list[int]
@@ -75,6 +79,7 @@ class DoseItem(BaseModel):
     dose:            str
     scheduled_at:    datetime
     status:          str
+    administered_at: datetime | None = None
     logged_by:       str | None = None
     logged_at:       datetime | None = None
     reason:          str | None = None
@@ -87,6 +92,7 @@ class DosesListOut(BaseModel):
 
 class DoseLogIn(BaseModel):
     status:          str
+    administered_at: datetime | None = None   # hora real de administración (si taken)
     postponed_until: datetime | None = None
     reason:          str | None = None
 
@@ -177,7 +183,9 @@ async def _build_medication_item(db: AsyncSession, row) -> MedicationItem:
     return MedicationItem(
         medication_id=mid,
         name=row["name"],
-        dose=row["dose"],
+        dose=row["dose_text"],
+        dose_amount=float(row["dose_amount"]),
+        dose_unit=row["dose_unit"],
         instructions=row["instructions"],
         times=times,
         days_of_week=days,
@@ -193,8 +201,8 @@ async def _load_medication(db: AsyncSession, patient_id: str,
     row = (
         await db.execute(
             text(
-                "SELECT id, name, dose, instructions, start_date, end_date, "
-                "prescribed_by, discontinued_at "
+                "SELECT id, name, dose_amount, dose_unit, dose_text, instructions, "
+                "start_date, end_date, prescribed_by, discontinued_at "
                 "FROM medications WHERE id = :mid AND patient_id = :pid"
             ),
             {"mid": medication_id, "pid": patient_id},
@@ -227,14 +235,15 @@ async def create_medication(
         await db.execute(
             text(
                 "INSERT INTO medications "
-                "(patient_id, name, dose, instructions, start_date, end_date, "
-                " grace_window_min, prescribed_by) "
-                "VALUES (:pid, :name, :dose, :instructions, :start_date, :end_date, "
-                "        :grace, :prescribed_by) "
+                "(patient_id, name, dose_amount, dose_unit, instructions, start_date, "
+                " end_date, grace_window_min, prescribed_by) "
+                "VALUES (:pid, :name, :dose_amount, :dose_unit, :instructions, "
+                "        :start_date, :end_date, :grace, :prescribed_by) "
                 "RETURNING id, name, prescribed_by, created_at"
             ),
             {
-                "pid": ctx.patient_id, "name": payload.name, "dose": payload.dose,
+                "pid": ctx.patient_id, "name": payload.name,
+                "dose_amount": payload.dose_amount, "dose_unit": payload.dose_unit,
                 "instructions": payload.instructions,
                 "start_date": payload.start_date, "end_date": payload.end_date,
                 "grace": payload.grace_window_min, "prescribed_by": prescribed_by,
@@ -264,8 +273,9 @@ async def list_medications(
     ctx: PatientContext = Depends(get_patient_member()),
     db: AsyncSession = Depends(get_db),
 ):
-    sql = ("SELECT id, name, dose, instructions, start_date, end_date, "
-           "prescribed_by, discontinued_at FROM medications WHERE patient_id = :pid")
+    sql = ("SELECT id, name, dose_amount, dose_unit, dose_text, instructions, "
+           "start_date, end_date, prescribed_by, discontinued_at "
+           "FROM medications WHERE patient_id = :pid")
     if active_only:
         sql += " AND discontinued_at IS NULL"
     sql += " ORDER BY name"
@@ -298,7 +308,7 @@ async def update_medication(
     sets: list[str] = []
     params: dict = {"mid": medication_id, "pid": ctx.patient_id}
 
-    simple_cols = ["name", "dose", "instructions", "start_date", "end_date"]
+    simple_cols = ["name", "dose_amount", "dose_unit", "instructions", "start_date", "end_date"]
     for col in simple_cols:
         if col in fields:
             sets.append(f"{col} = :{col}"); params[col] = fields[col]
@@ -357,8 +367,8 @@ async def list_doses(
             text(
                 """
                 SELECT sd.id AS dose_id, sd.medication_id, m.name AS medication_name,
-                       m.dose, sd.scheduled_at, sd.status, sd.logged_by,
-                       sd.logged_at, sd.reason
+                       m.dose_text, sd.scheduled_at, sd.status, sd.administered_at,
+                       sd.logged_by, sd.logged_at, sd.reason
                 FROM scheduled_doses sd
                 JOIN medications m ON m.id = sd.medication_id
                 WHERE m.patient_id = :pid
@@ -375,9 +385,10 @@ async def list_doses(
             dose_id=str(r["dose_id"]),
             medication_id=str(r["medication_id"]),
             medication_name=r["medication_name"],
-            dose=r["dose"],
+            dose=r["dose_text"],
             scheduled_at=r["scheduled_at"],
             status=r["status"],
+            administered_at=r["administered_at"],
             logged_by=str(r["logged_by"]) if r["logged_by"] else None,
             logged_at=r["logged_at"],
             reason=r["reason"],
@@ -456,13 +467,24 @@ async def log_dose(
                            message="La dosis solo puede posponerse hasta 4 horas.")
         postponed_until = payload.postponed_until
 
+    # Hora REAL de administración (hecho clínico). Para 'taken': la enviada por
+    # la cuidadora o, si no la indica, el momento del registro. El CHECK de la BD
+    # exige administered_at cuando status='taken' y que no sea anterior a scheduled_at.
+    administered_at = None
+    if payload.status == "taken":
+        administered_at = payload.administered_at or datetime.now(dose["scheduled_at"].tzinfo)
+        if administered_at < dose["scheduled_at"]:
+            administered_at = dose["scheduled_at"]
+
     await db.execute(
         text(
             "UPDATE scheduled_doses SET status = :status, logged_by = :uid, "
-            "logged_at = now(), reason = :reason, postponed_until = :postponed_until "
+            "logged_at = now(), administered_at = :administered_at, "
+            "reason = :reason, postponed_until = :postponed_until "
             "WHERE id = :did"
         ),
-        {"status": payload.status, "uid": user.user_id, "reason": payload.reason,
+        {"status": payload.status, "uid": user.user_id,
+         "administered_at": administered_at, "reason": payload.reason,
          "postponed_until": postponed_until, "did": dose_id},
     )
     await db.commit()

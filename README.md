@@ -31,8 +31,9 @@ Ingeniería en Informática · Sede San Andrés · Duoc UC · 2026
 6. [Aseguramiento de calidad](#6-aseguramiento-de-calidad)
 7. [Seguridad y protección de datos](#7-seguridad-y-protección-de-datos)
 8. [Fase 1 — Evidencias](#8-fase-1--evidencias)
-9. [Estructura del repositorio](#9-estructura-del-repositorio)
-10. [Licencia y uso](#10-licencia-y-uso)
+9. [Fase 2 — Evidencias (Avance)](#9-fase-2--evidencias-avance)
+10. [Estructura del repositorio](#10-estructura-del-repositorio)
+11. [Licencia y uso](#11-licencia-y-uso)
 
 ---
 
@@ -40,7 +41,7 @@ Ingeniería en Informática · Sede San Andrés · Duoc UC · 2026
 
 **AgeCare** es una propuesta de plataforma digital orientada a apoyar el cuidado de adultos mayores y a mejorar la coordinación entre las personas involucradas en ese cuidado: familia, cuidadores, personal de salud y la propia persona mayor.
 
-Este repositorio corresponde a la **Fase 1 — Definición del Proyecto** y reúne la evidencia académica formativa del equipo.
+Este repositorio reúne la evidencia académica del equipo correspondiente a la **Fase 1 — Definición del Proyecto** y al **avance de la Fase 2 — Diseño** (modelo de datos relacional y documentación técnica asociada).
 
 ---
 
@@ -54,6 +55,7 @@ Chile atraviesa un proceso acelerado de envejecimiento poblacional, lo que incre
 
 **Incluye:**
 - Evidencia grupal e individual de la Fase 1 (definición del proyecto).
+- Avance de la Fase 2 (diseño): requerimientos funcionales, modelo relacional, diccionario de datos, diagramas ER, normalización y esquema SQL.
 - Documentación académica de carácter general.
 
 **No incluye (por confidencialidad):**
@@ -86,7 +88,7 @@ El proyecto se organiza en **fases**, con revisión documental entre cada una. C
 | Fase | Descripción | Estado |
 |:----:|-------------|:------:|
 | 1 | Definición del proyecto | Entrega formativa |
-| 2 | Diseño | En progreso |
+| 2 | Diseño | Avance entregado |
 | 3 | Implementación (backend) | En progreso |
 | 4 | Implementación (frontend) | Pendiente |
 | 5 | Pruebas y calidad | Pendiente |
@@ -120,19 +122,57 @@ Los mecanismos técnicos específicos se gestionan en entornos privados y **no f
 
 ---
 
-## 9. Estructura del repositorio
+## 9. Fase 2 — Evidencias (Avance)
+
+La Fase 2 corresponde al **avance de diseño del proyecto** y entrega la documentación técnica que sustenta la base de datos. Se adopta un **enfoque tradicional (modelo relacional)**, con la documentación redactada en **español**.
+
+### Enfoque tradicional (modelo relacional)
+
+- **Documento de Requerimientos Funcionales:** especificación de las funcionalidades que debe cubrir el sistema.
+- **Modelo Relacional (en español):** diseño del modelo de datos relacional del proyecto. La documentación se encuentra en español; de haber elementos en inglés, se incorpora el **Diccionario de Datos** correspondiente.
+- **Diccionario de Datos:** descripción de tablas, campos, tipos y restricciones del modelo.
+
+> Nota: este proyecto utiliza un **motor relacional**, por lo que no aplica el detalle de colecciones de un motor no relacional.
+
+### Evidencias de Proyecto
+
+| Documento | Descripción |
+|-----------|-------------|
+| `00_ERS_Simplificado_Fase1.docx` | Especificación de Requerimientos de Software (simplificada). |
+| `01_Documento_Requerimientos_Funcionales.docx` | Documento de requerimientos funcionales. |
+| `02_Modelo_Relacional_Definitivo.docx` | Modelo relacional definitivo (en español). |
+| `03_Diccionario_de_Datos.docx` | Diccionario de datos del modelo relacional. |
+| `04_Diagrama_ER.dbml` | Diagrama entidad-relación en formato DBML. |
+| `04_Diagrama_ER_Mermaid.docx` | Diagrama entidad-relación en formato Mermaid. |
+| `05_Normalizacion_2FN.docx` | Proceso de normalización hasta 2FN. |
+| `06_Analisis_de_Realidad_y_Decisiones.docx` | Análisis de realidad y decisiones de diseño. |
+| `07_schema_completo.sql` | Script SQL del esquema completo de la base de datos. |
+
+### Otras evidencias de la Fase 2
+
+- **Evidencias Grupales:** guía del estudiante de la fase y planilla de evaluación del avance.
+- **Evidencias Individuales:** autoevaluación del avance de la Fase 2.
+
+---
+
+## 10. Estructura del repositorio
 
 ```
 G1_CAPSTONE_003D/
 ├── README.md
-└── Fase 1/
-    ├── Evidencias Grupales/       ← entregables grupales de la Fase 1
-    └── Evidencias Individuales/   ← autoevaluaciones y diarios por integrante
+├── Fase 1/
+│   ├── Evidencias Grupales/       ← entregables grupales de la Fase 1
+│   └── Evidencias Individuales/   ← autoevaluaciones y diarios por integrante
+└── Fase 2/
+    ├── Evidencias Grupales/       ← guía del estudiante y planilla de evaluación
+    ├── Evidencias Individuales/   ← autoevaluación del avance
+    └── Evidencias Proyecto/       ← requerimientos, modelo relacional, diccionario,
+                                      diagramas ER, normalización y esquema SQL
 ```
 
 ---
 
-## 10. Licencia y uso
+## 11. Licencia y uso
 
 Material de **uso académico**, elaborado para la asignatura Capstone (APT122) de Duoc UC. No se autoriza su uso, reproducción ni distribución con fines distintos al académico sin autorización expresa del equipo y de las partes involucradas.
 

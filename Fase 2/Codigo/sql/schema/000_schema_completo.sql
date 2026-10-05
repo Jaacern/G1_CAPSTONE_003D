@@ -961,8 +961,10 @@ CREATE TABLE medications (
     -- dose_text queda como presentación generada para la interfaz.
     dose_amount     numeric(8,2) NOT NULL,
     dose_unit       varchar(20)  NOT NULL,
+    -- trim_scale()::text es inmutable (requisito de columna generada STORED);
+    -- to_char() no lo es porque depende de lc_numeric de la sesión.
     dose_text       varchar(60)  GENERATED ALWAYS AS
-                        (trim(to_char(dose_amount, 'FM999999990.##')) || ' ' || dose_unit) STORED,
+                        (trim_scale(dose_amount)::text || ' ' || dose_unit) STORED,
     instructions    text,
     start_date      date         NOT NULL,
     end_date        date,

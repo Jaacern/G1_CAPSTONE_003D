@@ -147,6 +147,7 @@ La Fase 2 corresponde al **avance de diseño del proyecto** y entrega la documen
 | `05_Normalizacion_2FN.docx` | Proceso de normalización hasta 2FN. |
 | `06_Analisis_de_Realidad_y_Decisiones.docx` | Análisis de realidad y decisiones de diseño. |
 | `07_schema_completo.sql` | Script SQL del esquema completo de la base de datos. |
+| `08_Diagrama.pdf` | Diagrama del modelo de datos en formato PDF. |
 
 ### Otras evidencias de la Fase 2
 

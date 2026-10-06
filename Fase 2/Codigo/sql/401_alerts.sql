@@ -21,11 +21,11 @@ created_at timestamptz NOT NULL DEFAULT now(),
 updated_at timestamptz NOT NULL DEFAULT now(),
 
 CONSTRAINT fk_alerts_patient
-    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
 CONSTRAINT fk_alerts_acknowledged_by
-    FOREIGN KEY (acknowledged_by) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (acknowledged_by) REFERENCES users(id) ON DELETE RESTRICT,
 CONSTRAINT fk_alerts_resolved_by
-    FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE RESTRICT,
 
 CONSTRAINT ck_alerts_type
     CHECK (type IN ('fall','vital_out_of_range','missed_dose','sos','wearable_offline')),

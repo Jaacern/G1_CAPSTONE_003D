@@ -15,11 +15,11 @@ error_detail varchar(300),
 created_at timestamptz NOT NULL DEFAULT now(),
 
 CONSTRAINT fk_alert_deliveries_alert
-    FOREIGN KEY (alert_id) REFERENCES alerts(id) ON DELETE CASCADE,
+    FOREIGN KEY (alert_id) REFERENCES alerts(id) ON DELETE RESTRICT,
 CONSTRAINT fk_alert_deliveries_user
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
 CONSTRAINT fk_alert_deliveries_device
-    FOREIGN KEY (push_device_id) REFERENCES push_devices(id) ON DELETE SET NULL,
+    FOREIGN KEY (push_device_id) REFERENCES push_devices(id) ON DELETE RESTRICT,
 
 CONSTRAINT ck_alert_deliveries_channel
     CHECK (channel IN ('push','email','sms','in_app')),

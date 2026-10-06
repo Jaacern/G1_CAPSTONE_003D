@@ -22,7 +22,7 @@ CREATE TABLE refresh_tokens(
     CONSTRAINT ck_refresh_tokens_revoked_pair
         CHECK ((revoked_at IS NULL) = (revoked_reason IS NULL)),
     CONSTRAINT fk_refresh_tokens_user
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
 );
 
 --Busqueda de cada renovacion dos sesiopnes no pueden compartir tokens
@@ -49,7 +49,7 @@ COMMENT ON TABLE  refresh_tokens IS
 COMMENT ON COLUMN refresh_tokens.id IS
     'Identificador interno del registro de sesión.';
 COMMENT ON COLUMN refresh_tokens.user_id IS
-    'Dueño de la sesión. ON DELETE CASCADE: un token no tiene valor sin su usuario.';
+    'Dueño de la sesión. ON DELETE RESTRICT: el modelo no admite borrado físico; una cuenta se desactiva, no se elimina.';
 COMMENT ON COLUMN refresh_tokens.family_id IS
     'Agrupa todos los tokens nacidos del mismo inicio de sesión. Permite revocar una sola sesión ante reutilización, sin desconectar los demás dispositivos (ticket AGE-104).';
 COMMENT ON COLUMN refresh_tokens.token_hash IS

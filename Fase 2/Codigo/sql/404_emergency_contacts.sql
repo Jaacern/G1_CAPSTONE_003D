@@ -16,7 +16,7 @@ updated_at timestamptz NOT NULL DEFAULT now(),
 deleted_at timestamptz,
 
 CONSTRAINT fk_emergency_contacts_patient
-    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
 CONSTRAINT ck_emergency_contacts_first_name
     CHECK (char_length(first_name) >= 1),
 CONSTRAINT ck_emergency_contacts_last_name

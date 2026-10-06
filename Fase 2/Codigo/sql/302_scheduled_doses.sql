@@ -24,9 +24,9 @@ CREATE TABLE scheduled_doses (
     updated_at    timestamptz NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_scheduled_doses_medication
-        FOREIGN KEY (medication_id) REFERENCES medications(id) ON DELETE CASCADE,
+        FOREIGN KEY (medication_id) REFERENCES medications(id) ON DELETE RESTRICT,
     CONSTRAINT fk_scheduled_doses_user
-        FOREIGN KEY (logged_by) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY (logged_by) REFERENCES users(id) ON DELETE RESTRICT,
 
     -- Idempotencia del job generador: un slot por medicamento y hora
     CONSTRAINT uq_scheduled_doses_slot

@@ -26,7 +26,7 @@ CREATE TABLE subscriptions (
     updated_at    timestamptz NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_subscriptions_user
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
     CONSTRAINT ck_subscriptions_plan
         CHECK (plan IN ('free','premium')),
     CONSTRAINT ck_subscriptions_status

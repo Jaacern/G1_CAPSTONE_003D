@@ -12,7 +12,7 @@ created_at timestamptz  NOT NULL DEFAULT now(),
 updated_at timestamptz NOT NULL DEFAULT now(),
 
 CONSTRAINT fk_push_devices_user
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
 CONSTRAINT ck_push_devices_platform
     CHECK (platform IN ('ios', 'android', 'web'))
 );

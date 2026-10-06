@@ -29,7 +29,7 @@ CREATE TABLE wellbeing_snapshots (
     computed_at   timestamptz NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_wellbeing_snapshots_patient
-        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
     -- Una fotografía por paciente y día: recalcular el mismo día actualiza la fila.
     CONSTRAINT uq_wellbeing_snapshots_day
         UNIQUE (patient_id, snapshot_date),

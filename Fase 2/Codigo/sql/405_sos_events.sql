@@ -10,11 +10,11 @@ longitude numeric(9,6),
 created_at timestamptz NOT NULL DEFAULT now(),
 
 CONSTRAINT fk_sos_events_patient
-    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
 CONSTRAINT fk_sos_events_user
-    FOREIGN KEY (triggered_by) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (triggered_by) REFERENCES users(id) ON DELETE RESTRICT,
 CONSTRAINT fk_sos_events_alert
-    FOREIGN KEY (alert_id) REFERENCES alerts(id) ON DELETE CASCADE,
+    FOREIGN KEY (alert_id) REFERENCES alerts(id) ON DELETE RESTRICT,
 CONSTRAINT uq_sos_events_alert
     UNIQUE (alert_id),
 CONSTRAINT ck_sos_events_coords
@@ -33,4 +33,4 @@ COMMENT ON TABLE  sos_events IS
 COMMENT ON COLUMN sos_events.latitude IS
     'Ubicación al momento del SOS. No está en el Anexo A, pero la app la captura: el pubspec.yaml incluye geolocator con el comentario "ubicación para SOS".';
 COMMENT ON COLUMN sos_events.triggered_by IS
-    'Quién lo activó: cuidadora o el propio adulto mayor (RF-51). ON DELETE SET NULL: el evento queda en el expediente.';
+    'Quién lo activó: cuidadora o el propio adulto mayor (RF-51). ON DELETE RESTRICT: el evento queda en el expediente.';

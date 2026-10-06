@@ -33,11 +33,11 @@ CREATE TABLE vital_readings (
         UNIQUE (patient_id, type, measured_at, source),
 
     CONSTRAINT fk_vital_readings_patient
-        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
 
     -- FK al catálogo: reemplaza el CHECK de lista duplicada
     CONSTRAINT fk_vital_readings_type
-        FOREIGN KEY (type) REFERENCES vital_types(code),
+        FOREIGN KEY (type) REFERENCES vital_types(code) ON DELETE RESTRICT,
 
     CONSTRAINT ck_vital_readings_source
         CHECK (source IN ('wearable','manual')),

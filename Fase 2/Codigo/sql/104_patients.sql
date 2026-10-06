@@ -93,7 +93,7 @@ CREATE TABLE patient_conditions (
     created_at   timestamptz NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_patient_conditions_patient
-        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
     CONSTRAINT uq_patient_condition
         UNIQUE (patient_id, condition),
     CONSTRAINT ck_patient_condition_min

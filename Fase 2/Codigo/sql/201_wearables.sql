@@ -14,7 +14,7 @@ CREATE TABLE wearables (
     updated_at timestamptz NOT NULL DEFAULT now(),
 
 CONSTRAINT fk_wearables_patient
-    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
 CONSTRAINT ck_wearables_provider
     CHECK (provider IN ('simulator','healthkit','health_connect','garmin','whoop')),
 CONSTRAINT ck_wearables_battery

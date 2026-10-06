@@ -17,12 +17,12 @@ CREATE TABLE vital_thresholds (
     updated_at timestamptz  NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_vital_thresholds_patient
-        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
     CONSTRAINT fk_vital_thresholds_user
-        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE RESTRICT,
     -- FK al catálogo: reemplaza el CHECK de lista duplicada
     CONSTRAINT fk_vital_thresholds_type
-        FOREIGN KEY (type) REFERENCES vital_types(code),
+        FOREIGN KEY (type) REFERENCES vital_types(code) ON DELETE RESTRICT,
     CONSTRAINT uq_vital_thresholds_patient_type
         UNIQUE (patient_id, type),
     CONSTRAINT ck_vital_thresholds_range
@@ -45,4 +45,4 @@ COMMENT ON COLUMN vital_thresholds.min_value IS
 COMMENT ON COLUMN vital_thresholds.max_value IS
     'Límite superior. NULL si el vital solo tiene piso (ej. saturación O₂).';
 COMMENT ON COLUMN vital_thresholds.updated_by IS
-    'Quién configuró el umbral por última vez (RF-21). ON DELETE SET NULL: el umbral sigue vigente si el usuario se borra.';
+    'Quién configuró el umbral por última vez (RF-21). ON DELETE RESTRICT: se conserva el registro de quién lo definió.';

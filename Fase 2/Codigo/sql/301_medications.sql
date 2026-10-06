@@ -28,9 +28,9 @@ CREATE TABLE medications (
     updated_at      timestamptz  NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_medications_patient
-        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
     CONSTRAINT fk_medications_prescriber
-        FOREIGN KEY (prescribed_by) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY (prescribed_by) REFERENCES users(id) ON DELETE RESTRICT,
     CONSTRAINT ck_medications_dates
         CHECK (end_date IS NULL OR end_date >= start_date),
     CONSTRAINT ck_medications_grace
@@ -63,7 +63,7 @@ COMMENT ON COLUMN medications.dose_text IS
 COMMENT ON COLUMN medications.grace_window_min IS
     'Minutos de tolerancia tras la hora programada antes de marcar la dosis como omitida y alertar (Anexo B).';
 COMMENT ON COLUMN medications.prescribed_by IS
-    'Quién definió el plan: médico o cuidadora (RF-24). ON DELETE SET NULL: el plan sobrevive a la cuenta.';
+    'Quién definió el plan: médico o cuidadora (RF-24). ON DELETE RESTRICT: el plan y su responsable se conservan.';
 COMMENT ON COLUMN medications.discontinued_at IS
     'Descontinuación. Cancela las tomas futuras y conserva el historial (RF-27). NULL = vigente.';
 
@@ -79,7 +79,7 @@ CREATE TABLE medication_times (
     time_of_day   time    NOT NULL,
 
     CONSTRAINT fk_medication_times_medication
-        FOREIGN KEY (medication_id) REFERENCES medications(id) ON DELETE CASCADE,
+        FOREIGN KEY (medication_id) REFERENCES medications(id) ON DELETE RESTRICT,
     -- Un medicamento no puede tener el mismo horario dos veces
     CONSTRAINT uq_medication_times_slot
         UNIQUE (medication_id, time_of_day)
@@ -107,7 +107,7 @@ CREATE TABLE medication_days (
     PRIMARY KEY (medication_id, day_of_week),
 
     CONSTRAINT fk_medication_days_medication
-        FOREIGN KEY (medication_id) REFERENCES medications(id) ON DELETE CASCADE,
+        FOREIGN KEY (medication_id) REFERENCES medications(id) ON DELETE RESTRICT,
     -- 1 = lunes … 7 = domingo (ISO 8601)
     CONSTRAINT ck_medication_days_range
         CHECK (day_of_week BETWEEN 1 AND 7)

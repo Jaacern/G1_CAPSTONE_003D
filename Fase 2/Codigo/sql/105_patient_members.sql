@@ -12,9 +12,9 @@ CREATE TABLE patient_members (
     removed_at timestamptz,
 
 CONSTRAINT fk_patient_members_patient
-    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
 CONSTRAINT fk_patient_members_user
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
 CONSTRAINT uq_patient_members_pair
     UNIQUE (patient_id, user_id),
 CONSTRAINT ck_patient_members_role

@@ -21,7 +21,7 @@ CREATE TABLE system_parameters (
     updated_at   timestamptz  NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_system_parameters_user
-        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE RESTRICT,
     CONSTRAINT ck_system_parameters_type
         CHECK (value_type IN ('int','minutes','hours','decimal','bool','text'))
 );

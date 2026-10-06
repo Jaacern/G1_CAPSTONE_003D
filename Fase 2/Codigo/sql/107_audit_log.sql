@@ -35,9 +35,9 @@ CREATE TABLE audit_log (
     created_at  timestamptz NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_audit_log_actor
-        FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE RESTRICT,
     CONSTRAINT fk_audit_log_patient
-        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE SET NULL,
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
     CONSTRAINT ck_audit_log_action
         CHECK (action IN (
             'view_record','create','update','delete',
@@ -70,7 +70,7 @@ CREATE TRIGGER tg_audit_log_no_update
 COMMENT ON TABLE  audit_log IS
     'Registro inmutable (append-only) de accesos y cambios sobre datos clínicos. Cumple RNF-14 (trazabilidad clínica). Un trigger bloquea UPDATE y DELETE: la evidencia de auditoría no se puede alterar.';
 COMMENT ON COLUMN audit_log.actor_user_id IS
-    'Quién ejecutó la acción. ON DELETE SET NULL: el hecho auditado sobrevive a la cuenta.';
+    'Quién ejecutó la acción. ON DELETE RESTRICT: la evidencia de auditoría no se puede perder.';
 COMMENT ON COLUMN audit_log.action IS
     'Verbo del dominio: view_record (lectura de expediente), dose_log, alert_ack, etc.';
 COMMENT ON COLUMN audit_log.old_value IS

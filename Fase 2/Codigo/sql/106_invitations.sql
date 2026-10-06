@@ -16,11 +16,11 @@ CREATE TABLE invitations (
     updated_at timestamptz NOT NULL DEFAULT now(),
 
 CONSTRAINT fk_invitations_patient
-    FOREIGN KEY (patient_id)  REFERENCES patients(id) ON DELETE CASCADE,
+    FOREIGN KEY (patient_id)  REFERENCES patients(id) ON DELETE RESTRICT,
 CONSTRAINT fk_invitations_invited_by
-    FOREIGN KEY (invited_by)  REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (invited_by)  REFERENCES users(id) ON DELETE RESTRICT,
 CONSTRAINT fk_invitations_accepted_by
-    FOREIGN KEY (accepted_by) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (accepted_by) REFERENCES users(id) ON DELETE RESTRICT,
 CONSTRAINT ck_invitations_role
     CHECK (role IN ('family','caregiver','doctor','elder')),
 CONSTRAINT ck_invitations_expires
@@ -61,6 +61,6 @@ COMMENT ON COLUMN invitations.invited_by IS
 COMMENT ON COLUMN invitations.expires_at IS
     'Vencimiento. 7 días desde el envío, según el ticket AGE-202.';
 COMMENT ON COLUMN invitations.accepted_by IS
-    'Usuario que aceptó. ON DELETE SET NULL: si borra su cuenta, la invitación sigue siendo parte de la historia del paciente.';
+    'Usuario que aceptó. ON DELETE RESTRICT: la invitación es parte de la historia del paciente y no se pierde.';
 COMMENT ON COLUMN invitations.revoked_at IS
     'Invitación anulada por el administrador antes de ser aceptada (ticket AGE-207).';

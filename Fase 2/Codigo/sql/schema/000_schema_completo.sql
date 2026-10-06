@@ -1,4 +1,3 @@
--- ============================================================================
 -- AgeCare - Esquema completo consolidado (modelo de datos definitivo)
 -- Proyecto APT - Capstone PTY4614 - DUOC UC
 -- PostgreSQL 16 - Modelo relacional normalizado hasta 2FN
@@ -6,12 +5,36 @@
 -- Consolida los scripts de esquema del directorio sql/ en orden de
 -- dependencias de claves foraneas. El seed (900_seed_dev.sql) va aparte.
 -- 24 tablas de negocio + funciones y triggers.
+--
+-- GENERADO automaticamente por scripts/build_consolidado.py desde los
+-- scripts numerados. No editar a mano: editar los numerados y regenerar.
 -- ============================================================================
+
 
 
 -- ============================================================================
 -- Fuente: 001_base.sql
 -- ============================================================================
+-- ============================================================================
+-- POLITICA DE CONSERVACION DE DATOS
+-- ----------------------------------------------------------------------------
+-- El modelo NO admite borrado fisico. Las 36 claves foraneas usan
+-- ON DELETE RESTRICT, de modo que el motor impide eliminar una fila que tenga
+-- registros asociados. No es una convencion del codigo: es el propio Postgres
+-- el que lo rechaza.
+--
+-- Motivo: los datos clinicos e historicos son la base del analisis posterior.
+-- Una fila borrada hoy es una pregunta que no se podra responder en dos anos.
+--
+-- Como se da de baja un registro:
+--   · Marcas de desactivacion: deleted_at, removed_at, unlinked_at,
+--     discontinued_at, revoked_at, cancelled_at. La fila queda, deja de usarse.
+--   · Eliminacion de cuenta (exigencia de las tiendas y de la ley de datos
+--     personales): se anonimizan los campos identificatorios del usuario y se
+--     conservan los hechos registrados. El analisis no necesita saber QUIEN
+--     era, necesita saber QUE paso.
+-- ============================================================================
+
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -22,7 +45,6 @@ $$ LANGUAGE plpgsql;
 
 COMMENT ON FUNCTION set_updated_at() IS
     'Trigger compartido: actualiza updated_at en cada UPDATE.';
-
 
 
 -- ============================================================================
@@ -99,7 +121,6 @@ COMMENT ON COLUMN users.deleted_at IS
     'Baja lógica para la eliminación de cuenta. Ticket AGE-1007, requisito de Google Play. NULL = vigente.';
 
 
-
 -- ============================================================================
 -- Fuente: 102_refresh_tokens.sql
 -- ============================================================================
@@ -127,7 +148,7 @@ CREATE TABLE refresh_tokens(
     CONSTRAINT ck_refresh_tokens_revoked_pair
         CHECK ((revoked_at IS NULL) = (revoked_reason IS NULL)),
     CONSTRAINT fk_refresh_tokens_user
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
 );
 
 --Busqueda de cada renovacion dos sesiopnes no pueden compartir tokens
@@ -154,7 +175,7 @@ COMMENT ON TABLE  refresh_tokens IS
 COMMENT ON COLUMN refresh_tokens.id IS
     'Identificador interno del registro de sesión.';
 COMMENT ON COLUMN refresh_tokens.user_id IS
-    'Dueño de la sesión. ON DELETE CASCADE: un token no tiene valor sin su usuario.';
+    'Dueño de la sesión. ON DELETE RESTRICT: el modelo no admite borrado físico; una cuenta se desactiva, no se elimina.';
 COMMENT ON COLUMN refresh_tokens.family_id IS
     'Agrupa todos los tokens nacidos del mismo inicio de sesión. Permite revocar una sola sesión ante reutilización, sin desconectar los demás dispositivos (ticket AGE-104).';
 COMMENT ON COLUMN refresh_tokens.token_hash IS
@@ -186,7 +207,7 @@ created_at timestamptz  NOT NULL DEFAULT now(),
 updated_at timestamptz NOT NULL DEFAULT now(),
 
 CONSTRAINT fk_push_devices_user
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
 CONSTRAINT ck_push_devices_platform
     CHECK (platform IN ('ios', 'android', 'web'))
 );
@@ -325,7 +346,7 @@ CREATE TABLE patient_conditions (
     created_at   timestamptz NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_patient_conditions_patient
-        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
     CONSTRAINT uq_patient_condition
         UNIQUE (patient_id, condition),
     CONSTRAINT ck_patient_condition_min
@@ -360,9 +381,9 @@ CREATE TABLE patient_members (
     removed_at timestamptz,
 
 CONSTRAINT fk_patient_members_patient
-    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
 CONSTRAINT fk_patient_members_user
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
 CONSTRAINT uq_patient_members_pair
     UNIQUE (patient_id, user_id),
 CONSTRAINT ck_patient_members_role
@@ -417,11 +438,11 @@ CREATE TABLE invitations (
     updated_at timestamptz NOT NULL DEFAULT now(),
 
 CONSTRAINT fk_invitations_patient
-    FOREIGN KEY (patient_id)  REFERENCES patients(id) ON DELETE CASCADE,
+    FOREIGN KEY (patient_id)  REFERENCES patients(id) ON DELETE RESTRICT,
 CONSTRAINT fk_invitations_invited_by
-    FOREIGN KEY (invited_by)  REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (invited_by)  REFERENCES users(id) ON DELETE RESTRICT,
 CONSTRAINT fk_invitations_accepted_by
-    FOREIGN KEY (accepted_by) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (accepted_by) REFERENCES users(id) ON DELETE RESTRICT,
 CONSTRAINT ck_invitations_role
     CHECK (role IN ('family','caregiver','doctor','elder')),
 CONSTRAINT ck_invitations_expires
@@ -462,7 +483,7 @@ COMMENT ON COLUMN invitations.invited_by IS
 COMMENT ON COLUMN invitations.expires_at IS
     'Vencimiento. 7 días desde el envío, según el ticket AGE-202.';
 COMMENT ON COLUMN invitations.accepted_by IS
-    'Usuario que aceptó. ON DELETE SET NULL: si borra su cuenta, la invitación sigue siendo parte de la historia del paciente.';
+    'Usuario que aceptó. ON DELETE RESTRICT: la invitación es parte de la historia del paciente y no se pierde.';
 COMMENT ON COLUMN invitations.revoked_at IS
     'Invitación anulada por el administrador antes de ser aceptada (ticket AGE-207).';
 
@@ -507,9 +528,9 @@ CREATE TABLE audit_log (
     created_at  timestamptz NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_audit_log_actor
-        FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE RESTRICT,
     CONSTRAINT fk_audit_log_patient
-        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE SET NULL,
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
     CONSTRAINT ck_audit_log_action
         CHECK (action IN (
             'view_record','create','update','delete',
@@ -542,7 +563,7 @@ CREATE TRIGGER tg_audit_log_no_update
 COMMENT ON TABLE  audit_log IS
     'Registro inmutable (append-only) de accesos y cambios sobre datos clínicos. Cumple RNF-14 (trazabilidad clínica). Un trigger bloquea UPDATE y DELETE: la evidencia de auditoría no se puede alterar.';
 COMMENT ON COLUMN audit_log.actor_user_id IS
-    'Quién ejecutó la acción. ON DELETE SET NULL: el hecho auditado sobrevive a la cuenta.';
+    'Quién ejecutó la acción. ON DELETE RESTRICT: la evidencia de auditoría no se puede perder.';
 COMMENT ON COLUMN audit_log.action IS
     'Verbo del dominio: view_record (lectura de expediente), dose_log, alert_ack, etc.';
 COMMENT ON COLUMN audit_log.old_value IS
@@ -577,7 +598,7 @@ CREATE TABLE system_parameters (
     updated_at   timestamptz  NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_system_parameters_user
-        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE RESTRICT,
     CONSTRAINT ck_system_parameters_type
         CHECK (value_type IN ('int','minutes','hours','decimal','bool','text'))
 );
@@ -676,7 +697,7 @@ CREATE TABLE wearables (
     updated_at timestamptz NOT NULL DEFAULT now(),
 
 CONSTRAINT fk_wearables_patient
-    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
 CONSTRAINT ck_wearables_provider
     CHECK (provider IN ('simulator','healthkit','health_connect','garmin','whoop')),
 CONSTRAINT ck_wearables_battery
@@ -755,11 +776,11 @@ CREATE TABLE vital_readings (
         UNIQUE (patient_id, type, measured_at, source),
 
     CONSTRAINT fk_vital_readings_patient
-        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
 
     -- FK al catálogo: reemplaza el CHECK de lista duplicada
     CONSTRAINT fk_vital_readings_type
-        FOREIGN KEY (type) REFERENCES vital_types(code),
+        FOREIGN KEY (type) REFERENCES vital_types(code) ON DELETE RESTRICT,
 
     CONSTRAINT ck_vital_readings_source
         CHECK (source IN ('wearable','manual')),
@@ -855,12 +876,12 @@ CREATE TABLE vital_thresholds (
     updated_at timestamptz  NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_vital_thresholds_patient
-        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
     CONSTRAINT fk_vital_thresholds_user
-        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE RESTRICT,
     -- FK al catálogo: reemplaza el CHECK de lista duplicada
     CONSTRAINT fk_vital_thresholds_type
-        FOREIGN KEY (type) REFERENCES vital_types(code),
+        FOREIGN KEY (type) REFERENCES vital_types(code) ON DELETE RESTRICT,
     CONSTRAINT uq_vital_thresholds_patient_type
         UNIQUE (patient_id, type),
     CONSTRAINT ck_vital_thresholds_range
@@ -883,7 +904,7 @@ COMMENT ON COLUMN vital_thresholds.min_value IS
 COMMENT ON COLUMN vital_thresholds.max_value IS
     'Límite superior. NULL si el vital solo tiene piso (ej. saturación O₂).';
 COMMENT ON COLUMN vital_thresholds.updated_by IS
-    'Quién configuró el umbral por última vez (RF-21). ON DELETE SET NULL: el umbral sigue vigente si el usuario se borra.';
+    'Quién configuró el umbral por última vez (RF-21). ON DELETE RESTRICT: se conserva el registro de quién lo definió.';
 
 
 -- ============================================================================
@@ -920,7 +941,7 @@ CREATE TABLE wellbeing_snapshots (
     computed_at   timestamptz NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_wellbeing_snapshots_patient
-        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
     -- Una fotografía por paciente y día: recalcular el mismo día actualiza la fila.
     CONSTRAINT uq_wellbeing_snapshots_day
         UNIQUE (patient_id, snapshot_date),
@@ -975,9 +996,9 @@ CREATE TABLE medications (
     updated_at      timestamptz  NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_medications_patient
-        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
     CONSTRAINT fk_medications_prescriber
-        FOREIGN KEY (prescribed_by) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY (prescribed_by) REFERENCES users(id) ON DELETE RESTRICT,
     CONSTRAINT ck_medications_dates
         CHECK (end_date IS NULL OR end_date >= start_date),
     CONSTRAINT ck_medications_grace
@@ -1010,7 +1031,7 @@ COMMENT ON COLUMN medications.dose_text IS
 COMMENT ON COLUMN medications.grace_window_min IS
     'Minutos de tolerancia tras la hora programada antes de marcar la dosis como omitida y alertar (Anexo B).';
 COMMENT ON COLUMN medications.prescribed_by IS
-    'Quién definió el plan: médico o cuidadora (RF-24). ON DELETE SET NULL: el plan sobrevive a la cuenta.';
+    'Quién definió el plan: médico o cuidadora (RF-24). ON DELETE RESTRICT: el plan y su responsable se conservan.';
 COMMENT ON COLUMN medications.discontinued_at IS
     'Descontinuación. Cancela las tomas futuras y conserva el historial (RF-27). NULL = vigente.';
 
@@ -1026,7 +1047,7 @@ CREATE TABLE medication_times (
     time_of_day   time    NOT NULL,
 
     CONSTRAINT fk_medication_times_medication
-        FOREIGN KEY (medication_id) REFERENCES medications(id) ON DELETE CASCADE,
+        FOREIGN KEY (medication_id) REFERENCES medications(id) ON DELETE RESTRICT,
     -- Un medicamento no puede tener el mismo horario dos veces
     CONSTRAINT uq_medication_times_slot
         UNIQUE (medication_id, time_of_day)
@@ -1054,7 +1075,7 @@ CREATE TABLE medication_days (
     PRIMARY KEY (medication_id, day_of_week),
 
     CONSTRAINT fk_medication_days_medication
-        FOREIGN KEY (medication_id) REFERENCES medications(id) ON DELETE CASCADE,
+        FOREIGN KEY (medication_id) REFERENCES medications(id) ON DELETE RESTRICT,
     -- 1 = lunes … 7 = domingo (ISO 8601)
     CONSTRAINT ck_medication_days_range
         CHECK (day_of_week BETWEEN 1 AND 7)
@@ -1095,9 +1116,9 @@ CREATE TABLE scheduled_doses (
     updated_at    timestamptz NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_scheduled_doses_medication
-        FOREIGN KEY (medication_id) REFERENCES medications(id) ON DELETE CASCADE,
+        FOREIGN KEY (medication_id) REFERENCES medications(id) ON DELETE RESTRICT,
     CONSTRAINT fk_scheduled_doses_user
-        FOREIGN KEY (logged_by) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY (logged_by) REFERENCES users(id) ON DELETE RESTRICT,
 
     -- Idempotencia del job generador: un slot por medicamento y hora
     CONSTRAINT uq_scheduled_doses_slot
@@ -1193,11 +1214,11 @@ created_at timestamptz NOT NULL DEFAULT now(),
 updated_at timestamptz NOT NULL DEFAULT now(),
 
 CONSTRAINT fk_alerts_patient
-    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
 CONSTRAINT fk_alerts_acknowledged_by
-    FOREIGN KEY (acknowledged_by) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (acknowledged_by) REFERENCES users(id) ON DELETE RESTRICT,
 CONSTRAINT fk_alerts_resolved_by
-    FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE RESTRICT,
 
 CONSTRAINT ck_alerts_type
     CHECK (type IN ('fall','vital_out_of_range','missed_dose','sos','wearable_offline')),
@@ -1274,11 +1295,11 @@ error_detail varchar(300),
 created_at timestamptz NOT NULL DEFAULT now(),
 
 CONSTRAINT fk_alert_deliveries_alert
-    FOREIGN KEY (alert_id) REFERENCES alerts(id) ON DELETE CASCADE,
+    FOREIGN KEY (alert_id) REFERENCES alerts(id) ON DELETE RESTRICT,
 CONSTRAINT fk_alert_deliveries_user
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
 CONSTRAINT fk_alert_deliveries_device
-    FOREIGN KEY (push_device_id) REFERENCES push_devices(id) ON DELETE SET NULL,
+    FOREIGN KEY (push_device_id) REFERENCES push_devices(id) ON DELETE RESTRICT,
 
 CONSTRAINT ck_alert_deliveries_channel
     CHECK (channel IN ('push','email','sms','in_app')),
@@ -1327,7 +1348,7 @@ created_at timestamptz NOT NULL DEFAULT now(),
 updated_at timestamptz NOT NULL DEFAULT now(),
 
 CONSTRAINT fk_notification_settings_user
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
 CONSTRAINT uq_notification_settings_pair
     UNIQUE (user_id, alert_type),
 CONSTRAINT ck_notification_settings_type
@@ -1367,7 +1388,7 @@ updated_at timestamptz NOT NULL DEFAULT now(),
 deleted_at timestamptz,
 
 CONSTRAINT fk_emergency_contacts_patient
-    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
 CONSTRAINT ck_emergency_contacts_first_name
     CHECK (char_length(first_name) >= 1),
 CONSTRAINT ck_emergency_contacts_last_name
@@ -1408,11 +1429,11 @@ longitude numeric(9,6),
 created_at timestamptz NOT NULL DEFAULT now(),
 
 CONSTRAINT fk_sos_events_patient
-    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
 CONSTRAINT fk_sos_events_user
-    FOREIGN KEY (triggered_by) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (triggered_by) REFERENCES users(id) ON DELETE RESTRICT,
 CONSTRAINT fk_sos_events_alert
-    FOREIGN KEY (alert_id) REFERENCES alerts(id) ON DELETE CASCADE,
+    FOREIGN KEY (alert_id) REFERENCES alerts(id) ON DELETE RESTRICT,
 CONSTRAINT uq_sos_events_alert
     UNIQUE (alert_id),
 CONSTRAINT ck_sos_events_coords
@@ -1431,7 +1452,7 @@ COMMENT ON TABLE  sos_events IS
 COMMENT ON COLUMN sos_events.latitude IS
     'Ubicación al momento del SOS. No está en el Anexo A, pero la app la captura: el pubspec.yaml incluye geolocator con el comentario "ubicación para SOS".';
 COMMENT ON COLUMN sos_events.triggered_by IS
-    'Quién lo activó: cuidadora o el propio adulto mayor (RF-51). ON DELETE SET NULL: el evento queda en el expediente.';
+    'Quién lo activó: cuidadora o el propio adulto mayor (RF-51). ON DELETE RESTRICT: el evento queda en el expediente.';
 
 
 -- ============================================================================
@@ -1465,7 +1486,7 @@ CREATE TABLE subscriptions (
     updated_at    timestamptz NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_subscriptions_user
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
     CONSTRAINT ck_subscriptions_plan
         CHECK (plan IN ('free','premium')),
     CONSTRAINT ck_subscriptions_status
@@ -1496,4 +1517,3 @@ COMMENT ON COLUMN subscriptions.status IS
     'active | past_due | cancelled | expired. Solo una activa por usuario (índice parcial).';
 COMMENT ON COLUMN subscriptions.provider_ref IS
     'Referencia opaca a la pasarela de pago. NO se almacenan datos de tarjeta (cumplimiento PCI).';
-

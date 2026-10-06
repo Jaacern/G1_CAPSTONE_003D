@@ -344,17 +344,23 @@ CREATE TABLE patient_conditions (
     condition    varchar(80) NOT NULL,
     diagnosed_at date,
     created_at   timestamptz NOT NULL DEFAULT now(),
+    -- Baja lógica: una condición corregida o remitida se desactiva, no se borra.
+    -- Conserva el histórico clínico para analítica (p. ej. evolución de padecimientos).
+    deleted_at   timestamptz,
 
     CONSTRAINT fk_patient_conditions_patient
         FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
-    CONSTRAINT uq_patient_condition
-        UNIQUE (patient_id, condition),
     CONSTRAINT ck_patient_condition_min
         CHECK (char_length(condition) >= 2)
 );
 
+-- Unicidad solo entre condiciones vigentes: permite re-registrar una condición
+-- que antes fue dada de baja, sin chocar con el histórico conservado.
+CREATE UNIQUE INDEX ux_patient_condition
+    ON patient_conditions (patient_id, condition) WHERE deleted_at IS NULL;
+
 CREATE INDEX ix_patient_conditions_patient
-    ON patient_conditions (patient_id);
+    ON patient_conditions (patient_id) WHERE deleted_at IS NULL;
 
 COMMENT ON TABLE  patient_conditions IS
     'Condiciones médicas del paciente. Normalización 1FN: reemplaza el arreglo JSON conditions que vivía en patients. Permite filtrar pacientes por padecimiento y agregar fecha de diagnóstico.';
@@ -362,6 +368,8 @@ COMMENT ON COLUMN patient_conditions.condition IS
     'Código o descripción del padecimiento (ej. hipertension, diabetes_tipo_2).';
 COMMENT ON COLUMN patient_conditions.diagnosed_at IS
     'Fecha de diagnóstico. Opcional; no estaba disponible en el modelo anterior.';
+COMMENT ON COLUMN patient_conditions.deleted_at IS
+    'Baja lógica. Una condición corregida o remitida se desactiva; el histórico clínico se conserva para trazabilidad y analítica.';
 
 
 -- ============================================================================
@@ -507,8 +515,8 @@ COMMENT ON COLUMN invitations.revoked_at IS
 
 CREATE TABLE audit_log (
     id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-    -- Quién ejecutó la acción. SET NULL si la cuenta se elimina: el hecho
-    -- auditado no desaparece aunque el usuario ya no exista.
+    -- Quién ejecutó la acción. ON DELETE RESTRICT: la cuenta no se elimina
+    -- físicamente, por lo que el hecho auditado conserva siempre su autor.
     actor_user_id uuid,
     -- Acción realizada: verbo normalizado del dominio.
     action      varchar(40) NOT NULL,
@@ -874,6 +882,9 @@ CREATE TABLE vital_thresholds (
     updated_by uuid,
     created_at timestamptz  NOT NULL DEFAULT now(),
     updated_at timestamptz  NOT NULL DEFAULT now(),
+    -- Baja lógica: un umbral reemplazado se desactiva, no se borra. Conserva el
+    -- histórico de rangos (con qué umbral se evaluó una alerta en el pasado).
+    deleted_at timestamptz,
 
     CONSTRAINT fk_vital_thresholds_patient
         FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
@@ -882,13 +893,16 @@ CREATE TABLE vital_thresholds (
     -- FK al catálogo: reemplaza el CHECK de lista duplicada
     CONSTRAINT fk_vital_thresholds_type
         FOREIGN KEY (type) REFERENCES vital_types(code) ON DELETE RESTRICT,
-    CONSTRAINT uq_vital_thresholds_patient_type
-        UNIQUE (patient_id, type),
     CONSTRAINT ck_vital_thresholds_range
         CHECK (min_value IS NULL OR max_value IS NULL OR min_value < max_value),
     CONSTRAINT ck_vital_thresholds_at_least_one
         CHECK (min_value IS NOT NULL OR max_value IS NOT NULL)
 );
+
+-- Un umbral vigente por paciente y tipo. El índice parcial permite conservar
+-- umbrales anteriores (deleted_at NOT NULL) como histórico sin romper la unicidad.
+CREATE UNIQUE INDEX uq_vital_thresholds_patient_type
+    ON vital_thresholds (patient_id, type) WHERE deleted_at IS NULL;
 
 CREATE TRIGGER tg_vital_thresholds_updated_at
     BEFORE UPDATE ON vital_thresholds
@@ -897,6 +911,8 @@ CREATE TRIGGER tg_vital_thresholds_updated_at
 
 COMMENT ON TABLE  vital_thresholds IS
     'Rango normal de cada signo vital por paciente. Define cuándo una lectura dispara una alerta vital_out_of_range.';
+COMMENT ON COLUMN vital_thresholds.deleted_at IS
+    'Baja lógica. Un umbral reemplazado se desactiva; se conserva el histórico de rangos para trazabilidad y analítica.';
 COMMENT ON COLUMN vital_thresholds.type IS
     'Tipo de signo vital. FK a vital_types.code: reemplaza el CHECK de lista duplicada que existía en vital_readings y aquí.';
 COMMENT ON COLUMN vital_thresholds.min_value IS

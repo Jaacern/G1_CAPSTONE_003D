@@ -91,17 +91,23 @@ CREATE TABLE patient_conditions (
     condition    varchar(80) NOT NULL,
     diagnosed_at date,
     created_at   timestamptz NOT NULL DEFAULT now(),
+    -- Baja lógica: una condición corregida o remitida se desactiva, no se borra.
+    -- Conserva el histórico clínico para analítica (p. ej. evolución de padecimientos).
+    deleted_at   timestamptz,
 
     CONSTRAINT fk_patient_conditions_patient
         FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
-    CONSTRAINT uq_patient_condition
-        UNIQUE (patient_id, condition),
     CONSTRAINT ck_patient_condition_min
         CHECK (char_length(condition) >= 2)
 );
 
+-- Unicidad solo entre condiciones vigentes: permite re-registrar una condición
+-- que antes fue dada de baja, sin chocar con el histórico conservado.
+CREATE UNIQUE INDEX ux_patient_condition
+    ON patient_conditions (patient_id, condition) WHERE deleted_at IS NULL;
+
 CREATE INDEX ix_patient_conditions_patient
-    ON patient_conditions (patient_id);
+    ON patient_conditions (patient_id) WHERE deleted_at IS NULL;
 
 COMMENT ON TABLE  patient_conditions IS
     'Condiciones médicas del paciente. Normalización 1FN: reemplaza el arreglo JSON conditions que vivía en patients. Permite filtrar pacientes por padecimiento y agregar fecha de diagnóstico.';
@@ -109,3 +115,5 @@ COMMENT ON COLUMN patient_conditions.condition IS
     'Código o descripción del padecimiento (ej. hipertension, diabetes_tipo_2).';
 COMMENT ON COLUMN patient_conditions.diagnosed_at IS
     'Fecha de diagnóstico. Opcional; no estaba disponible en el modelo anterior.';
+COMMENT ON COLUMN patient_conditions.deleted_at IS
+    'Baja lógica. Una condición corregida o remitida se desactiva; el histórico clínico se conserva para trazabilidad y analítica.';

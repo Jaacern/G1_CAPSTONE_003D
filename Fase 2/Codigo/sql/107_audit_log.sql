@@ -14,8 +14,8 @@
 
 CREATE TABLE audit_log (
     id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-    -- Quién ejecutó la acción. SET NULL si la cuenta se elimina: el hecho
-    -- auditado no desaparece aunque el usuario ya no exista.
+    -- Quién ejecutó la acción. ON DELETE RESTRICT: la cuenta no se elimina
+    -- físicamente, por lo que el hecho auditado conserva siempre su autor.
     actor_user_id uuid,
     -- Acción realizada: verbo normalizado del dominio.
     action      varchar(40) NOT NULL,

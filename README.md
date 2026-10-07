@@ -55,7 +55,7 @@ Chile atraviesa un proceso acelerado de envejecimiento poblacional, lo que incre
 
 **Incluye:**
 - Evidencia grupal e individual de la Fase 1 (definición del proyecto).
-- Avance de la Fase 2 (diseño): requerimientos funcionales, modelo relacional, diccionario de datos, diagramas ER, normalización y esquema SQL.
+- Avance de la Fase 2 (diseño): requerimientos funcionales, modelo relacional, diccionario de datos, normalización, análisis de realidad y decisiones, y esquema SQL.
 - Documentación académica de carácter general.
 
 **No incluye (por confidencialidad):**
@@ -142,17 +142,14 @@ La Fase 2 corresponde al **avance de diseño del proyecto** y entrega la documen
 | `01_Documento_Requerimientos_Funcionales.docx` | Documento de requerimientos funcionales. |
 | `02_Modelo_Relacional_Definitivo.docx` | Modelo relacional definitivo (en español). |
 | `03_Diccionario_de_Datos.docx` | Diccionario de datos del modelo relacional. |
-| `04_Diagrama_ER.dbml` | Diagrama entidad-relación en formato DBML. |
-| `04_Diagrama_ER_Mermaid.docx` | Diagrama entidad-relación en formato Mermaid. |
-| `05_Normalizacion_2FN.docx` | Proceso de normalización hasta 2FN. |
-| `06_Analisis_de_Realidad_y_Decisiones.docx` | Análisis de realidad y decisiones de diseño. |
+| `04_Normalizacion_2FN.docx` | Proceso de normalización hasta 2FN. |
+| `05_Analisis_de_Realidad_y_Decisiones.docx` | Análisis de realidad y decisiones de diseño. |
 | `07_schema_completo.sql` | Script SQL del esquema completo de la base de datos. |
-| `08_Diagrama.pdf` | Diagrama del modelo de datos en formato PDF. |
 
 ### Otras evidencias de la Fase 2
 
 - **Evidencias Grupales:** guía del estudiante de la fase y planilla de evaluación del avance.
-- **Evidencias Individuales:** autoevaluación del avance de la Fase 2.
+- **Evidencias Individuales:** autoevaluación del avance de la Fase 2 de cada integrante (Benjamín Camus, Javier Cerna y Juan Mora).
 
 ---
 
@@ -168,7 +165,7 @@ G1_CAPSTONE_003D/
     ├── Evidencias Grupales/       ← guía del estudiante y planilla de evaluación
     ├── Evidencias Individuales/   ← autoevaluación del avance
     └── Evidencias Proyecto/       ← requerimientos, modelo relacional, diccionario,
-                                      diagramas ER, normalización y esquema SQL
+                                      normalización, análisis y esquema SQL
 ```
 
 ---

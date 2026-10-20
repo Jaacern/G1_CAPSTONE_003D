@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe · Suite Cuidado Adultos Mayores — 3 roles</title>
+<style>
+  :root{
+    --bg:#eef1f5;
+    --frame:#ffffff;
+    --ink:#1f2733;
+    --ink-soft:#5b6573;
+    --ink-faint:#97a0ad;
+    --line:#e2e6ec;
+    --line-strong:#cfd5dd;
+    --surface:#f6f8fb;
+    --surface-2:#eef2f7;
+    --brand:#3b6fd4;
+    --brand-soft:#e7eefb;
+    --ok:#2e9e6b;        --ok-bg:#e6f5ed;
+    --warn:#d99211;      --warn-bg:#fbf2dd;
+    --danger:#d6453c;    --danger-bg:#fbe6e4;
+    --radius:16px;
+    --shadow:0 10px 40px rgba(31,39,51,.16);
+    font-size:15px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;
+    padding:28px 16px 60px;
+  }
+
+  /* ---- Doc header ---- */
+  .doc-head{max-width:430px;text-align:center;margin-bottom:22px}
+  .doc-head h1{font-size:18px;font-weight:700;letter-spacing:-.01em}
+  .doc-head p{font-size:13px;color:var(--ink-soft);margin-top:6px;line-height:1.5}
+  .legend{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:14px;font-size:11.5px;color:var(--ink-soft)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+
+  /* ---- Phone frame ---- */
+  .phone{
+    width:390px;max-width:100%;height:800px;background:var(--frame);
+    border-radius:40px;box-shadow:var(--shadow);position:relative;overflow:hidden;
+    border:1px solid var(--line-strong);display:flex;flex-direction:column;
+  }
+  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:130px;height:26px;background:#0c0f14;border-radius:0 0 16px 16px;z-index:60}
+  .statusbar{height:30px;display:flex;align-items:center;justify-content:space-between;padding:0 26px;font-size:12px;font-weight:600;color:var(--ink);flex-shrink:0}
+
+  /* ---- Persistent top bar ---- */
+  .topbar{
+    display:flex;align-items:center;gap:10px;padding:6px 16px 12px;flex-shrink:0;
+    border-bottom:1px solid var(--line);background:var(--frame);z-index:30;
+  }
+  .pt-selector{display:flex;align-items:center;gap:9px;flex:1;cursor:pointer;padding:5px 8px;border-radius:12px}
+  .pt-selector:active{background:var(--surface-2)}
+  .avatar{width:36px;height:36px;border-radius:50%;background:var(--brand-soft);color:var(--brand);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+  .pt-name{font-weight:700;font-size:15px;line-height:1.1}
+  .pt-sub{font-size:11px;color:var(--ink-faint)}
+  .caret{color:var(--ink-faint);font-size:11px}
+  .bell{position:relative;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:19px}
+  .bell:active{background:var(--surface-2)}
+  .badge{position:absolute;top:5px;right:5px;min-width:17px;height:17px;border-radius:9px;background:var(--danger);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid var(--frame)}
+
+  /* ---- Scroll area ---- */
+  .screen-wrap{flex:1;overflow-y:auto;position:relative}
+  .screen-wrap::-webkit-scrollbar{width:0}
+  .screen{display:none;padding:14px 16px 20px}
+  .screen.active{display:block}
+  .screen-title{font-size:21px;font-weight:700;letter-spacing:-.02em;margin:2px 0 14px}
+  .section-label{font-size:12px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 9px}
+
+  /* ---- Cards ---- */
+  .card{background:var(--frame);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px}
+  .card.tap{cursor:pointer}
+  .card.tap:active{background:var(--surface)}
+  .card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .card-head h3{font-size:14px;font-weight:700}
+  .muted{color:var(--ink-soft);font-size:12.5px;line-height:1.5}
+  .faint{color:var(--ink-faint);font-size:11.5px}
+  .row{display:flex;align-items:center;gap:10px}
+  .between{justify-content:space-between}
+
+  /* ---- Semáforo patient card ---- */
+  .sem-card{border-left:5px solid var(--line);background:var(--frame);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px;cursor:pointer}
+  .sem-card:active{background:var(--surface)}
+  .sem-ok{border-left-color:var(--ok)}
+  .sem-warn{border-left-color:var(--warn)}
+  .sem-danger{border-left-color:var(--danger)}
+  .sem-top{display:flex;align-items:center;gap:11px}
+  .pill{font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;display:inline-flex;align-items:center;gap:5px}
+  .pill-ok{background:var(--ok-bg);color:var(--ok)}
+  .pill-warn{background:var(--warn-bg);color:var(--warn)}
+  .pill-danger{background:var(--danger-bg);color:var(--danger)}
+  .sem-metrics{display:flex;gap:18px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
+  .metric .v{font-size:16px;font-weight:700}
+  .metric .l{font-size:10.5px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.03em}
+
+  /* ---- Alert band ---- */
+  .alert-band{background:var(--danger-bg);border:1px solid #f3c9c5;border-radius:14px;padding:11px 13px;margin-bottom:14px;display:flex;align-items:center;gap:11px;cursor:pointer}
+  .alert-band.warn{background:var(--warn-bg);border-color:#eedcab}
+  .alert-ic{font-size:18px}
+  .alert-band .t{font-size:13px;font-weight:700;color:var(--ink)}
+  .alert-band .s{font-size:11.5px;color:var(--ink-soft)}
+
+  /* ---- Vitals mini ---- */
+  .vital-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .vital{background:var(--frame);border:1px solid var(--line);border-radius:14px;padding:12px}
+  .vital .top{display:flex;justify-content:space-between;align-items:flex-start}
+  .vital .name{font-size:11.5px;color:var(--ink-soft);font-weight:600}
+  .vital .val{font-size:22px;font-weight:700;margin-top:5px}
+  .vital .val small{font-size:12px;font-weight:600;color:var(--ink-faint)}
+  .spark{height:26px;margin-top:8px;display:block;width:100%}
+  .thr{font-size:10.5px;color:var(--ink-faint);margin-top:5px}
+
+  /* ---- Meds ---- */
+  .med{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .med:last-child{border-bottom:0}
+  .med-status{width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;font-weight:700}
+  .ms-ok{background:var(--ok)} .ms-pend{background:#fff;border:2px solid var(--line-strong);color:var(--ink-faint)} .ms-miss{background:var(--danger)}
+  .med .mn{font-size:13.5px;font-weight:600}
+  .med .md{font-size:11.5px;color:var(--ink-faint)}
+  .med .mt{margin-left:auto;font-size:12px;font-weight:600;color:var(--ink-soft);text-align:right}
+
+  .progress{height:8px;background:var(--surface-2);border-radius:5px;overflow:hidden;margin:6px 0 4px}
+  .progress > i{display:block;height:100%;background:var(--ok);border-radius:5px}
+
+  .ai-cta{display:flex;align-items:center;gap:9px;background:var(--brand-soft);color:var(--brand);border-radius:12px;padding:11px 13px;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px}
+  .ai-cta:active{filter:brightness(.97)}
+
+  /* ---- Sub tabs ---- */
+  .subtabs{display:flex;gap:6px;background:var(--surface-2);padding:4px;border-radius:12px;margin-bottom:14px}
+  .subtab{flex:1;text-align:center;font-size:12.5px;font-weight:600;color:var(--ink-soft);padding:8px 4px;border-radius:9px;cursor:pointer}
+  .subtab.active{background:var(--frame);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  .subpane{display:none} .subpane.active{display:block}
+
+  /* ---- Observations / docs ---- */
+  .obs{display:flex;gap:11px;padding:12px 0;border-bottom:1px solid var(--line)}
+  .obs:last-child{border-bottom:0}
+  .obs .av{width:30px;height:30px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+  .obs .b{font-size:13px;line-height:1.5}
+  .obs .meta{font-size:11px;color:var(--ink-faint);margin-top:3px}
+  .doc-row{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .doc-row:last-child{border-bottom:0}
+  .doc-ic{width:34px;height:34px;border-radius:9px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:16px}
+
+  /* ---- Chat ---- */
+  .chat{display:flex;flex-direction:column;gap:10px;padding-bottom:8px}
+  .bubble{max-width:80%;padding:10px 13px;border-radius:16px;font-size:13.5px;line-height:1.5}
+  .b-them{background:var(--surface-2);border-bottom-left-radius:5px;align-self:flex-start}
+  .b-me{background:var(--brand);color:#fff;border-bottom-right-radius:5px;align-self:flex-end}
+  .b-ai{background:var(--brand-soft);color:var(--ink);align-self:flex-start;border-bottom-left-radius:5px;border:1px solid #d4e0f7}
+  .b-name{font-size:10.5px;font-weight:700;color:var(--ink-faint);margin:2px 4px -4px}
+  .chat-meta{font-size:10px;color:var(--ink-faint);margin:0 6px}
+  .composer{display:flex;align-items:center;gap:9px;padding:10px 12px;border-top:1px solid var(--line);background:var(--frame)}
+  .composer .input{flex:1;background:var(--surface-2);border-radius:20px;padding:10px 14px;font-size:12.5px;color:var(--ink-faint)}
+  .composer .ic{width:38px;height:38px;border-radius:50%;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+  .suggest{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+  .chip{font-size:11.5px;background:var(--frame);border:1px solid var(--line-strong);border-radius:18px;padding:7px 12px;color:var(--ink-soft);cursor:pointer}
+  .chip:active{background:var(--surface)}
+
+  /* ---- Marketplace ---- */
+  .mk-banner{background:var(--surface-2);border:1px dashed var(--line-strong);border-radius:12px;padding:10px 13px;font-size:11.5px;color:var(--ink-soft);margin-bottom:14px}
+  .provider{display:flex;gap:12px;align-items:center;padding:13px;border:1px solid var(--line);border-radius:14px;margin-bottom:11px;cursor:pointer}
+  .provider:active{background:var(--surface)}
+  .pv-av{width:48px;height:48px;border-radius:12px;background:var(--surface-2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px}
+  .stars{color:var(--warn);font-size:12px}
+  .tag{display:inline-block;font-size:10.5px;background:var(--surface-2);color:var(--ink-soft);border-radius:6px;padding:2px 7px;margin:3px 4px 0 0}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:var(--brand);color:#fff;border:0;border-radius:11px;padding:9px 14px;font-size:12.5px;font-weight:600;cursor:pointer}
+  .btn.ghost{background:var(--frame);color:var(--brand);border:1px solid var(--brand)}
+  .prod-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .prod{border:1px solid var(--line);border-radius:14px;overflow:hidden;cursor:pointer}
+  .prod .img{height:84px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--ink-faint)}
+  .prod .pb{padding:10px}
+  .prod .pn{font-size:12.5px;font-weight:600;line-height:1.3}
+  .prod .pp{font-size:12px;color:var(--brand);font-weight:700;margin-top:4px}
+  .cat-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px}
+  .cat-row::-webkit-scrollbar{height:0}
+  .cat{flex-shrink:0;font-size:12px;padding:7px 13px;border-radius:18px;background:var(--surface-2);color:var(--ink-soft);font-weight:600;cursor:pointer}
+  .cat.active{background:var(--brand);color:#fff}
+
+  /* ---- Más (settings) ---- */
+  .list-grp{background:var(--frame);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:14px}
+  .li{display:flex;align-items:center;gap:13px;padding:14px;border-bottom:1px solid var(--line);cursor:pointer}
+  .li:last-child{border-bottom:0}
+  .li:active{background:var(--surface)}
+  .li-ic{width:32px;height:32px;border-radius:9px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:16px}
+  .li .lt{font-size:13.5px;font-weight:600}
+  .li .ls{font-size:11.5px;color:var(--ink-faint)}
+  .li .chev{margin-left:auto;color:var(--ink-faint)}
+  .role-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;background:var(--brand-soft);color:var(--brand)}
+
+  /* ---- Bottom nav ---- */
+  .botnav{display:flex;border-top:1px solid var(--line);background:var(--frame);flex-shrink:0;padding-bottom:6px}
+  .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0 5px;cursor:pointer;color:var(--ink-faint)}
+  .nav-item.active{color:var(--brand)}
+  .nav-item .ni{font-size:20px;line-height:1}
+  .nav-item .nl{font-size:10px;font-weight:600}
+
+  /* ---- Overlays ---- */
+  .overlay{position:absolute;inset:0;background:rgba(20,26,36,.42);z-index:80;display:none;align-items:flex-start;justify-content:center}
+  .overlay.open{display:flex}
+  .sheet{background:var(--frame);width:100%;margin-top:auto;border-radius:22px 22px 0 0;padding:8px 16px 24px;max-height:78%;overflow-y:auto;animation:up .22s ease}
+  @keyframes up{from{transform:translateY(40px);opacity:.6}to{transform:translateY(0);opacity:1}}
+  .grab{width:38px;height:4px;background:var(--line-strong);border-radius:3px;margin:8px auto 14px}
+  .sheet h2{font-size:16px;font-weight:700;margin-bottom:12px}
+  .pt-opt{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;cursor:pointer;border:1px solid var(--line);margin-bottom:10px}
+  .pt-opt.sel{border-color:var(--brand);background:var(--brand-soft)}
+  .pt-opt:active{background:var(--surface)}
+  .check{margin-left:auto;color:var(--brand);font-weight:700}
+
+  .alert-item{display:flex;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+  .alert-item:last-child{border-bottom:0}
+  .ai-ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+  .crit{background:var(--danger-bg);color:var(--danger)} .med-a{background:var(--warn-bg);color:var(--warn)} .resolved{background:var(--surface-2);color:var(--ink-faint)}
+  .alert-item .at{font-size:13px;font-weight:700}
+  .alert-item .as{font-size:11.5px;color:var(--ink-soft);margin-top:2px;line-height:1.4}
+  .alert-item .atime{font-size:10.5px;color:var(--ink-faint);margin-top:4px}
+  .crit-actions{display:flex;gap:8px;margin-top:9px}
+  .crit-actions .btn{flex:1;padding:8px}
+  .btn.danger{background:var(--danger)}
+
+  /* ---- Contact modal / paywall ---- */
+  .contact-head{display:flex;align-items:center;gap:13px}
+  .locked-box{position:relative;border:1px solid var(--line);border-radius:14px;padding:6px 14px;overflow:hidden}
+  .blur{filter:blur(5px);user-select:none;color:var(--ink-soft)}
+  .lock-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:24px;background:rgba(246,248,251,.35)}
+  .paywall{background:var(--brand-soft);border:1px solid #d4e0f7;border-radius:16px;padding:16px;margin-top:14px;text-align:center}
+  .pw-title{font-size:15px;font-weight:700;color:var(--ink)}
+  .pw-sub{font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin-top:6px}
+
+  /* ---- Prototype plan switch ---- */
+  .plan-switch{display:inline-flex;gap:4px;background:var(--surface-2);padding:4px;border-radius:11px;margin-top:14px}
+  .plan-switch button{border:0;background:transparent;font-size:11.5px;font-weight:600;color:var(--ink-soft);padding:6px 14px;border-radius:8px;cursor:pointer}
+  .plan-switch button.on{background:var(--frame);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.1)}
+  .plan-tag{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;margin-left:8px}
+  .plan-free{background:var(--surface-2);color:var(--ink-soft)}
+  .plan-paid{background:var(--warn-bg);color:var(--warn)}
+
+  .hint{font-size:11px;color:var(--ink-faint);text-align:center;margin-top:16px;max-width:390px;line-height:1.5}
+
+  /* ===== Multi-rol: switch + apps ===== */
+  .role-switch{display:inline-flex;gap:4px;background:var(--surface-2);padding:4px;border-radius:11px;margin-bottom:8px}
+  .role-switch button{border:0;background:transparent;font-size:12px;font-weight:700;color:var(--ink-soft);padding:7px 15px;border-radius:8px;cursor:pointer}
+  .role-switch button.on{background:var(--frame);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+  .roleapp{display:none;flex-direction:column;flex:1;min-height:0}
+  .roleapp.active{display:flex}
+
+  /* ---- Cuidadora ---- */
+  .next-dose{background:var(--brand);color:#fff;border-radius:var(--radius);padding:16px;margin-bottom:14px}
+  .next-dose .lbl{font-size:11px;opacity:.9;text-transform:uppercase;letter-spacing:.05em}
+  .next-dose .nm{font-size:19px;font-weight:800;margin-top:4px}
+  .next-dose .cd{font-size:12.5px;opacity:.95;margin-top:2px}
+  .next-dose .btn{background:#fff;color:var(--brand);width:100%;margin-top:13px;padding:11px;font-weight:700}
+  .alarm-band{background:var(--warn-bg);border:1px solid #eedcab;border-radius:14px;padding:11px 13px;margin-bottom:14px;display:flex;align-items:center;gap:11px}
+  .task{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+  .task:last-child{border-bottom:0}
+  .task .cb{width:24px;height:24px;border-radius:7px;border:2px solid var(--line-strong);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;font-weight:700}
+  .task.done .cb{background:var(--ok);border-color:var(--ok)}
+  .task.done .tn{text-decoration:line-through;color:var(--ink-faint)}
+  .task .tn{font-size:14px;font-weight:600}
+  .task .tt{margin-left:auto;font-size:12px;color:var(--ink-faint)}
+  .qa-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .qa{border:1px solid var(--line);border-radius:14px;padding:14px 10px;text-align:center;cursor:pointer;background:var(--frame)}
+  .qa:active{background:var(--surface)}
+  .qa .qi{font-size:22px}
+  .qa .ql{font-size:12px;font-weight:600;margin-top:6px}
+  .sos-big{display:flex;align-items:center;justify-content:center;gap:9px;background:var(--danger);color:#fff;border-radius:14px;padding:15px;font-size:15px;font-weight:800;cursor:pointer;margin-top:14px}
+  .sos-mini{width:46px;height:40px;border-radius:12px;background:var(--danger);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0}
+  .job{border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:11px}
+  .job .jt{font-size:14px;font-weight:700}
+  .job .jm{font-size:12px;color:var(--ink-soft);margin-top:3px;line-height:1.5}
+
+  /* ---- Adulto mayor (accesible) ---- */
+  #app-adulto .screen-wrap{background:var(--frame)}
+  .am-hello{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:6px 0 2px}
+  .am-sub{font-size:15px;color:var(--ink-soft);margin-bottom:18px}
+  .am-tile{display:flex;align-items:center;gap:16px;background:var(--frame);border:2px solid var(--line);border-radius:20px;padding:20px;margin-bottom:14px;cursor:pointer}
+  .am-tile:active{background:var(--surface)}
+  .am-tile .ic{width:58px;height:58px;border-radius:16px;background:var(--brand-soft);color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0}
+  .am-tile .tx{font-size:21px;font-weight:800}
+  .am-tile .ts{font-size:14px;color:var(--ink-soft);margin-top:2px}
+  .am-mood{background:var(--frame);border:2px solid var(--line);border-radius:20px;padding:18px;margin-bottom:16px;text-align:center}
+  .am-mood .q{font-size:19px;font-weight:800;margin-bottom:14px}
+  .am-faces{display:flex;justify-content:center;gap:14px}
+  .am-face{font-size:40px;cursor:pointer;padding:6px;border-radius:14px;line-height:1}
+  .am-face:active{background:var(--surface-2)}
+  .am-back{display:inline-flex;align-items:center;gap:8px;font-size:17px;font-weight:700;color:var(--brand);cursor:pointer;margin-bottom:14px}
+  .am-mic{display:flex;align-items:center;justify-content:center;width:84px;height:84px;border-radius:50%;background:var(--brand);color:#fff;font-size:36px;cursor:pointer;margin:18px auto 0}
+  .am-bubble{max-width:84%;padding:15px 18px;border-radius:20px;font-size:18px;line-height:1.5;background:var(--surface-2);align-self:flex-start}
+  .am-listen{display:inline-flex;align-items:center;gap:10px;background:var(--brand-soft);color:var(--brand);border-radius:14px;padding:14px 18px;font-size:18px;font-weight:700;cursor:pointer;margin-top:14px}
+  .am-photo{border-radius:18px;background:var(--surface-2);height:200px;display:flex;align-items:center;justify-content:center;font-size:56px;color:var(--ink-faint);margin-bottom:12px}
+  .am-thumbs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .am-thumb{height:80px;border-radius:12px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--ink-faint)}
+
+  /* ---- Check-in de síntomas (adulto mayor) ---- */
+  .ci-q{font-size:18px;font-weight:800;margin:18px 0 2px}
+  .ci-scale{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:8px}
+  .ci-scale .am-face{font-size:34px}
+  .ci-ends{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-faint);margin-top:2px;padding:0 6px}
+  .btn:disabled{opacity:.4;cursor:default}
+
+
+  /* ---- Toggle switch ---- */
+  .switch{margin-left:auto;width:44px;height:26px;border-radius:14px;background:var(--line-strong);position:relative;flex-shrink:0;transition:background .2s}
+  .switch i{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s}
+  .switch.on{background:var(--brand)}
+  .switch.on i{left:21px}
+
+  /* ---- Modo oscuro ---- */
+  body{transition:background .2s,color .2s}
+  body.dark{
+    --bg:#0f1318; --frame:#171c23; --ink:#e8ecf2; --ink-soft:#aab2bf; --ink-faint:#6f7884;
+    --line:#272f3a; --line-strong:#3a4350; --surface:#1c222b; --surface-2:#222b35;
+    --brand-soft:#1c2b43; --ok-bg:#12301f; --warn-bg:#33280f; --danger-bg:#341a17;
+  }
+
+</style>
+</head>
+<body>
+
+<div class="doc-head">
+  <h1>Suite de Cuidado de Adultos Mayores</h1>
+  <p>Wireframe navegable · v1 · móvil — cambia entre <strong>Familiar · Cuidadora · Adulto mayor</strong></p>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--ok)"></i>Bien</span>
+    <span><i class="dot" style="background:var(--warn)"></i>Regular</span>
+    <span><i class="dot" style="background:var(--danger)"></i>Requiere atención</span>
+  </div>
+  <div class="role-switch">
+    <button id="rs-fam" class="on" onclick="setRole('familiar')">Familiar</button>
+    <button id="rs-cui" onclick="setRole('cuidadora')">Cuidadora</button>
+    <button id="rs-am" onclick="setRole('adulto')">Adulto mayor</button>
+  </div>
+  <div class="plan-switch">
+
+    <button id="ps-free" class="on" onclick="simulatePlan('free')">Plan Gratis</button>
+    <button id="ps-paid" onclick="simulatePlan('paid')">Plan Premium</button>
+  </div>
+  <div class="faint" style="font-size:10.5px;margin-top:6px">Simula el plan para ver cómo se revelan los datos de contacto del Marketplace</div>
+</div>
+
+<div class="phone">
+  <div class="notch"></div>
+  <div class="statusbar"><span>9:41</span><span>5G ▪ 100%</span></div>
+
+  <div class="roleapp active" id="app-familiar">
+  <!-- Persistent top bar -->
+  <div class="topbar">
+    <div class="pt-selector" onclick="openSheet('sheet-patients')">
+      <div class="avatar" id="tb-av">E</div>
+      <div>
+        <div class="pt-name" id="tb-name">Mamá · Elena</div>
+        <div class="pt-sub">Toca para cambiar de paciente</div>
+      </div>
+      <div class="caret">▾</div>
+    </div>
+    <div class="bell" onclick="openSheet('sheet-alerts')">🔔<span class="badge">2</span></div>
+  </div>
+
+  <div class="screen-wrap" id="scroll">
+
+    <!-- ============ INICIO / HOY ============ -->
+    <section class="screen active" id="s-home">
+      <div class="screen-title">Hoy</div>
+
+      <!-- Alert band -->
+      <div class="alert-band" onclick="openSheet('sheet-alerts')">
+        <span class="alert-ic">🟠</span>
+        <div style="flex:1">
+          <div class="t">Medicamento no tomado</div>
+          <div class="s">Elena · Losartán de las 14:00 sin registrar</div>
+        </div>
+        <span class="caret">›</span>
+      </div>
+
+      <div class="section-label">Tus pacientes</div>
+
+      <!-- Patient A -->
+      <div class="sem-card sem-warn" onclick="go('salud')">
+        <div class="sem-top">
+          <div class="avatar">E</div>
+          <div style="flex:1">
+            <div class="pt-name">Mamá · Elena, 78</div>
+            <div class="faint">Última lectura hace 6 min</div>
+          </div>
+          <span class="pill pill-warn">● Regular</span>
+        </div>
+        <div class="sem-metrics">
+          <div class="metric"><div class="v">72 <small>lpm</small></div><div class="l">Ritmo</div></div>
+          <div class="metric"><div class="v">96 <small>%</small></div><div class="l">SpO₂</div></div>
+          <div class="metric"><div class="v">2/3</div><div class="l">Medicinas</div></div>
+        </div>
+      </div>
+
+      <!-- Patient B -->
+      <div class="sem-card sem-ok" onclick="switchPatient('jorge');go('salud')">
+        <div class="sem-top">
+          <div class="avatar">J</div>
+          <div style="flex:1">
+            <div class="pt-name">Papá · Jorge, 81</div>
+            <div class="faint">Última lectura hace 2 min</div>
+          </div>
+          <span class="pill pill-ok">● Bien</span>
+        </div>
+        <div class="sem-metrics">
+          <div class="metric"><div class="v">68 <small>lpm</small></div><div class="l">Ritmo</div></div>
+          <div class="metric"><div class="v">98 <small>%</small></div><div class="l">SpO₂</div></div>
+          <div class="metric"><div class="v">3/3</div><div class="l">Medicinas</div></div>
+        </div>
+      </div>
+
+      <div class="section-label">Resumen de Elena</div>
+
+      <div class="card tap" onclick="go('salud')">
+        <div class="card-head"><h3>Vitals del wearable</h3><span class="faint">Ver todo ›</span></div>
+        <div class="vital-grid">
+          <div class="vital">
+            <div class="top"><span class="name">❤️ Ritmo cardíaco</span></div>
+            <div class="val">72 <small>lpm</small></div>
+            <svg class="spark" viewBox="0 0 100 26" preserveAspectRatio="none"><polyline fill="none" stroke="var(--ok)" stroke-width="2" points="0,18 14,14 28,16 42,10 56,13 70,9 84,12 100,8"/></svg>
+          </div>
+          <div class="vital">
+            <div class="top"><span class="name">🫁 SpO₂</span></div>
+            <div class="val">96 <small>%</small></div>
+            <svg class="spark" viewBox="0 0 100 26" preserveAspectRatio="none"><polyline fill="none" stroke="var(--warn)" stroke-width="2" points="0,8 14,9 28,7 42,11 56,12 70,14 84,11 100,13"/></svg>
+            <div class="thr">Umbral mín. 94%</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Medicamentos de hoy</h3><span class="pill pill-warn">1 pendiente</span></div>
+        <div class="med"><div class="med-status ms-ok">✓</div><div><div class="mn">Metformina</div><div class="md">850 mg</div></div><div class="mt">08:00 ✓</div></div>
+        <div class="med"><div class="med-status ms-miss">!</div><div><div class="mn">Losartán</div><div class="md">50 mg</div></div><div class="mt" style="color:var(--danger)">14:00 omitida</div></div>
+        <div class="med"><div class="med-status ms-pend"></div><div><div class="mn">Atorvastatina</div><div class="md">20 mg</div></div><div class="mt">21:00</div></div>
+        <div class="faint" style="margin-top:8px">El plan lo gestiona la cuidadora / médico · tú observas</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Última observación</h3><span class="faint">hace 1 h</span></div>
+        <div class="row" style="align-items:flex-start;gap:11px">
+          <div class="obs" style="border:0;padding:0"><div class="av">👩‍⚕️</div></div>
+          <div class="muted">"Desayunó bien y de buen ánimo. Caminamos en el jardín 15 min. Comenta leve dolor de rodilla." <br><span class="faint">— Rosa (cuidadora)</span></div>
+        </div>
+      </div>
+
+      <div class="ai-cta" onclick="setCommTab('ai')">💬 Preguntar al asistente sobre Elena</div>
+    </section>
+
+    <!-- ============ SALUD ============ -->
+    <section class="screen" id="s-salud">
+      <div class="screen-title">Salud · Elena</div>
+      <div class="subtabs">
+        <div class="subtab active" onclick="sub(this,'sp-vitals')">Vitals</div>
+        <div class="subtab" onclick="sub(this,'sp-meds')">Medicinas</div>
+        <div class="subtab" onclick="sub(this,'sp-obs')">Bitácora</div>
+        <div class="subtab" onclick="sub(this,'sp-docs')">Docs</div>
+      </div>
+
+      <!-- Vitals -->
+      <div class="subpane active" id="sp-vitals">
+        <div class="card" style="background:var(--surface);display:flex;align-items:center;gap:10px">
+          <span style="font-size:18px">⌚</span>
+          <div style="flex:1"><div style="font-size:13px;font-weight:600">Wearable sincronizado</div><div class="faint">Última lectura 9:35 · Batería 64%</div></div>
+          <span class="pill pill-ok">● En línea</span>
+        </div>
+
+        <div class="vital-grid">
+          <div class="vital">
+            <div class="top"><span class="name">❤️ Ritmo</span><span class="faint">reposo</span></div>
+            <div class="val">72 <small>lpm</small></div>
+            <svg class="spark" viewBox="0 0 100 26" preserveAspectRatio="none"><polyline fill="none" stroke="var(--ok)" stroke-width="2" points="0,18 14,14 28,16 42,10 56,13 70,9 84,12 100,8"/></svg>
+            <div class="thr">Rango 55–95 lpm</div>
+          </div>
+          <div class="vital">
+            <div class="top"><span class="name">🫁 SpO₂</span></div>
+            <div class="val" style="color:var(--warn)">96 <small>%</small></div>
+            <svg class="spark" viewBox="0 0 100 26" preserveAspectRatio="none"><polyline fill="none" stroke="var(--warn)" stroke-width="2" points="0,8 14,9 28,7 42,11 56,12 70,14 84,11 100,13"/></svg>
+            <div class="thr">Umbral mín. 94% ⚙︎</div>
+          </div>
+          <div class="vital">
+            <div class="top"><span class="name">😴 Sueño</span></div>
+            <div class="val">6.2 <small>h</small></div>
+            <svg class="spark" viewBox="0 0 100 26" preserveAspectRatio="none"><polyline fill="none" stroke="var(--brand)" stroke-width="2" points="0,6 14,9 28,8 42,14 56,12 70,16 84,10 100,12"/></svg>
+            <div class="thr">Anoche · -1.3h vs media</div>
+          </div>
+          <div class="vital">
+            <div class="top"><span class="name">🚶 Actividad</span></div>
+            <div class="val">2,340 <small>pasos</small></div>
+            <svg class="spark" viewBox="0 0 100 26" preserveAspectRatio="none"><polyline fill="none" stroke="var(--ok)" stroke-width="2" points="0,20 14,18 28,15 42,16 56,12 70,13 84,9 100,7"/></svg>
+            <div class="thr">Sedentario 5.1 h</div>
+          </div>
+        </div>
+        <div class="ai-cta" onclick="setCommTab('ai')">💬 ¿Cómo ha dormido esta semana?</div>
+      </div>
+
+      <!-- Meds -->
+      <div class="subpane" id="sp-meds">
+        <div class="card">
+          <div class="card-head"><h3>Adherencia de hoy</h3><span class="faint">2 de 3</span></div>
+          <div class="progress"><i style="width:66%"></i></div>
+          <div class="faint">2 tomadas · 1 omitida · 0 pendientes</div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Plan de medicamentos</h3><span class="role-badge">Solo lectura</span></div>
+          <div class="med"><div class="med-status ms-ok">✓</div><div><div class="mn">Metformina</div><div class="md">850 mg · con desayuno</div></div><div class="mt">08:00</div></div>
+          <div class="med"><div class="med-status ms-miss">!</div><div><div class="mn">Losartán</div><div class="md">50 mg · mediodía</div></div><div class="mt" style="color:var(--danger)">14:00</div></div>
+          <div class="med"><div class="med-status ms-pend"></div><div><div class="mn">Atorvastatina</div><div class="md">20 mg · noche</div></div><div class="mt">21:00</div></div>
+          <div class="faint" style="margin-top:10px">El plan lo configuran la cuidadora o el médico. Como familiar puedes verlo pero no editarlo.</div>
+        </div>
+      </div>
+
+      <!-- Observaciones -->
+      <div class="subpane" id="sp-obs">
+        <div class="card">
+          <div class="obs"><div class="av">👩‍⚕️</div><div><div class="b">Desayunó bien y de buen ánimo. Caminamos en el jardín 15 min. Comenta leve dolor de rodilla.</div><div class="meta">Rosa · hoy 10:20 · 📷 1 foto</div></div></div>
+          <div class="obs"><div class="av">👵</div><div><div class="b">"Hoy me siento regular" — check-in del paciente</div><div class="meta">Elena · hoy 09:10</div></div></div>
+          <div class="obs"><div class="av">👩‍⚕️</div><div><div class="b">Durmió intranquila, se despertó dos veces. Tomó su té antes de dormir.</div><div class="meta">Rosa · ayer 22:40</div></div></div>
+        </div>
+        <div class="faint" style="text-align:center">La bitácora la escribe la cuidadora · el paciente aporta su check-in</div>
+      </div>
+
+      <!-- Docs -->
+      <div class="subpane" id="sp-docs">
+        <div class="card">
+          <div class="doc-row"><div class="doc-ic">📄</div><div style="flex:1"><div class="mn" style="font-size:13.5px;font-weight:600">Receta — Dr. Núñez</div><div class="md">PDF · 12 jun 2026</div></div><span class="chev">›</span></div>
+          <div class="doc-row"><div class="doc-ic">🩻</div><div style="flex:1"><div class="mn" style="font-size:13.5px;font-weight:600">Radiografía rodilla der.</div><div class="md">Imagen · 03 jun 2026</div></div><span class="chev">›</span></div>
+          <div class="doc-row"><div class="doc-ic">🧪</div><div style="flex:1"><div class="mn" style="font-size:13.5px;font-weight:600">Análisis de sangre</div><div class="md">PDF · 28 may 2026</div></div><span class="chev">›</span></div>
+        </div>
+        <div class="ai-cta" onclick="setCommTab('ai')">💬 Resúmeme los últimos estudios</div>
+      </div>
+    </section>
+
+    <!-- ============ COMUNICACIÓN ============ -->
+    <section class="screen" id="s-comunicacion">
+      <div class="screen-title">Comunicación</div>
+      <div class="subtabs">
+        <div class="subtab active" id="ct-ai" onclick="setCommTab('ai')">🤖 Asistente IA</div>
+        <div class="subtab" id="ct-msg" onclick="setCommTab('msg')">👥 Mensajes</div>
+      </div>
+
+      <!-- AI tab -->
+      <div class="subpane active" id="cp-ai">
+        <div class="faint" style="text-align:center;margin-bottom:12px">Pregunta en lenguaje natural sobre el expediente de Elena</div>
+        <div class="suggest">
+          <span class="chip">¿Cómo ha dormido esta semana?</span>
+          <span class="chip">¿Se saltó alguna medicina?</span>
+          <span class="chip">Resúmeme mayo</span>
+        </div>
+        <div class="chat">
+          <div class="bubble b-me">¿Cómo estuvo el sueño de mamá esta semana?</div>
+          <div class="b-name">🤖 Asistente</div>
+          <div class="bubble b-ai">Esta semana Elena durmió en promedio <strong>6.4 h</strong>, por debajo de su media habitual (7.7 h). Las noches más cortas fueron lunes y anoche. Coincide con la observación de Rosa sobre despertares. ¿Quieres ver la tendencia detallada?</div>
+          <div class="bubble b-me">¿Y se tomó todas sus medicinas?</div>
+          <div class="b-name">🤖 Asistente</div>
+          <div class="bubble b-ai">Casi todas. Hoy quedó pendiente el <strong>Losartán de las 14:00</strong>. El resto de la semana la adherencia fue del 100%.</div>
+        </div>
+        <div class="composer">
+          <div class="input">Pregunta sobre el historial…</div>
+          <div class="ic">↑</div>
+        </div>
+      </div>
+
+      <!-- Messages tab -->
+      <div class="subpane" id="cp-msg">
+        <div class="faint" style="text-align:center;margin-bottom:10px">Grupo · Cuidado de Elena · 4 personas</div>
+        <div class="chat">
+          <div class="b-name">Rosa (cuidadora)</div>
+          <div class="bubble b-them">Buenos días 🙂 Elena amaneció bien, desayunó completo.</div>
+          <div class="chat-meta" style="align-self:flex-start">10:21</div>
+
+          <div class="bubble b-me">Gracias Rosa 🙏 ¿Quién la lleva al médico el jueves?</div>
+          <div class="chat-meta" style="align-self:flex-end">10:24</div>
+
+          <div class="b-name">Carlos (hermano)</div>
+          <div class="bubble b-them">Yo puedo el jueves en la mañana.</div>
+          <div class="chat-meta" style="align-self:flex-start">10:26</div>
+
+          <div class="bubble b-me">@asistente ¿cómo van sus vitals esta semana?</div>
+          <div class="b-name">🤖 Asistente (en el chat)</div>
+          <div class="bubble b-ai">Vitals estables. SpO₂ rozó el umbral (96%) hoy y el sueño bajó un poco. Ritmo cardíaco normal.</div>
+
+          <div class="b-name">👵 Elena</div>
+          <div class="bubble b-them">🎤 Nota de voz · 0:08 ▶</div>
+          <div class="chat-meta" style="align-self:flex-start">10:30</div>
+        </div>
+        <div class="composer">
+          <div class="input">Escribe al grupo… (usa @asistente)</div>
+          <div class="ic">↑</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ MARKETPLACE ============ -->
+    <section class="screen" id="s-marketplace">
+      <div class="screen-title">Marketplace</div>
+      <div class="mk-banner">🛈 Vitrina de descubrimiento. En v1 el contacto y la compra ocurren fuera de la app. <span id="mk-plan-tag" class="plan-tag plan-free">Plan Gratis</span></div>
+      <div class="subtabs">
+        <div class="subtab active" onclick="sub(this,'mk-care')">Cuidadoras</div>
+        <div class="subtab" onclick="sub(this,'mk-items')">Artículos</div>
+      </div>
+
+      <div class="subpane active" id="mk-care">
+        <div class="cat-row">
+          <div class="cat active">Todas</div><div class="cat">Cerca de ti</div><div class="cat">Geriatría</div><div class="cat">Disponible ya</div><div class="cat">Inglés</div>
+        </div>
+        <div class="provider">
+          <div class="pv-av">👩‍⚕️</div>
+          <div style="flex:1">
+            <div class="mn" style="font-size:14px;font-weight:700">Rosa Medina</div>
+            <div class="stars">★★★★★ <span class="faint">4.9 · 86 reseñas</span></div>
+            <div><span class="tag">Geriatría</span><span class="tag">8 años</span><span class="tag">Zona Norte</span></div>
+          </div>
+          <button class="btn" onclick="openContact('Rosa Medina','👩‍⚕️','Geriatría · 4.9★','+52 55 1234 5678','rosa.medina@cuida.mx')">Contactar</button>
+        </div>
+        <div class="provider">
+          <div class="pv-av">👨‍⚕️</div>
+          <div style="flex:1">
+            <div class="mn" style="font-size:14px;font-weight:700">Luis Cárdenas</div>
+            <div class="stars">★★★★☆ <span class="faint">4.6 · 41 reseñas</span></div>
+            <div><span class="tag">Movilidad</span><span class="tag">Certificado RCP</span><span class="tag">Inglés</span></div>
+          </div>
+          <button class="btn" onclick="openContact('Luis Cárdenas','👨‍⚕️','Movilidad · 4.6★','+52 55 9876 5432','luis.cardenas@cuida.mx')">Contactar</button>
+        </div>
+        <div class="provider">
+          <div class="pv-av">👩‍⚕️</div>
+          <div style="flex:1">
+            <div class="mn" style="font-size:14px;font-weight:700">Andrea Sosa</div>
+            <div class="stars">★★★★★ <span class="faint">5.0 · 23 reseñas</span></div>
+            <div><span class="tag">Demencia</span><span class="tag">Nocturno</span></div>
+          </div>
+          <button class="btn" onclick="openContact('Andrea Sosa','👩‍⚕️','Demencia · 5.0★','+52 55 4455 6677','andrea.sosa@cuida.mx')">Contactar</button>
+        </div>
+      </div>
+
+      <div class="subpane" id="mk-items">
+        <div class="cat-row">
+          <div class="cat active">Todo</div><div class="cat">Movilidad</div><div class="cat">Monitoreo</div><div class="cat">Seguridad hogar</div><div class="cat">Cuidado diario</div>
+        </div>
+        <div class="prod-grid">
+          <div class="prod"><div class="img">🦯</div><div class="pb"><div class="pn">Andador plegable con asiento</div><div class="pp">$ 45 – 70</div></div></div>
+          <div class="prod"><div class="img">🩺</div><div class="pb"><div class="pn">Oxímetro de pulso</div><div class="pp">$ 18 – 30</div></div></div>
+          <div class="prod"><div class="img">🛁</div><div class="pb"><div class="pn">Barras de baño antideslizantes</div><div class="pp">$ 22 – 40</div></div></div>
+          <div class="prod"><div class="img">📟</div><div class="pb"><div class="pn">Botón de emergencia SOS</div><div class="pp">$ 35 – 60</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ MÁS ============ -->
+    <section class="screen" id="s-mas">
+      <div class="screen-title">Más</div>
+
+      <div class="section-label">Pacientes</div>
+      <div class="list-grp">
+        <div class="li"><div class="li-ic">👵</div><div><div class="lt">Mamá · Elena</div><div class="ls">Wearable vinculado · 2 cuidadores</div></div><span class="chev">›</span></div>
+        <div class="li"><div class="li-ic">👴</div><div><div class="lt">Papá · Jorge</div><div class="ls">Wearable vinculado · 1 cuidador</div></div><span class="chev">›</span></div>
+        <div class="li"><div class="li-ic" style="color:var(--brand)">＋</div><div><div class="lt" style="color:var(--brand)">Añadir paciente</div></div></div>
+      </div>
+
+      <div class="section-label">Roles e invitaciones</div>
+      <div class="list-grp">
+        <div class="li"><div class="li-ic">👩‍⚕️</div><div style="flex:1"><div class="lt">Rosa Medina</div><div class="ls">Cuidadora · opera el día a día</div></div><span class="role-badge">Cuidadora</span></div>
+        <div class="li"><div class="li-ic">🧑‍⚕️</div><div style="flex:1"><div class="lt">Dr. Núñez</div><div class="ls">Prescribe medicamentos</div></div><span class="role-badge">Médico</span></div>
+        <div class="li"><div class="li-ic">👨</div><div style="flex:1"><div class="lt">Carlos (tú)</div><div class="ls">Observa, recibe alertas, coordina</div></div><span class="role-badge">Familiar</span></div>
+        <div class="li"><div class="li-ic" style="color:var(--brand)">✉️</div><div><div class="lt" style="color:var(--brand)">Invitar a alguien</div></div></div>
+      </div>
+
+      <div class="section-label">Apariencia e idioma</div>
+      <div class="list-grp">
+        <div class="li" onclick="openSheet('sheet-lang')"><div class="li-ic">🌐</div><div style="flex:1"><div class="lt">Idioma</div><div class="ls lang-label">Español</div></div><span class="chev">›</span></div>
+        <div class="li" onclick="toggleTheme()"><div class="li-ic">🌙</div><div style="flex:1"><div class="lt">Modo oscuro</div><div class="ls theme-label">Desactivado</div></div><span class="switch theme-sw"><i></i></span></div>
+      </div>
+
+      <div class="section-label">Notificaciones y ajustes</div>
+      <div class="list-grp">
+        <div class="li"><div class="li-ic">🔔</div><div style="flex:1"><div class="lt">Alertas y umbrales</div><div class="ls">SpO₂, ritmo, ventanas de medicación</div></div><span class="chev">›</span></div>
+        <div class="li"><div class="li-ic">📲</div><div style="flex:1"><div class="lt">Notificaciones push</div><div class="ls">Activadas para alertas críticas</div></div><span class="chev">›</span></div>
+        <div class="li"><div class="li-ic">⌚</div><div style="flex:1"><div class="lt">Dispositivos / wearables</div></div><span class="chev">›</span></div>
+        <div class="li"><div class="li-ic">⚙️</div><div style="flex:1"><div class="lt">Cuenta y privacidad</div></div><span class="chev">›</span></div>
+      </div>
+    </section>
+
+  </div><!-- /screen-wrap -->
+
+  <!-- Bottom nav -->
+  <div class="botnav">
+    <div class="nav-item active" id="n-home" onclick="go('home')"><span class="ni">🏠</span><span class="nl">Hoy</span></div>
+    <div class="nav-item" id="n-salud" onclick="go('salud')"><span class="ni">❤️</span><span class="nl">Salud</span></div>
+    <div class="nav-item" id="n-comunicacion" onclick="go('comunicacion')"><span class="ni">💬</span><span class="nl">Comunicación</span></div>
+    <div class="nav-item" id="n-marketplace" onclick="go('marketplace')"><span class="ni">🛍️</span><span class="nl">Marketplace</span></div>
+    <div class="nav-item" id="n-mas" onclick="go('mas')"><span class="ni">☰</span><span class="nl">Más</span></div>
+  </div>
+
+  </div><!-- /app-familiar -->
+
+  <!-- ====================== APP CUIDADORA ====================== -->
+  <div class="roleapp" id="app-cuidadora">
+    <div class="topbar">
+      <div class="pt-selector" style="cursor:default">
+        <div class="avatar">E</div>
+        <div>
+          <div class="pt-name">Elena, 78</div>
+          <div class="pt-sub">A tu cuidado · turno mañana</div>
+        </div>
+      </div>
+      <div class="sos-mini" onclick="openSheet('sheet-sos')">SOS</div>
+      <div class="bell" onclick="openSheet('sheet-alarm')">🔔<span class="badge">1</span></div>
+    </div>
+
+    <div class="screen-wrap" id="scrollC">
+
+      <!-- Check-in / Hoy -->
+      <section class="screen active" id="sc-hoy">
+        <div class="screen-title">Hoy · turno mañana</div>
+
+        <div class="alarm-band" onclick="openSheet('sheet-alarm')">
+          <span class="alert-ic">⏰</span>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:700">Alarma de medicamento</div>
+            <div style="font-size:11.5px;color:var(--ink-soft)">Losartán 50 mg · venció 14:00 · sin confirmar</div>
+          </div>
+          <button class="btn" style="padding:7px 12px">Marcar</button>
+        </div>
+
+        <div class="next-dose">
+          <div class="lbl">Próxima toma</div>
+          <div class="nm">Atorvastatina 20 mg</div>
+          <div class="cd">Hoy 21:00 · en 6 h 12 min</div>
+          <button class="btn">✓ Marcar administrada</button>
+        </div>
+
+        <div class="section-label">Tareas del día</div>
+        <div class="card">
+          <div class="task done" onclick="this.classList.toggle('done')"><div class="cb">✓</div><div class="tn">Metformina 850 mg</div><div class="tt">08:00</div></div>
+          <div class="task done" onclick="this.classList.toggle('done')"><div class="cb">✓</div><div class="tn">Desayuno</div><div class="tt">08:30</div></div>
+          <div class="task done" onclick="this.classList.toggle('done')"><div class="cb">✓</div><div class="tn">Higiene / aseo</div><div class="tt">09:30</div></div>
+          <div class="task" onclick="this.classList.toggle('done')"><div class="cb"></div><div class="tn">Caminata en el jardín</div><div class="tt">11:00</div></div>
+          <div class="task" onclick="this.classList.toggle('done')"><div class="cb"></div><div class="tn">Almuerzo</div><div class="tt">13:00</div></div>
+          <div class="task" onclick="this.classList.toggle('done')"><div class="cb"></div><div class="tn">Losartán 50 mg</div><div class="tt">14:00</div></div>
+        </div>
+
+        <div class="section-label">Acciones rápidas</div>
+        <div class="qa-grid">
+          <div class="qa" onclick="goC('registrar')"><div class="qi">📝</div><div class="ql">Observación</div></div>
+          <div class="qa" onclick="goC('registrar')"><div class="qi">🩺</div><div class="ql">Vital manual</div></div>
+          <div class="qa" onclick="onPhoto()"><div class="qi">📷</div><div class="ql">Foto a familia<br><span class="plan-tag plan-paid" style="font-size:9px;padding:1px 6px;margin:3px 0 0">Premium</span></div></div>
+          <div class="qa" onclick="openSheet('sheet-incident')"><div class="qi">⚠️</div><div class="ql">Incidente</div></div>
+        </div>
+
+        <div class="sos-big" onclick="openSheet('sheet-sos')">🆘 Emergencia / SOS</div>
+      </section>
+
+      <!-- Registrar -->
+      <section class="screen" id="sc-registrar">
+        <div class="screen-title">Registrar</div>
+        <div class="faint" style="text-align:center;margin-bottom:12px">Captura la información del día de Elena</div>
+        <div class="list-grp">
+          <div class="li"><div class="li-ic">💊</div><div style="flex:1"><div class="lt">Confirmar medicamento</div><div class="ls">Administrada · pospuesta · omitida</div></div><span class="chev">›</span></div>
+          <div class="li"><div class="li-ic">📝</div><div style="flex:1"><div class="lt">Nueva observación</div><div class="ls">Ánimo, apetito, sueño · texto o foto</div></div><span class="chev">›</span></div>
+          <div class="li"><div class="li-ic">🩺</div><div style="flex:1"><div class="lt">Vital manual</div><div class="ls">Presión, temperatura, glucosa</div></div><span class="chev">›</span></div>
+          <div class="li" onclick="openSheet('sheet-incident')"><div class="li-ic">⚠️</div><div style="flex:1"><div class="lt">Registrar incidente</div><div class="ls">Caída presenciada u otro evento</div></div><span class="chev">›</span></div>
+          <div class="li"><div class="li-ic">🔁</div><div style="flex:1"><div class="lt">Nota de relevo</div><div class="ls">Para la siguiente cuidadora</div></div><span class="chev">›</span></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Ejemplo · Confirmar dosis</h3></div>
+          <div class="med" style="border:0"><div class="med-status ms-pend"></div><div><div class="mn">Losartán</div><div class="md">50 mg · 14:00</div></div></div>
+          <div class="row" style="gap:8px;margin-top:10px">
+            <button class="btn" style="flex:1">✓ Administrada</button>
+            <button class="btn ghost" style="flex:1">Posponer</button>
+            <button class="btn ghost" style="flex:1;color:var(--danger);border-color:var(--danger)">Omitir</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Familia (chat) -->
+      <section class="screen" id="sc-familia">
+        <div class="screen-title">Familia</div>
+        <div class="faint" style="text-align:center;margin-bottom:10px">Grupo · Cuidado de Elena · 4 personas</div>
+        <div class="chat">
+          <div class="bubble b-me">Buenos días 🙂 Elena amaneció bien, desayunó completo.</div>
+          <div class="chat-meta" style="align-self:flex-end">10:21</div>
+          <div class="b-name">Carlos (familiar)</div>
+          <div class="bubble b-them">Gracias Rosa 🙏 ¿Quién la lleva al médico el jueves?</div>
+          <div class="chat-meta" style="align-self:flex-start">10:24</div>
+          <div class="bubble b-me" style="padding:0;overflow:hidden">
+            <div style="height:120px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:34px">🖼️</div>
+            <div style="padding:9px 13px">Foto del jardín 🌿</div>
+          </div>
+          <div class="chat-meta" style="align-self:flex-end">11:05 · enviada con Premium</div>
+        </div>
+        <div class="composer">
+          <div class="ic" style="background:var(--surface-2);color:var(--ink-soft)" onclick="onPhoto()">📷</div>
+          <div class="input">Escribe al grupo…</div>
+          <div class="ic">↑</div>
+        </div>
+      </section>
+
+      <!-- Trabajo -->
+      <section class="screen" id="sc-trabajo">
+        <div class="screen-title">Trabajo</div>
+
+        <div class="section-label">Mi perfil profesional</div>
+        <div class="card">
+          <div class="row" style="gap:12px">
+            <div class="pv-av" style="width:54px;height:54px;font-size:24px">👩‍⚕️</div>
+            <div style="flex:1">
+              <div class="mn" style="font-size:15px;font-weight:700">Rosa Medina</div>
+              <div class="stars">★★★★★ <span class="faint">4.9 · 86 reseñas</span></div>
+              <div><span class="tag">Geriatría</span><span class="tag">8 años</span><span class="tag">RCP</span></div>
+            </div>
+          </div>
+          <button class="btn ghost" style="width:100%;margin-top:12px">Editar perfil</button>
+        </div>
+
+        <div class="card" style="border-color:#eedcab;background:var(--warn-bg)">
+          <div class="row between"><h3 style="font-size:14px">⭐ Perfil destacado</h3><span class="plan-tag plan-paid">Premium</span></div>
+          <div class="muted" style="margin-top:6px">Aparece primero en el marketplace y recibe más solicitudes.</div>
+          <button class="btn" style="width:100%;margin-top:10px" onclick="simulatePlan('paid')">Activar destacado</button>
+        </div>
+
+        <div class="section-label">Ofertas de trabajo <span class="plan-tag plan-paid">Premium</span></div>
+        <div id="jobs-paid" style="display:none">
+          <div class="job"><div class="jt">Cuidado diurno · Sra. Beatriz, 82</div><div class="jm">Col. Roma · Lun–Vie 8:00–15:00 · Movilidad reducida</div><button class="btn ghost" style="margin-top:9px">Ver contacto (fuera de la app)</button></div>
+          <div class="job"><div class="jt">Cuidado nocturno · Sr. Alfonso, 79</div><div class="jm">Coyoacán · Vie–Sáb noches · Demencia leve</div><button class="btn ghost" style="margin-top:9px">Ver contacto (fuera de la app)</button></div>
+        </div>
+        <div id="jobs-locked">
+          <div class="locked-box" style="padding:10px 14px">
+            <div class="job" style="margin:0;border:0;padding:4px 0"><div class="jt blur">Cuidado diurno · Sra. Beatriz</div><div class="jm blur">Col. Roma · Lun–Vie 8:00–15:00 · Movilidad</div></div>
+            <div class="lock-overlay">🔒</div>
+          </div>
+          <div class="paywall">
+            <div class="pw-title">🔒 Ofertas con Premium</div>
+            <div class="pw-sub">Mejora tu plan para ver y postular a ofertas de trabajo de cuidado.</div>
+            <button class="btn" style="width:100%;margin-top:12px;padding:12px" onclick="simulatePlan('paid')">⭐ Mejorar a Premium</button>
+          </div>
+        </div>
+
+        <div class="section-label">Reportes <span class="plan-tag plan-paid">Premium</span></div>
+        <div class="card tap" onclick="if(userPlan!=='paid'){openSheet('sheet-paywall')}">
+          <div class="row between"><div><div class="lt" style="font-size:13.5px;font-weight:600">Historial y reportes extendidos</div><div class="ls">Exporta tu trabajo y estadísticas</div></div><span class="chev">🔒</span></div>
+        </div>
+      </section>
+
+      <!-- Más -->
+      <section class="screen" id="sc-mas">
+        <div class="screen-title">Más</div>
+        <div class="section-label">Mi plan</div>
+        <div class="card">
+          <div class="row between"><div><div class="lt" style="font-size:14px;font-weight:700">Plan actual</div><div class="ls" id="cui-plan-label">Gratis</div></div><span class="plan-tag plan-free" id="cui-plan-tag">Gratis</span></div>
+          <div class="muted" style="margin-top:8px">Premium habilita: foto al grupo familiar, ofertas de trabajo, perfil destacado y reportes extendidos.</div>
+          <button class="btn" style="width:100%;margin-top:10px" onclick="simulatePlan('paid')">⭐ Mejorar a Premium</button>
+        </div>
+        <div class="section-label">Apariencia e idioma</div>
+        <div class="list-grp">
+          <div class="li" onclick="openSheet('sheet-lang')"><div class="li-ic">🌐</div><div style="flex:1"><div class="lt">Idioma</div><div class="ls lang-label">Español</div></div><span class="chev">›</span></div>
+          <div class="li" onclick="toggleTheme()"><div class="li-ic">🌙</div><div style="flex:1"><div class="lt">Modo oscuro</div><div class="ls theme-label">Desactivado</div></div><span class="switch theme-sw"><i></i></span></div>
+        </div>
+
+        <div class="section-label">Cuenta</div>
+        <div class="list-grp">
+          <div class="li"><div class="li-ic">👤</div><div style="flex:1"><div class="lt">Perfil y credenciales</div></div><span class="chev">›</span></div>
+          <div class="li"><div class="li-ic">🔔</div><div style="flex:1"><div class="lt">Alarmas de medicación</div><div class="ls">Sonido y recordatorio persistente</div></div><span class="chev">›</span></div>
+          <div class="li"><div class="li-ic">⚙️</div><div style="flex:1"><div class="lt">Ajustes y privacidad</div></div><span class="chev">›</span></div>
+        </div>
+      </section>
+
+    </div><!-- /scrollC -->
+
+    <div class="botnav">
+      <div class="nav-item active" id="nc-hoy" onclick="goC('hoy')"><span class="ni">🏠</span><span class="nl">Hoy</span></div>
+      <div class="nav-item" id="nc-registrar" onclick="goC('registrar')"><span class="ni">📝</span><span class="nl">Registrar</span></div>
+      <div class="nav-item" id="nc-familia" onclick="goC('familia')"><span class="ni">💬</span><span class="nl">Familia</span></div>
+      <div class="nav-item" id="nc-trabajo" onclick="goC('trabajo')"><span class="ni">💼</span><span class="nl">Trabajo</span></div>
+      <div class="nav-item" id="nc-mas" onclick="goC('mas')"><span class="ni">☰</span><span class="nl">Más</span></div>
+    </div>
+  </div><!-- /app-cuidadora -->
+
+  <!-- ====================== APP ADULTO MAYOR ====================== -->
+  <div class="roleapp" id="app-adulto">
+    <div class="screen-wrap" id="scrollA">
+
+      <section class="screen active" id="sa-home" style="padding:18px 18px 28px">
+        <div class="am-hello" id="am-greet">Hola, Elena 👋</div>
+        <div class="am-sub">Lunes 15 de junio</div>
+
+        <div class="am-mood">
+          <div class="q" id="am-moodq">¿Cómo te sientes hoy?</div>
+          <div class="am-faces">
+            <span class="am-face" onclick="amMood(this,'Bien')">😀</span>
+            <span class="am-face" onclick="amMood(this,'Regular')">😐</span>
+            <span class="am-face" onclick="amMood(this,'Mal')">😟</span>
+          </div>
+        </div>
+
+        <div class="am-tile" onclick="goA('familia')"><div class="ic">💬</div><div><div class="tx" id="am-t-familia">Familia</div><div class="ts" id="am-s-familia">Hablar y escuchar mensajes</div></div></div>
+        <div class="am-tile" onclick="goA('fotos')"><div class="ic">🖼️</div><div><div class="tx" id="am-t-fotos">Fotos</div><div class="ts" id="am-s-fotos">Ver fotos de la familia</div></div></div>
+        <div class="am-tile" onclick="goA('entre')"><div class="ic">📻</div><div><div class="tx" id="am-t-entre">Entretenimiento</div><div class="ts" id="am-s-entre">Chistes y noticias</div></div></div>
+      </section>
+
+      <section class="screen" id="sa-familia" style="padding:18px">
+        <div class="am-back" onclick="goA('home')">‹ Volver</div>
+        <div class="am-hello" style="font-size:22px">Familia</div>
+        <div class="chat" style="margin-top:16px">
+          <div class="am-bubble">Hola mamá, ¿cómo amaneciste? ❤️</div>
+          <div class="am-bubble">Te mandamos fotos del paseo 🌳</div>
+          <div class="am-bubble" style="background:var(--brand);color:#fff;align-self:flex-end">🎤 Nota de voz · 0:08 ▶</div>
+        </div>
+        <div class="am-mic" onclick="alert('Grabando nota de voz…')">🎤</div>
+        <div class="faint" style="text-align:center;margin-top:12px;font-size:13px">Mantén pulsado para grabar · o escribe</div>
+      </section>
+
+      <section class="screen" id="sa-fotos" style="padding:18px">
+        <div class="am-back" onclick="goA('home')">‹ Volver</div>
+        <div class="am-hello" style="font-size:22px">Fotos</div>
+        <div class="am-photo" style="margin-top:16px">🖼️</div>
+        <div class="row between" style="margin-bottom:14px">
+          <span class="faint" style="font-size:13px">Del paseo · enviada por Carlos</span>
+          <span class="am-listen" style="padding:9px 13px;font-size:14px;margin:0">▶ Presentación</span>
+        </div>
+        <div class="am-thumbs">
+          <div class="am-thumb">🖼️</div><div class="am-thumb">🖼️</div><div class="am-thumb">🖼️</div>
+          <div class="am-thumb">🖼️</div><div class="am-thumb">🖼️</div><div class="am-thumb">🖼️</div>
+        </div>
+      </section>
+
+      <section class="screen" id="sa-entre" style="padding:18px">
+        <div class="am-back" onclick="goA('home')">‹ Volver</div>
+        <div class="am-hello" style="font-size:22px">Entretenimiento</div>
+        <div class="subtabs" style="margin-top:16px">
+          <div class="subtab active" onclick="sub(this,'ea-chiste')">Chistes</div>
+          <div class="subtab" onclick="sub(this,'ea-noticia')">Noticias</div>
+        </div>
+        <div class="subpane active" id="ea-chiste">
+          <div class="card" style="padding:22px"><div style="font-size:19px;line-height:1.55">¿Qué le dijo un semáforo a otro? ¡No me mires, que me estoy cambiando! 😄</div></div>
+          <div class="am-listen" onclick="alert('Reproduciendo en voz alta…')">🔊 Escuchar en voz alta</div>
+        </div>
+        <div class="subpane" id="ea-noticia">
+          <div class="card" style="padding:22px"><div style="font-size:17px;font-weight:700;margin-bottom:8px">Hoy en el mundo</div><div style="font-size:16px;line-height:1.6;color:var(--ink-soft)">Un resumen sencillo de tres noticias del día, contado en lenguaje claro y cercano.</div></div>
+          <div class="am-listen" onclick="alert('Reproduciendo en voz alta…')">🔊 Escuchar en voz alta</div>
+        </div>
+      </section>
+
+    </div><!-- /scrollA -->
+  </div><!-- /app-adulto -->
+
+  <!-- ===== Overlay: patient selector ===== -->
+  <div class="overlay" id="sheet-patients" onclick="closeSheet(event)">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="grab"></div>
+      <h2>Cambiar de paciente</h2>
+      <div class="pt-opt sel" onclick="switchPatient('elena')"><div class="avatar">E</div><div><div class="pt-name">Mamá · Elena, 78</div><div class="faint">Requiere atención · 1 alerta</div></div><span class="check">✓</span></div>
+      <div class="pt-opt" onclick="switchPatient('jorge')"><div class="avatar">J</div><div><div class="pt-name">Papá · Jorge, 81</div><div class="faint">Bien · sin alertas</div></div></div>
+      <div class="pt-opt" style="border-style:dashed;justify-content:center;color:var(--brand);font-weight:600">＋ Añadir paciente</div>
+    </div>
+  </div>
+
+  <!-- ===== Overlay: contact caregiver (gated by plan) ===== -->
+  <div class="overlay" id="sheet-contact" onclick="closeSheet(event)">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="grab"></div>
+      <div class="contact-head">
+        <div class="pv-av" id="ct-av" style="width:56px;height:56px;border-radius:16px;font-size:26px">👩‍⚕️</div>
+        <div>
+          <h2 id="ct-name" style="margin-bottom:2px">Rosa Medina</h2>
+          <div class="faint" id="ct-spec">Geriatría · 4.9★</div>
+        </div>
+      </div>
+
+      <!-- UNLOCKED (plan pago) -->
+      <div id="contact-unlocked">
+        <div class="section-label" style="margin-top:18px">Datos de contacto</div>
+        <div class="list-grp" style="margin-bottom:14px">
+          <div class="li"><div class="li-ic">📞</div><div style="flex:1"><div class="ls">Teléfono</div><div class="lt" id="ct-phone">+52 55 1234 5678</div></div><span class="chev">›</span></div>
+          <div class="li"><div class="li-ic">💬</div><div style="flex:1"><div class="ls">WhatsApp</div><div class="lt" id="ct-wa">+52 55 1234 5678</div></div><span class="chev">›</span></div>
+          <div class="li"><div class="li-ic">✉️</div><div style="flex:1"><div class="ls">Email</div><div class="lt" id="ct-email">rosa.medina@cuida.mx</div></div><span class="chev">›</span></div>
+        </div>
+        <div class="row" style="gap:9px"><button class="btn ghost" style="flex:1">💬 WhatsApp</button><button class="btn" style="flex:1">📞 Llamar</button></div>
+        <div class="faint" style="text-align:center;margin-top:12px">El contacto y la contratación ocurren fuera de la app (v1).</div>
+      </div>
+
+      <!-- LOCKED (plan gratis) -->
+      <div id="contact-locked">
+        <div class="section-label" style="margin-top:18px">Datos de contacto</div>
+        <div class="locked-box">
+          <div class="li" style="border:0;padding:8px 0"><div class="li-ic">📞</div><div style="flex:1"><div class="ls">Teléfono</div><div class="lt blur">+52 55 •••• ••••</div></div></div>
+          <div class="li" style="border:0;padding:8px 0"><div class="li-ic">✉️</div><div style="flex:1"><div class="ls">Email</div><div class="lt blur">••••••@cuida.mx</div></div></div>
+          <div class="lock-overlay">🔒</div>
+        </div>
+        <div class="paywall">
+          <div class="pw-title">🔒 Disponible con Premium</div>
+          <div class="pw-sub">Mejora tu plan para ver los datos de contacto de cuidadoras y escribirles directamente.</div>
+          <button class="btn" style="width:100%;margin-top:12px;padding:12px" onclick="simulatePlan('paid')">⭐ Mejorar a Premium</button>
+          <div class="faint" style="text-align:center;margin-top:9px">El monitoreo, las alertas y la comunicación familiar siguen siendo gratis.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Overlay: alert center ===== -->
+  <div class="overlay" id="sheet-alerts" onclick="closeSheet(event)">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="grab"></div>
+      <h2>Centro de alertas</h2>
+
+      <div class="section-label" style="margin-top:0">Activas</div>
+      <div class="alert-item">
+        <div class="ai-ic crit">🆘</div>
+        <div style="flex:1">
+          <div class="at">Caída detectada</div>
+          <div class="as">Elena · hace 3 min · sala de estar</div>
+          <div class="crit-actions">
+            <button class="btn">📞 Llamar a Rosa</button>
+            <button class="btn danger">🚑 Emergencias</button>
+          </div>
+        </div>
+      </div>
+      <div class="alert-item">
+        <div class="ai-ic med-a">💊</div>
+        <div style="flex:1">
+          <div class="at">Medicamento no tomado</div>
+          <div class="as">Elena · Losartán 50 mg de las 14:00 fuera de ventana</div>
+          <div class="atime">hace 1 h 10 min</div>
+        </div>
+      </div>
+
+      <div class="section-label">Historial</div>
+      <div class="alert-item">
+        <div class="ai-ic resolved">🫁</div>
+        <div style="flex:1"><div class="at">SpO₂ por debajo del umbral</div><div class="as">Elena · 93% (mín. 94%) · normalizado</div><div class="atime">Ayer 18:42 · resuelto</div></div>
+      </div>
+      <div class="alert-item">
+        <div class="ai-ic resolved">❤️</div>
+        <div style="flex:1"><div class="at">Ritmo cardíaco elevado</div><div class="as">Jorge · 102 lpm en reposo · normalizado</div><div class="atime">12 jun · resuelto</div></div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ===== Overlay: SOS (cuidadora) ===== -->
+  <div class="overlay" id="sheet-sos" onclick="closeSheet(event)">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="grab"></div>
+      <h2>Emergencia / SOS</h2>
+      <div class="muted" style="margin-bottom:14px">¿A quién quieres avisar ahora? El evento quedará registrado en el expediente con la hora.</div>
+      <button class="btn danger" style="width:100%;margin-bottom:10px;padding:13px">🚑 Llamar a emergencias</button>
+      <button class="btn ghost" style="width:100%;margin-bottom:10px;padding:13px">📞 Avisar a la familia (Carlos)</button>
+      <button class="btn ghost" style="width:100%;padding:13px">🧑‍⚕️ Llamar al médico</button>
+    </div>
+  </div>
+
+  <!-- ===== Overlay: registrar incidente ===== -->
+  <div class="overlay" id="sheet-incident" onclick="closeSheet(event)">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="grab"></div>
+      <h2>Registrar incidente</h2>
+      <div class="qa-grid" style="margin-bottom:12px">
+        <div class="qa"><div class="qi">🤕</div><div class="ql">Caída</div></div>
+        <div class="qa"><div class="qi">🤢</div><div class="ql">Malestar</div></div>
+        <div class="qa"><div class="qi">😵</div><div class="ql">Desorientación</div></div>
+        <div class="qa"><div class="qi">➕</div><div class="ql">Otro</div></div>
+      </div>
+      <div class="input" style="background:var(--surface-2);border-radius:12px;padding:12px;font-size:13px;color:var(--ink-faint);margin-bottom:12px">Describe lo ocurrido… (hora automática)</div>
+      <button class="btn" style="width:100%;padding:12px">Guardar y avisar a la familia</button>
+    </div>
+  </div>
+
+  <!-- ===== Overlay: alarma de medicamento ===== -->
+  <div class="overlay" id="sheet-alarm" onclick="closeSheet(event)">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="grab"></div>
+      <h2>⏰ Hora del medicamento</h2>
+      <div class="card" style="margin-top:6px"><div class="med" style="border:0;padding:6px 0"><div class="med-status ms-pend"></div><div><div class="mn">Losartán</div><div class="md">50 mg · con comida</div></div><div class="mt">14:00</div></div></div>
+      <div class="row" style="gap:9px;margin-top:6px"><button class="btn" style="flex:1;padding:12px">✓ Administrada</button><button class="btn ghost" style="flex:1;padding:12px">Posponer 15 min</button></div>
+      <div class="faint" style="text-align:center;margin-top:10px">Si no se confirma dentro de la ventana, se avisa a la familia.</div>
+    </div>
+  </div>
+
+  <!-- ===== Overlay: paywall genérico ===== -->
+  <div class="overlay" id="sheet-paywall" onclick="closeSheet(event)">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="grab"></div>
+      <div class="paywall" style="margin-top:4px">
+        <div class="pw-title">🔒 Disponible con Premium</div>
+        <div class="pw-sub">Mejora tu plan para enviar fotos a la familia, ver ofertas de trabajo, destacar tu perfil y acceder a reportes extendidos.</div>
+        <button class="btn" style="width:100%;margin-top:12px;padding:12px" onclick="simulatePlan('paid');closeSheetById('sheet-paywall')">⭐ Mejorar a Premium</button>
+        <div class="faint" style="text-align:center;margin-top:9px">El cuidado del día a día sigue siendo gratis.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Overlay: check-in de síntomas (adulto mayor) ===== -->
+  <div class="overlay" id="sheet-checkin" onclick="closeSheet(event)">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="grab"></div>
+      <h2 style="font-size:21px">Cuéntame un poco más</h2>
+      <div class="muted" style="font-size:14px;margin-bottom:4px">Hoy te sientes: <strong id="ci-mood-label">Bien</strong></div>
+
+      <div class="ci-q">¿Tienes dolor?</div>
+      <div class="ci-scale" id="ci-dolor">
+        <span class="am-face" onclick="ciPick(this,'dolor',0)">😀</span>
+        <span class="am-face" onclick="ciPick(this,'dolor',1)">🙂</span>
+        <span class="am-face" onclick="ciPick(this,'dolor',2)">😣</span>
+        <span class="am-face" onclick="ciPick(this,'dolor',3)">😖</span>
+      </div>
+      <div class="ci-ends"><span>Nada</span><span>Mucho</span></div>
+
+      <div class="ci-q">¿Sientes el cuerpo tieso o rígido?</div>
+      <div class="ci-scale" id="ci-rigidez">
+        <span class="am-face" onclick="ciPick(this,'rigidez',0)">😀</span>
+        <span class="am-face" onclick="ciPick(this,'rigidez',1)">🙂</span>
+        <span class="am-face" onclick="ciPick(this,'rigidez',2)">😣</span>
+        <span class="am-face" onclick="ciPick(this,'rigidez',3)">😖</span>
+      </div>
+      <div class="ci-ends"><span>Nada</span><span>Mucho</span></div>
+
+      <button class="btn" id="ci-save" style="width:100%;margin-top:20px;padding:14px;font-size:16px" onclick="ciSave()" disabled>Guardar</button>
+      <div class="am-listen" style="justify-content:center;width:100%;margin-top:10px;font-size:15px;padding:11px" onclick="alert('Escuchando… puedes responder hablando.')">🎤 Responder con la voz</div>
+    </div>
+  </div>
+
+
+  <!-- ===== Overlay: idioma ===== -->
+  <div class="overlay" id="sheet-lang" onclick="closeSheet(event)">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="grab"></div>
+      <h2>Idioma</h2>
+      <div class="pt-opt sel" data-lang="es" onclick="setLang('es')"><div class="li-ic">🇪🇸</div><div style="flex:1"><div class="pt-name">Español</div></div></div>
+      <div class="pt-opt" data-lang="en" onclick="setLang('en')"><div class="li-ic">🇬🇧</div><div style="flex:1"><div class="pt-name">English</div></div></div>
+      <div class="pt-opt" data-lang="pt" onclick="setLang('pt')"><div class="li-ic">🇧🇷</div><div style="flex:1"><div class="pt-name">Português</div></div></div>
+      <div class="faint" style="text-align:center;margin-top:8px">Demo: se traduce la vista del adulto mayor para ilustrar el cambio de idioma.</div>
+    </div>
+  </div>
+
+</div><!-- /phone -->
+
+<p class="hint">Prototipo interactivo · 3 roles. Usa el selector de arriba para cambiar de rol. En el Adulto mayor, toca una carita de ánimo: se abre un modal que pregunta por dolor y rigidez, cada uno puntuado con caritas.</p>
+
+<script>
+  const screens = ['home','salud','comunicacion','marketplace','mas'];
+  function go(name){
+    screens.forEach(s=>{
+      document.getElementById('s-'+s).classList.toggle('active', s===name);
+      document.getElementById('n-'+s).classList.toggle('active', s===name);
+    });
+    document.getElementById('scroll').scrollTop = 0;
+  }
+  function sub(el,paneId){
+    const tabs = el.parentElement.querySelectorAll('.subtab');
+    tabs.forEach(t=>t.classList.remove('active'));
+    el.classList.add('active');
+    const panes = el.closest('.screen').querySelectorAll('.subpane');
+    panes.forEach(p=>p.classList.remove('active'));
+    document.getElementById(paneId).classList.add('active');
+  }
+  function setCommTab(which){
+    go('comunicacion');
+    document.getElementById('ct-ai').classList.toggle('active', which==='ai');
+    document.getElementById('ct-msg').classList.toggle('active', which==='msg');
+    document.getElementById('cp-ai').classList.toggle('active', which==='ai');
+    document.getElementById('cp-msg').classList.toggle('active', which==='msg');
+  }
+  function openSheet(id){ document.getElementById(id).classList.add('open'); }
+  function closeSheet(e){ e.currentTarget.classList.remove('open'); }
+
+  /* ----- Plan gating for Marketplace contact ----- */
+  let userPlan = 'free'; // 'free' | 'paid'
+
+  function renderContactState(){
+    const paid = userPlan === 'paid';
+    document.getElementById('contact-unlocked').style.display = paid ? 'block' : 'none';
+    document.getElementById('contact-locked').style.display   = paid ? 'none'  : 'block';
+  }
+
+  function openContact(name, av, spec, phone, email){
+    document.getElementById('ct-name').textContent  = name;
+    document.getElementById('ct-av').textContent     = av;
+    document.getElementById('ct-spec').textContent   = spec;
+    document.getElementById('ct-phone').textContent  = phone;
+    document.getElementById('ct-wa').textContent     = phone;
+    document.getElementById('ct-email').textContent  = email;
+    renderContactState();
+    openSheet('sheet-contact');
+  }
+
+  function simulatePlan(plan){
+    userPlan = plan;
+    const paid = plan === 'paid';
+    document.getElementById('ps-free').classList.toggle('on', !paid);
+    document.getElementById('ps-paid').classList.toggle('on', paid);
+    const tag = document.getElementById('mk-plan-tag');
+    tag.textContent = paid ? 'Plan Premium' : 'Plan Gratis';
+    tag.className = 'plan-tag ' + (paid ? 'plan-paid' : 'plan-free');
+    renderContactState(); // update modal live if open
+  }
+  function switchPatient(p){
+    const map = {
+      elena:{av:'E',name:'Mamá · Elena'},
+      jorge:{av:'J',name:'Papá · Jorge'}
+    };
+    document.getElementById('tb-av').textContent = map[p].av;
+    document.getElementById('tb-name').textContent = map[p].name;
+    document.getElementById('sheet-patients').classList.remove('open');
+  }
+
+  /* ===== Multi-rol ===== */
+  function setRole(role){
+    ['familiar','cuidadora','adulto'].forEach(r=>document.getElementById('app-'+r).classList.toggle('active', r===role));
+    document.getElementById('rs-fam').classList.toggle('on', role==='familiar');
+    document.getElementById('rs-cui').classList.toggle('on', role==='cuidadora');
+    document.getElementById('rs-am').classList.toggle('on', role==='adulto');
+  }
+  const cScreens=['hoy','registrar','familia','trabajo','mas'];
+  function goC(name){
+    cScreens.forEach(s=>{
+      document.getElementById('sc-'+s).classList.toggle('active', s===name);
+      document.getElementById('nc-'+s).classList.toggle('active', s===name);
+    });
+    document.getElementById('scrollC').scrollTop=0;
+  }
+  const aScreens=['home','familia','fotos','entre'];
+  function goA(name){
+    aScreens.forEach(s=>document.getElementById('sa-'+s).classList.toggle('active', s===name));
+    document.getElementById('scrollA').scrollTop=0;
+  }
+  let checkin = { mood:null, dolor:null, rigidez:null };
+  function amMood(el,label){
+    el.parentElement.querySelectorAll('.am-face').forEach(f=>f.style.background='');
+    el.style.background='var(--brand-soft)';
+    checkin.mood = label;
+    checkin.dolor = null; checkin.rigidez = null;
+    document.querySelectorAll('#ci-dolor .am-face, #ci-rigidez .am-face').forEach(f=>f.style.background='');
+    document.getElementById('ci-mood-label').textContent = label;
+    document.getElementById('ci-save').disabled = true;
+    openSheet('sheet-checkin');
+  }
+  function ciPick(el,item,score){
+    el.parentElement.querySelectorAll('.am-face').forEach(f=>f.style.background='');
+    el.style.background='var(--brand-soft)';
+    checkin[item] = score;
+    document.getElementById('ci-save').disabled = !(checkin.dolor!==null && checkin.rigidez!==null);
+  }
+  function ciSave(){
+    closeSheetById('sheet-checkin');
+    alert('¡Gracias, Elena! Tu check-in se guardó.\n\nÁnimo: '+checkin.mood+'\nDolor: '+checkin.dolor+'/3\nRigidez: '+checkin.rigidez+'/3\n\nSe añade a la bitácora y la familia podrá verlo.');
+  }
+  function onPhoto(){
+    if(userPlan!=='paid'){ openSheet('sheet-paywall'); }
+    else { alert('Selecciona una foto para enviar al grupo familiar.'); }
+  }
+  function closeSheetById(id){ document.getElementById(id).classList.remove('open'); }
+  function updatePlanUI(){
+    const paid = userPlan==='paid';
+    const jp=document.getElementById('jobs-paid'), jl=document.getElementById('jobs-locked');
+    if(jp&&jl){ jp.style.display=paid?'block':'none'; jl.style.display=paid?'none':'block'; }
+    const lbl=document.getElementById('cui-plan-label'), tg=document.getElementById('cui-plan-tag');
+    if(lbl){ lbl.textContent=paid?'Premium':'Gratis'; }
+    if(tg){ tg.textContent=paid?'Premium':'Gratis'; tg.className='plan-tag '+(paid?'plan-paid':'plan-free'); }
+  }
+  const _origSimulatePlan = simulatePlan;
+  simulatePlan = function(p){ _origSimulatePlan(p); updatePlanUI(); };
+  updatePlanUI();
+
+
+  /* ===== Apariencia e idioma ===== */
+  let darkOn = false;
+  function toggleTheme(){
+    darkOn = !darkOn;
+    document.body.classList.toggle('dark', darkOn);
+    document.querySelectorAll('.theme-sw').forEach(s=>s.classList.toggle('on', darkOn));
+    document.querySelectorAll('.theme-label').forEach(l=>l.textContent = darkOn ? 'Activado' : 'Desactivado');
+  }
+  const I18N = {
+    es:{label:'Español',  greet:'Hola, Elena 👋', mood:'¿Cómo te sientes hoy?', familia:'Familia', familiaS:'Hablar y escuchar mensajes', fotos:'Fotos', fotosS:'Ver fotos de la familia', entre:'Entretenimiento', entreS:'Chistes y noticias'},
+    en:{label:'English',  greet:'Hi, Elena 👋',   mood:'How do you feel today?', familia:'Family', familiaS:'Talk and listen to messages', fotos:'Photos', fotosS:'See family photos', entre:'Entertainment', entreS:'Jokes and news'},
+    pt:{label:'Português', greet:'Olá, Elena 👋',  mood:'Como você se sente hoje?', familia:'Família', familiaS:'Falar e ouvir mensagens', fotos:'Fotos', fotosS:'Ver fotos da família', entre:'Entretenimento', entreS:'Piadas e notícias'}
+  };
+  function setTxt(id,v){ const e=document.getElementById(id); if(e) e.textContent=v; }
+  function setLang(code){
+    const t = I18N[code]; if(!t) return;
+    document.querySelectorAll('.lang-label').forEach(l=>l.textContent = t.label);
+    setTxt('am-greet', t.greet); setTxt('am-moodq', t.mood);
+    setTxt('am-t-familia', t.familia); setTxt('am-s-familia', t.familiaS);
+    setTxt('am-t-fotos', t.fotos);     setTxt('am-s-fotos', t.fotosS);
+    setTxt('am-t-entre', t.entre);     setTxt('am-s-entre', t.entreS);
+    document.querySelectorAll('#sheet-lang .pt-opt').forEach(o=>o.classList.toggle('sel', o.dataset.lang===code));
+    closeSheetById('sheet-lang');
+  }
+
+</script>
+</body>
+</html>

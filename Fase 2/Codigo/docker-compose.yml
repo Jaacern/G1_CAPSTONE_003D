@@ -1,0 +1,81 @@
+services:
+  db:
+    image: postgres:16.15-bookworm
+    container_name: agecare-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale-provider=icu --icu-locale=es-CL"
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Los .sql se ejecutan automáticamente SOLO la primera vez
+      # que se crea el volumen pgdata (en orden alfabético).
+      - ./sql:/docker-entrypoint-initdb.d:ro,Z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks: [agecare-net]
+
+  api:
+    build: ./api
+    container_name: agecare-api
+    environment:
+      # La API se conecta a la BD por el nombre de servicio de la red interna.
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-cambiar-en-produccion}
+    ports:
+      # 0.0.0.0 = accesible desde otras máquinas de la red local (para que el
+      # frontend de un compañero pueda probar). Solo la API se expone; la BD
+      # (5432) y pgadmin (5050) siguen restringidos a 127.0.0.1 por seguridad.
+      - "0.0.0.0:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [agecare-net]
+
+  cloudflared:
+    image: docker.io/cloudflare/cloudflared:latest
+    container_name: agecare-cloudflared
+    # user root: en Podman rootless equivale a tu usuario del host, así el
+    # contenedor puede LEER el cert.pem y las credenciales (permisos 0400).
+    user: root
+    # Ejecuta el túnel con nombre usando el config.yml y las credenciales
+    # montadas desde ~/.cloudflared del host.
+    command: tunnel --config /home/nonroot/.cloudflared/config.yml run
+    volumes:
+      - ${HOME}/.cloudflared:/home/nonroot/.cloudflared:ro,Z
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks: [agecare-net]
+
+  pgadmin:
+    image: dpage/pgadmin4:9
+    container_name: agecare-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "127.0.0.1:5050:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [agecare-net]
+
+volumes:
+  pgdata:
+
+networks:
+  agecare-net:

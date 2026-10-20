@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgeCare — Consola de API</title>
+<style>
+  :root{
+    color-scheme: light;
+    --plane:#f9f9f7; --surface:#fcfcfb; --surface-2:#f2f2ef;
+    --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --axis:#c3c2b7; --line:#e1e0d9;
+    --brand:#1b4965; --brand-soft:#e8eef2;
+    --series:#2a78d6; --series-fill:#cde2fb;
+    --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
+    --radius:10px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#222221;
+      --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+      --grid:#2c2c2a; --axis:#383835; --line:#2c2c2a;
+      --brand:#9fc6dd; --brand-soft:#1f2b33;
+      --series:#3987e5; --series-fill:#184f95;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#222221;
+    --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --line:#2c2c2a;
+    --brand:#9fc6dd; --brand-soft:#1f2b33;
+    --series:#3987e5; --series-fill:#184f95;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--plane); color:var(--ink);
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  .wrap{max-width:1100px; margin:0 auto; padding:24px 16px 64px}
+
+  header{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px}
+  h1{font-size:22px; margin:0; letter-spacing:-.01em}
+  .sub{color:var(--ink-2); font-size:13.5px; margin:0 0 20px}
+
+  .card{
+    background:var(--surface); border:1px solid var(--line);
+    border-radius:var(--radius); padding:18px; margin-bottom:16px;
+  }
+  .card h2{font-size:15px; margin:0 0 14px; color:var(--brand); letter-spacing:.01em}
+
+  label{display:block; font-size:12.5px; color:var(--ink-2); margin-bottom:4px}
+  input,select,button{font:inherit}
+  input,select{
+    width:100%; padding:8px 10px; border:1px solid var(--line);
+    border-radius:7px; background:var(--surface-2); color:var(--ink);
+  }
+  input:focus,select:focus{outline:2px solid var(--series); outline-offset:1px}
+  button{
+    padding:8px 14px; border:1px solid var(--brand); border-radius:7px;
+    background:var(--brand); color:var(--surface); cursor:pointer; font-weight:600; font-size:14px;
+  }
+  button:hover{filter:brightness(1.1)}
+  button:disabled{opacity:.45; cursor:default; filter:none}
+  button.ghost{background:transparent; color:var(--ink-2); border-color:var(--line); font-weight:500}
+
+  .row{display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end}
+  .row > *{flex:1 1 180px; min-width:0}
+  .row > .fit{flex:0 0 auto}
+
+  .dot{display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--muted); margin-right:6px}
+  .dot.ok{background:var(--good)} .dot.bad{background:var(--critical)}
+
+  .chips{display:flex; gap:8px; flex-wrap:wrap}
+  .chip{
+    padding:6px 12px; border:1px solid var(--line); border-radius:999px;
+    background:var(--surface-2); color:var(--ink-2); cursor:pointer; font-size:13.5px;
+  }
+  .chip[aria-pressed="true"]{background:var(--brand); border-color:var(--brand); color:var(--surface); font-weight:600}
+
+  .tiles{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px}
+  .tile{border:1px solid var(--line); border-radius:8px; padding:12px; background:var(--surface-2)}
+  .tile .k{font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em}
+  .tile .v{font-size:24px; font-weight:650; margin:3px 0 1px; letter-spacing:-.02em}
+  .tile .u{font-size:12px; color:var(--ink-2); font-weight:400}
+  .tile .s{font-size:11.5px; margin-top:3px}
+
+  .badge{display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:600}
+  .b-good{color:var(--good)} .b-warn{color:#8a5e00} .b-crit{color:var(--critical)} .b-info{color:var(--ink-2)}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .b-warn{color:var(--warning)}}
+  :root[data-theme="dark"] .b-warn{color:var(--warning)}
+
+  table{width:100%; border-collapse:collapse; font-size:13.5px}
+  th,td{text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{color:var(--muted); font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; font-weight:600}
+  td.num,th.num{text-align:right; font-variant-numeric:tabular-nums}
+
+  .msg{padding:10px 12px; border-radius:7px; font-size:13.5px; margin-top:12px}
+  .msg.err{background:#fdecec; color:#7d1f1f; border:1px solid #f3c9c9}
+  .msg.ok{background:#e8f6e8; color:#155715; border:1px solid #c4e6c4}
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]) .msg.err{background:#2e1616; color:#f0b4b4; border-color:#5a2a2a}
+    :root:not([data-theme="light"]) .msg.ok{background:#152a15; color:#a8d9a8; border-color:#2c522c}
+  }
+  .hint{font-size:12.5px; color:var(--muted); margin-top:8px}
+  .hidden{display:none !important}
+
+  figure{margin:0}
+  figcaption{font-size:13px; color:var(--ink-2); margin-bottom:8px}
+  svg{display:block; width:100%; height:auto; touch-action:none}
+  .tip{
+    position:fixed; pointer-events:none; z-index:20; background:var(--surface);
+    border:1px solid var(--axis); border-radius:7px; padding:7px 9px; font-size:12.5px;
+    box-shadow:0 4px 14px rgba(0,0,0,.14); white-space:nowrap;
+  }
+  .log{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; max-height:220px; overflow:auto}
+  .log div{padding:2px 0; border-bottom:1px solid var(--line); color:var(--ink-2)}
+  .log .s2{color:var(--good)} .log .s4,.log .s5{color:var(--critical)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>AgeCare — Consola de API</h1>
+    <button class="ghost fit" id="theme" style="margin-left:auto">Tema</button>
+  </header>
+  <p class="sub">Herramienta de verificación del backend. No es la aplicación del producto — esa es la app Flutter.</p>
+
+  <!-- CONEXIÓN -->
+  <div class="card">
+    <h2>1 · Conexión</h2>
+    <div class="row">
+      <div style="flex:3 1 320px">
+        <label for="base">Dirección de la API</label>
+        <input id="base" value="https://agecare-api.javiercerna.dev" spellcheck="false">
+      </div>
+      <div class="fit"><button id="ping">Probar</button></div>
+    </div>
+    <p class="hint"><span class="dot" id="dot"></span><span id="pingTxt">Sin probar. Si corres la API local, usa http://localhost:8000</span></p>
+  </div>
+
+  <!-- SESIÓN -->
+  <div class="card" id="cLogin">
+    <h2>2 · Iniciar sesión</h2>
+    <div class="row">
+      <div><label for="email">Correo</label><input id="email" type="email" value="juan@duocuc.cl" autocomplete="username"></div>
+      <div><label for="pass">Contraseña</label><input id="pass" type="password" autocomplete="current-password"></div>
+      <div class="fit"><button id="login">Entrar</button></div>
+    </div>
+    <p class="hint">Los usuarios de la semilla de desarrollo son <b>juan@duocuc.cl</b> y <b>rosa@cuidados.cl</b>.</p>
+    <div id="loginMsg"></div>
+  </div>
+
+  <div class="card hidden" id="cUser">
+    <div class="row">
+      <div style="flex:1 1 auto">
+        <div style="font-weight:650" id="uName"></div>
+        <div style="font-size:13px; color:var(--ink-2)" id="uMail"></div>
+      </div>
+      <div class="fit"><button class="ghost" id="logout">Cerrar sesión</button></div>
+    </div>
+  </div>
+
+  <!-- PACIENTE -->
+  <div class="card hidden" id="cPat">
+    <h2>3 · Paciente</h2>
+    <div class="chips" id="pats"></div>
+  </div>
+
+  <!-- ESTADO ACTUAL -->
+  <div class="card hidden" id="cLatest">
+    <h2>4 · Última medición de cada signo vital</h2>
+    <div class="tiles" id="tiles"></div>
+  </div>
+
+  <!-- SERIE -->
+  <div class="card hidden" id="cChart">
+    <h2>5 · Historial</h2>
+    <div class="row" style="margin-bottom:16px">
+      <div>
+        <label for="vtype">Signo vital</label>
+        <select id="vtype">
+          <option value="heart_rate">Frecuencia cardíaca</option>
+          <option value="spo2">Saturación de oxígeno</option>
+          <option value="steps">Pasos</option>
+          <option value="sleep">Sueño</option>
+        </select>
+      </div>
+      <div>
+        <label for="days">Período</label>
+        <select id="days">
+          <option value="7">Últimos 7 días</option>
+          <option value="14">Últimos 14 días</option>
+          <option value="30" selected>Últimos 30 días</option>
+        </select>
+      </div>
+      <div class="fit"><button class="ghost" id="toggleTable">Ver tabla</button></div>
+    </div>
+    <figure>
+      <figcaption id="chartCap"></figcaption>
+      <div id="chart"></div>
+    </figure>
+    <div id="tableWrap" class="hidden" style="margin-top:14px; max-height:280px; overflow:auto"></div>
+  </div>
+
+  <!-- ALERTAS -->
+  <div class="card hidden" id="cAlerts">
+    <h2>6 · Alertas</h2>
+    <div class="chips" style="margin-bottom:14px">
+      <button class="chip" data-st="active" aria-pressed="true">Activas</button>
+      <button class="chip" data-st="acknowledged" aria-pressed="false">Atendidas</button>
+      <button class="chip" data-st="resolved" aria-pressed="false">Resueltas</button>
+      <button class="chip" data-st="all" aria-pressed="false">Todas</button>
+    </div>
+    <div id="alerts"></div>
+    <div id="alertMsg"></div>
+  </div>
+
+  <!-- ADHERENCIA -->
+  <div class="card hidden" id="cAdh">
+    <h2>7 · Adherencia a los medicamentos</h2>
+    <div class="tiles" id="adhTiles" style="margin-bottom:14px"></div>
+    <div id="adhTable"></div>
+  </div>
+
+  <!-- LOG -->
+  <div class="card hidden" id="cLog">
+    <h2>Registro de llamadas</h2>
+    <div class="log" id="log"></div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // El token vive solo en memoria. Se pierde al recargar, y así debe ser.
+  var token = null, patients = [], patientId = null, alertStatus = "active", series = null;
+
+  var $ = function(id){ return document.getElementById(id); };
+  var base = function(){ return $("base").value.trim().replace(/\/+$/, ""); };
+
+  var VT = { heart_rate:"Frecuencia cardíaca", spo2:"Saturación de oxígeno", steps:"Pasos",
+             sleep:"Sueño", temperature:"Temperatura", glucose:"Glucosa",
+             blood_pressure:"Presión arterial", sedentary_min:"Minutos sedentario", fall_event:"Caídas" };
+  var SEV = { info:["b-info","Informativa"], warning:["b-warn","Aviso"], critical:["b-crit","Crítica"] };
+  var STA = { active:"Activa", acknowledged:"Atendida", resolved:"Resuelta" };
+
+  function esc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+
+  function logLine(method, path, status, ms){
+    var d = document.createElement("div");
+    d.className = "s" + String(status).charAt(0);
+    d.textContent = method + " " + path + "  →  " + status + "  (" + ms + " ms)";
+    $("log").prepend(d);
+    $("cLog").classList.remove("hidden");
+  }
+
+  function show(el, msg, kind){
+    el.innerHTML = msg ? '<div class="msg ' + kind + '">' + esc(msg) + "</div>" : "";
+  }
+
+  async function api(path, opts){
+    opts = opts || {};
+    var t0 = performance.now();
+    var headers = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = "Bearer " + token;
+    var res, body;
+    try {
+      res = await fetch(base() + path, {
+        method: opts.method || "GET",
+        headers: headers,
+        body: opts.body ? JSON.stringify(opts.body) : undefined
+      });
+    } catch (e) {
+      logLine(opts.method || "GET", path, "ERR", Math.round(performance.now() - t0));
+      throw new Error("No se pudo contactar la API. Revisa la dirección y que el servidor esté arriba.");
+    }
+    var ms = Math.round(performance.now() - t0);
+    logLine(opts.method || "GET", path, res.status, ms);
+    try { body = res.status === 204 ? null : await res.json(); } catch (e) { body = null; }
+    if (!res.ok){
+      var m = (body && body.error && body.error.message) || (body && body.detail) ||
+              ("La API respondió " + res.status + ".");
+      var err = new Error(m); err.status = res.status; throw err;
+    }
+    return body;
+  }
+
+  function ymd(d){ return d.toISOString().slice(0,10); }
+
+  // ---------------------------------------------------------------- conexión
+  $("ping").onclick = async function(){
+    $("dot").className = "dot";
+    $("pingTxt").textContent = "Probando…";
+    try {
+      var r = await api("/health");
+      $("dot").className = "dot ok";
+      $("pingTxt").textContent = "La API responde. " + (r && r.status ? "Estado: " + r.status : "");
+    } catch (e) {
+      $("dot").className = "dot bad";
+      $("pingTxt").textContent = e.message;
+    }
+  };
+
+  // ------------------------------------------------------------------ sesión
+  $("login").onclick = async function(){
+    show($("loginMsg"), "", "");
+    $("login").disabled = true;
+    try {
+      var r = await api("/api/v1/auth/login", {
+        method: "POST",
+        body: { email: $("email").value.trim(), password: $("pass").value }
+      });
+      token = r.access_token;
+      $("pass").value = "";
+      $("uName").textContent = r.user.full_name;
+      $("uMail").textContent = r.user.email + " · " +
+        (r.memberships || []).map(function(m){ return m.patient_name + " (" + m.role + ")"; }).join(" · ");
+      $("cLogin").classList.add("hidden");
+      ["cUser","cPat","cLatest","cChart","cAlerts","cAdh"].forEach(function(i){ $(i).classList.remove("hidden"); });
+      await loadPatients();
+    } catch (e) {
+      show($("loginMsg"), e.message, "err");
+    } finally {
+      $("login").disabled = false;
+    }
+  };
+
+  $("logout").onclick = function(){
+    token = null; patientId = null; patients = [];
+    ["cUser","cPat","cLatest","cChart","cAlerts","cAdh"].forEach(function(i){ $(i).classList.add("hidden"); });
+    $("cLogin").classList.remove("hidden");
+  };
+
+  // --------------------------------------------------------------- pacientes
+  async function loadPatients(){
+    var r = await api("/api/v1/patients");
+    patients = r.items || [];
+    $("pats").innerHTML = patients.map(function(p, i){
+      return '<button class="chip" data-id="' + esc(p.patient_id) + '" aria-pressed="' + (i === 0) + '">' +
+             esc(p.full_name) + " · " + esc(p.role) + "</button>";
+    }).join("") || '<span class="hint">Este usuario no tiene pacientes asociados.</span>';
+
+    Array.prototype.forEach.call($("pats").children, function(b){
+      if (!b.dataset.id) return;
+      b.onclick = function(){
+        Array.prototype.forEach.call($("pats").children, function(x){ x.setAttribute("aria-pressed","false"); });
+        b.setAttribute("aria-pressed","true");
+        patientId = b.dataset.id;
+        loadPatientData();
+      };
+    });
+    if (patients.length){ patientId = patients[0].patient_id; await loadPatientData(); }
+  }
+
+  async function loadPatientData(){
+    await Promise.all([loadLatest(), loadSeries(), loadAlerts(), loadAdherence()]);
+  }
+
+  // ------------------------------------------------------- últimas mediciones
+  async function loadLatest(){
+    try {
+      var r = await api("/api/v1/patients/" + patientId + "/vitals/latest");
+      $("tiles").innerHTML = (r.items || []).map(function(it){
+        var ok = it.in_range;
+        return '<div class="tile"><div class="k">' + esc(VT[it.type] || it.type) + "</div>" +
+          '<div class="v">' + esc(it.value) + ' <span class="u">' + esc(it.unit || "") + "</span></div>" +
+          '<div class="s"><span class="badge ' + (ok ? "b-good" : "b-crit") + '">' +
+          (ok ? "✓ En rango" : "▲ Fuera de rango") + "</span></div></div>";
+      }).join("") || '<span class="hint">Sin mediciones registradas.</span>';
+    } catch (e) {
+      $("tiles").innerHTML = '<span class="hint">' + esc(e.message) + "</span>";
+    }
+  }
+
+  // ------------------------------------------------------------------- serie
+  async function loadSeries(){
+    var type = $("vtype").value, days = parseInt($("days").value, 10);
+    var to = new Date(), from = new Date(Date.now() - days * 864e5);
+    try {
+      series = await api("/api/v1/patients/" + patientId + "/vitals?type=" + type +
+        "&date_from=" + ymd(from) + "&date_to=" + ymd(to) + "&granularity=day");
+      $("chartCap").textContent = (VT[type] || type) + " · promedio diario de los últimos " + days + " días" +
+        (series.unit ? " (" + series.unit + ")" : "");
+      drawChart(series);
+      drawTable(series);
+    } catch (e) {
+      $("chart").innerHTML = '<p class="hint">' + esc(e.message) + "</p>";
+      $("tableWrap").innerHTML = "";
+    }
+  }
+  $("vtype").onchange = loadSeries;
+  $("days").onchange = loadSeries;
+  $("toggleTable").onclick = function(){
+    var h = $("tableWrap").classList.toggle("hidden");
+    this.textContent = h ? "Ver tabla" : "Ocultar tabla";
+  };
+
+  function drawChart(s){
+    var pts = (s.points || []).filter(function(p){ return p.value != null; });
+    if (!pts.length){ $("chart").innerHTML = '<p class="hint">Sin datos en este período.</p>'; return; }
+
+    var W = 860, H = 300, mL = 46, mR = 16, mT = 14, mB = 30;
+    var iw = W - mL - mR, ih = H - mT - mB;
+
+    var xs = pts.map(function(p){ return new Date(p.ts).getTime(); });
+    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
+    var vals = [];
+    pts.forEach(function(p){
+      vals.push(p.value);
+      if (p.min != null) vals.push(p.min);
+      if (p.max != null) vals.push(p.max);
+    });
+    var th = s.threshold || {};
+    if (th.min_value != null) vals.push(th.min_value);
+    if (th.max_value != null) vals.push(th.max_value);
+    var y0 = Math.min.apply(null, vals), y1 = Math.max.apply(null, vals);
+    var pad = (y1 - y0) * 0.12 || 1; y0 -= pad; y1 += pad;
+
+    var X = function(t){ return mL + (x1 === x0 ? iw / 2 : (t - x0) / (x1 - x0) * iw); };
+    var Y = function(v){ return mT + ih - (v - y0) / (y1 - y0) * ih; };
+
+    // 4–5 marcas en Y, en números redondos
+    var step = Math.pow(10, Math.floor(Math.log10((y1 - y0) / 4)));
+    var m = (y1 - y0) / 4 / step;
+    step *= m >= 5 ? 5 : m >= 2 ? 2 : 1;
+    var ticks = [];
+    for (var v = Math.ceil(y0 / step) * step; v <= y1; v += step) ticks.push(+v.toFixed(6));
+
+    var o = [];
+    o.push('<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Gráfico de ' + esc($("chartCap").textContent) + '">');
+
+    // banda del rango normal, recesiva y por debajo de todo
+    if (th.min_value != null && th.max_value != null){
+      var yb = Y(th.max_value), hb = Y(th.min_value) - Y(th.max_value);
+      o.push('<rect x="' + mL + '" y="' + yb.toFixed(1) + '" width="' + iw + '" height="' + Math.max(hb,0).toFixed(1) +
+             '" fill="var(--good)" opacity=".07"/>');
+      [["min_value", th.min_value], ["max_value", th.max_value]].forEach(function(p){
+        o.push('<line x1="' + mL + '" x2="' + (mL+iw) + '" y1="' + Y(p[1]).toFixed(1) + '" y2="' + Y(p[1]).toFixed(1) +
+               '" stroke="var(--good)" stroke-width="1" stroke-dasharray="4 4" opacity=".55"/>');
+      });
+      o.push('<text x="' + (mL+iw) + '" y="' + (Y(th.max_value) - 4).toFixed(1) +
+             '" text-anchor="end" font-size="10" fill="var(--muted)">rango normal</text>');
+    }
+
+    // grilla + eje Y
+    ticks.forEach(function(v){
+      o.push('<line x1="' + mL + '" x2="' + (mL+iw) + '" y1="' + Y(v).toFixed(1) + '" y2="' + Y(v).toFixed(1) +
+             '" stroke="var(--grid)" stroke-width="1"/>');
+      o.push('<text x="' + (mL-8) + '" y="' + (Y(v)+3.5).toFixed(1) +
+             '" text-anchor="end" font-size="11" fill="var(--muted)">' + v + "</text>");
+    });
+    o.push('<line x1="' + mL + '" x2="' + (mL+iw) + '" y1="' + (mT+ih) + '" y2="' + (mT+ih) +
+           '" stroke="var(--axis)" stroke-width="1"/>');
+
+    // banda mín–máx del día
+    var hasBand = pts.some(function(p){ return p.min != null && p.max != null; });
+    if (hasBand){
+      var up = [], dn = [];
+      pts.forEach(function(p){ up.push(X(new Date(p.ts)) .toFixed(1) + "," + Y(p.max != null ? p.max : p.value).toFixed(1)); });
+      for (var i = pts.length - 1; i >= 0; i--){
+        var p2 = pts[i];
+        dn.push(X(new Date(p2.ts)).toFixed(1) + "," + Y(p2.min != null ? p2.min : p2.value).toFixed(1));
+      }
+      o.push('<polygon points="' + up.concat(dn).join(" ") + '" fill="var(--series)" opacity=".13"/>');
+    }
+
+    // línea del promedio, 2px
+    var d = pts.map(function(p, i){
+      return (i ? "L" : "M") + X(new Date(p.ts)).toFixed(1) + " " + Y(p.value).toFixed(1); }).join(" ");
+    o.push('<path d="' + d + '" fill="none" stroke="var(--series)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
+
+    // marcadores solo si son pocos puntos
+    if (pts.length <= 20){
+      pts.forEach(function(p){
+        o.push('<circle cx="' + X(new Date(p.ts)).toFixed(1) + '" cy="' + Y(p.value).toFixed(1) +
+               '" r="4" fill="var(--series)" stroke="var(--surface)" stroke-width="2"/>');
+      });
+    }
+
+    // eje X, primera y última fecha
+    [[pts[0], "start"], [pts[pts.length-1], "end"]].forEach(function(e){
+      var t = new Date(e[0].ts);
+      o.push('<text x="' + X(t).toFixed(1) + '" y="' + (mT+ih+18) + '" text-anchor="' + e[1] +
+             '" font-size="11" fill="var(--muted)">' + t.toLocaleDateString("es-CL", {day:"2-digit", month:"short"}) + "</text>");
+    });
+
+    // capa de hover
+    o.push('<line id="cross" x1="0" x2="0" y1="' + mT + '" y2="' + (mT+ih) + '" stroke="var(--axis)" stroke-width="1" opacity="0"/>');
+    o.push('<circle id="focus" r="5" fill="var(--series)" stroke="var(--surface)" stroke-width="2" opacity="0"/>');
+    o.push('<rect id="hit" x="' + mL + '" y="' + mT + '" width="' + iw + '" height="' + ih + '" fill="transparent"/>');
+    o.push("</svg>");
+    $("chart").innerHTML = o.join("");
+
+    var svg = $("chart").querySelector("svg");
+    var tip = document.querySelector(".tip") || (function(){
+      var t = document.createElement("div"); t.className = "tip"; t.style.display = "none";
+      document.body.appendChild(t); return t; })();
+
+    function move(ev){
+      var r = svg.getBoundingClientRect(), sx = W / r.width;
+      var mx = (ev.clientX - r.left) * sx;
+      var best = 0, bd = Infinity;
+      pts.forEach(function(p, i){
+        var dd = Math.abs(X(new Date(p.ts)) - mx);
+        if (dd < bd){ bd = dd; best = i; }
+      });
+      var p = pts[best], px = X(new Date(p.ts)), py = Y(p.value);
+      svg.querySelector("#cross").setAttribute("x1", px); svg.querySelector("#cross").setAttribute("x2", px);
+      svg.querySelector("#cross").setAttribute("opacity", ".6");
+      var f = svg.querySelector("#focus");
+      f.setAttribute("cx", px); f.setAttribute("cy", py); f.setAttribute("opacity", "1");
+      tip.style.display = "block";
+      tip.innerHTML = "<b>" + new Date(p.ts).toLocaleDateString("es-CL", {day:"2-digit", month:"long"}) + "</b><br>" +
+        "Promedio " + p.value + (s.unit ? " " + s.unit : "") +
+        (p.min != null ? "<br>Mínimo " + p.min + " · Máximo " + p.max : "");
+      tip.style.left = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 10) + "px";
+      tip.style.top  = Math.max(ev.clientY - tip.offsetHeight - 12, 8) + "px";
+    }
+    function out(){
+      tip.style.display = "none";
+      svg.querySelector("#cross").setAttribute("opacity", "0");
+      svg.querySelector("#focus").setAttribute("opacity", "0");
+    }
+    svg.querySelector("#hit").addEventListener("mousemove", move);
+    svg.querySelector("#hit").addEventListener("mouseleave", out);
+  }
+
+  function drawTable(s){
+    var pts = s.points || [];
+    $("tableWrap").innerHTML =
+      "<table><thead><tr><th>Fecha</th><th class='num'>Promedio</th><th class='num'>Mínimo</th><th class='num'>Máximo</th></tr></thead><tbody>" +
+      pts.map(function(p){
+        return "<tr><td>" + new Date(p.ts).toLocaleDateString("es-CL") + "</td><td class='num'>" +
+          (p.value != null ? p.value : "—") + "</td><td class='num'>" + (p.min != null ? p.min : "—") +
+          "</td><td class='num'>" + (p.max != null ? p.max : "—") + "</td></tr>";
+      }).join("") + "</tbody></table>";
+  }
+
+  // ----------------------------------------------------------------- alertas
+  Array.prototype.forEach.call(document.querySelectorAll("[data-st]"), function(b){
+    b.onclick = function(){
+      document.querySelectorAll("[data-st]").forEach(function(x){ x.setAttribute("aria-pressed","false"); });
+      b.setAttribute("aria-pressed","true");
+      alertStatus = b.dataset.st;
+      loadAlerts();
+    };
+  });
+
+  async function loadAlerts(){
+    show($("alertMsg"), "", "");
+    try {
+      var r = await api("/api/v1/users/me/alerts?status=" + alertStatus + "&page_size=50");
+      var items = (r.items || []).filter(function(a){ return !patientId || a.patient_id === patientId; });
+      if (!items.length){ $("alerts").innerHTML = '<p class="hint">No hay alertas en este estado.</p>'; return; }
+
+      $("alerts").innerHTML =
+        "<table><thead><tr><th>Alerta</th><th>Gravedad</th><th>Estado</th><th>Generada</th><th></th></tr></thead><tbody>" +
+        items.map(function(a){
+          var sev = SEV[a.severity] || ["b-info", a.severity];
+          var ico = a.severity === "critical" ? "▲" : a.severity === "warning" ? "●" : "○";
+          return "<tr><td><b>" + esc(a.title) + "</b>" +
+            (a.detail ? '<br><span style="color:var(--ink-2); font-size:12.5px">' + esc(a.detail) + "</span>" : "") +
+            "</td><td><span class='badge " + sev[0] + "'>" + ico + " " + sev[1] + "</span></td>" +
+            "<td>" + esc(STA[a.status] || a.status) + "</td>" +
+            "<td style='font-size:12.5px; color:var(--ink-2)'>" +
+              new Date(a.created_at).toLocaleString("es-CL", {day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit"}) + "</td>" +
+            "<td>" + (a.status === "active"
+              ? "<button data-ack='" + esc(a.alert_id) + "'>Atender</button>" : "") + "</td></tr>";
+        }).join("") + "</tbody></table>";
+
+      Array.prototype.forEach.call($("alerts").querySelectorAll("[data-ack]"), function(btn){
+        btn.onclick = async function(){
+          btn.disabled = true;
+          try {
+            await api("/api/v1/alerts/" + btn.dataset.ack + "/acknowledge", { method: "POST" });
+            show($("alertMsg"), "Alerta atendida. El tiempo de respuesta quedó registrado en la base de datos.", "ok");
+            await loadAlerts();
+          } catch (e) {
+            show($("alertMsg"), e.message, "err");
+            btn.disabled = false;
+          }
+        };
+      });
+    } catch (e) {
+      $("alerts").innerHTML = '<p class="hint">' + esc(e.message) + "</p>";
+    }
+  }
+
+  // -------------------------------------------------------------- adherencia
+  async function loadAdherence(){
+    var to = new Date(), from = new Date(Date.now() - 30 * 864e5);
+    try {
+      var r = await api("/api/v1/patients/" + patientId + "/adherence?date_from=" + ymd(from) + "&date_to=" + ymd(to));
+      var pct = Math.round((r.adherence_pct || 0) * 10) / 10;
+      var cls = pct >= 90 ? "b-good" : pct >= 75 ? "b-warn" : "b-crit";
+      var ico = pct >= 90 ? "✓" : pct >= 75 ? "●" : "▲";
+      $("adhTiles").innerHTML =
+        '<div class="tile"><div class="k">Adherencia, 30 días</div><div class="v">' + pct +
+          '<span class="u">%</span></div><div class="s"><span class="badge ' + cls + '">' + ico +
+          (pct >= 90 ? " Buena" : pct >= 75 ? " Regular" : " Baja") + "</span></div></div>" +
+        '<div class="tile"><div class="k">Dosis administradas</div><div class="v">' + (r.taken || 0) + "</div></div>" +
+        '<div class="tile"><div class="k">Dosis omitidas</div><div class="v">' + (r.missed || 0) + "</div></div>";
+
+      var bm = r.by_medication || [];
+      $("adhTable").innerHTML = bm.length
+        ? "<table><thead><tr><th>Medicamento</th><th class='num'>Adherencia</th><th class='num'>Tomadas</th><th class='num'>Omitidas</th></tr></thead><tbody>" +
+          bm.map(function(m){
+            return "<tr><td>" + esc(m.medication_name || m.name || "—") + "</td><td class='num'>" +
+              (m.adherence_pct != null ? Math.round(m.adherence_pct * 10) / 10 + " %" : "—") +
+              "</td><td class='num'>" + (m.taken != null ? m.taken : "—") +
+              "</td><td class='num'>" + (m.missed != null ? m.missed : "—") + "</td></tr>";
+          }).join("") + "</tbody></table>"
+        : "";
+    } catch (e) {
+      $("adhTiles").innerHTML = '<span class="hint">' + esc(e.message) + "</span>";
+      $("adhTable").innerHTML = "";
+    }
+  }
+
+  // -------------------------------------------------------------------- tema
+  $("theme").onclick = function(){
+    var d = document.documentElement;
+    var now = d.getAttribute("data-theme");
+    if (!now) now = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    d.setAttribute("data-theme", now === "dark" ? "light" : "dark");
+  };
+
+  $("pass").addEventListener("keydown", function(e){ if (e.key === "Enter") $("login").click(); });
+})();
+</script>
+</body>
+</html>

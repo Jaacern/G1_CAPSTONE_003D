@@ -5,7 +5,7 @@ Cambios 2FN aplicados:
 - scheduled_doses: patient_id eliminado; todas las queries filtran por paciente
   haciendo JOIN medications.patient_id.
 """
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, Query, Response, status
 from pydantic import BaseModel, Field
@@ -157,10 +157,12 @@ async def _replace_times(db: AsyncSession, medication_id: str, times: list[str])
         text("DELETE FROM medication_times WHERE medication_id = :mid"), {"mid": medication_id}
     )
     for t in times:
+        # asyncpg requiere un objeto time nativo, no el string "HH:MM".
+        parsed = t if isinstance(t, time) else time.fromisoformat(t)
         await db.execute(
             text("INSERT INTO medication_times (medication_id, time_of_day) "
-                 "VALUES (:mid, :t::time) ON CONFLICT (medication_id, time_of_day) DO NOTHING"),
-            {"mid": medication_id, "t": t},
+                 "VALUES (:mid, :t) ON CONFLICT (medication_id, time_of_day) DO NOTHING"),
+            {"mid": medication_id, "t": parsed},
         )
 
 

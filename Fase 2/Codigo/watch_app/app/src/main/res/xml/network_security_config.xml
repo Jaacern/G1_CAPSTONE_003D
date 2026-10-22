@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Permite HTTP en texto plano SOLO hacia el backend de desarrollo en la red
+  local. Todo lo demás sigue exigiendo HTTPS.
+  Reemplaza la IP de ejemplo por la IP local de tu backend.
+  PRODUCCIÓN: el backend iría por HTTPS y esta excepción se quita.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

@@ -506,7 +506,7 @@ async def get_series(
                     WHERE patient_id = :pid
                       AND type = :type
                       AND measured_at >= :from
-                      AND measured_at < (:to::date + interval '1 day')
+                      AND measured_at < (cast(:to as date) + interval '1 day')
                     ORDER BY measured_at ASC
                     """
                 ),
@@ -531,7 +531,7 @@ async def get_series(
                     WHERE patient_id = :pid
                       AND type = :type
                       AND measured_at >= :from
-                      AND measured_at < (:to::date + interval '1 day')
+                      AND measured_at < (cast(:to as date) + interval '1 day')
                     GROUP BY date_trunc('{unit}', measured_at)
                     ORDER BY ts ASC
                     """

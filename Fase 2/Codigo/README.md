@@ -1,468 +1,456 @@
-# AgeCare — Backend
+<div align="center">
 
-Backend de **AgeCare**, una suite de cuidado de adultos mayores. Expone una API REST
-construida con **FastAPI** sobre **PostgreSQL**, pensada para acompañar a la familia,
-la cuidadora, el médico y el propio adulto mayor en el seguimiento diario: signos
-vitales, medicación, alertas y emergencias.
+<img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRBUB5NxN49OL9L-_ZM5faV-gPJEJonlr7K1WY057Dq&s=10" alt="Alloxtentric Logo" width="160"/>
+<img src="https://thumb.wikimedia.org/wikipedia/commons/thumb/a/aa/Logo_DuocUC.svg/3840px-Logo_DuocUC.svg.png" alt="Duoc UC Logo" width="220"/>
 
-Este repositorio contiene:
+# 🩺 AgeCare
 
-- El **esquema de base de datos** (carpeta `sql/`), con 17 tablas y datos de demostración.
-- La **API** en FastAPI (carpeta `api/`), con los módulos ya implementados.
-- La orquestación con **Docker/Podman Compose** (base de datos + pgAdmin + API).
+### Plataforma Digital Integral de Cuidado de Adultos Mayores
 
----
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Flutter](https://img.shields.io/badge/Mobile-Flutter-02569B?style=for-the-badge&logo=flutter)](https://flutter.dev/)
+[![PostgreSQL](https://img.shields.io/badge/DB-PostgreSQL-336791?style=for-the-badge&logo=postgresql)](https://www.postgresql.org/)
+[![Azure](https://img.shields.io/badge/Cloud-Microsoft_Azure-0078D4?style=for-the-badge&logo=microsoftazure)](https://azure.microsoft.com/)
+[![Docker](https://img.shields.io/badge/Infra-Docker-2496ED?style=for-the-badge&logo=docker)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/License-Academic-blueviolet?style=for-the-badge)](./LICENSE)
 
-## Tabla de contenidos
+**Capstone APT122 · PTY4614 · Grupo 1 · Sección 003D**
+**Ingeniería en Informática — Sede San Andrés · Duoc UC**
 
-- [Arquitectura](#arquitectura)
-- [Stack tecnológico](#stack-tecnológico)
-- [Estructura del proyecto](#estructura-del-proyecto)
-- [Puesta en marcha](#puesta-en-marcha)
-- [Cómo probar la API](#cómo-probar-la-api)
-- [Usuarios y datos de demostración](#usuarios-y-datos-de-demostración)
-- [Convenciones de la API](#convenciones-de-la-api)
-- [Endpoints implementados](#endpoints-implementados)
-- [Endpoints faltantes](#endpoints-faltantes)
-- [Solución de problemas](#solución-de-problemas)
+<sub>¿Quieres entender el contexto académico detrás de este proyecto? → [Visita nuestra Wiki](https://github.com/Jaacern/G1_CAPSTONE_003D/wiki)</sub>
+
+</div>
 
 ---
 
-## Arquitectura
+> 📍 **Ubicación:** esta carpeta (`Fase 2/Codigo/`) contiene el **código fuente fullstack**
+> de AgeCare (backend, frontend y app de reloj). La documentación académica del proyecto
+> (ERS, UML, modelo de datos, autoevaluaciones y evidencias) vive en las carpetas
+> `Fase 1/` y `Fase 2/` de este mismo repositorio.
+
+---
+
+## 📋 Tabla de Contenidos
+
+1. [🔍 Contexto y Problemática](#-contexto-y-problemática)
+2. [💡 Descripción del Proyecto](#-descripción-del-proyecto)
+3. [🎯 Objetivos](#-objetivos)
+4. [👥 Equipo](#-equipo)
+5. [🏗️ Arquitectura del Sistema](#️-arquitectura-del-sistema)
+6. [🛠️ Stack Tecnológico](#️-stack-tecnológico)
+7. [📐 Metodología](#-metodología)
+8. [📅 Carta Gantt](#-carta-gantt)
+9. [📦 Fases del Proyecto](#-fases-del-proyecto)
+10. [📂 Estructura del Código](#-estructura-del-código)
+11. [⚙️ Instalación y Ejecución](#️-instalación-y-ejecución)
+12. [🔐 Seguridad](#-seguridad)
+13. [📖 Documentación Adicional](#-documentación-adicional)
+
+---
+
+## 🔍 Contexto y Problemática
+
+### El problema
+
+Chile enfrenta un acelerado proceso de envejecimiento poblacional. Según proyecciones del INE, para 2050 más del **22% de la población será mayor de 65 años**. Este fenómeno genera una presión creciente sobre los sistemas de salud, las familias y los cuidadores formales e informales.
+
+Hoy en día, el cuidado de adultos mayores se caracteriza por:
+
+| 🔴 Problema | 🟢 Impacto |
+|------------|-----------|
+| 🔴 Fragmentación de información clínica | 🟢 Retrasos en respuesta ante emergencias |
+| 🔴 Falta de coordinación entre familia y cuidadores | 🟢 Errores en medicación y seguimiento |
+| 🔴 Ausencia de monitoreo continuo a distancia | 🟢 Incidentes no detectados a tiempo |
+| 🔴 Interfaces tecnológicas poco accesibles para adultos mayores | 🟢 Baja adopción de herramientas digitales |
+| 🔴 Inexistencia de un canal unificado de comunicación | 🟢 Información dispersa en llamadas, mensajes y papeles |
+
+### Relevancia sociosanitaria
+
+La descoordinación en el ecosistema de cuidado retarda la toma de decisiones críticas y aumenta el riesgo de complicaciones de salud evitables. **AgeCare** aborda esta brecha mediante una plataforma HealthTech que centraliza monitoreo, alertas, coordinación clínica y asistencia con inteligencia artificial en un único ecosistema digital multi-rol.
+
+---
+
+## 💡 Descripción del Proyecto
+
+**AgeCare** es una plataforma digital integral de cuidado de adultos mayores, compuesta por:
+
+- 📱 **Aplicaciones móviles** para Familias, Cuidadores, Médicos y el propio Adulto Mayor
+- ⌚ **App de reloj (Wear OS)** para captura de signos vitales (pulso) en tiempo real
+- 🖥️ **Panel web administrativo** para gestión clínica centralizada
+- 🤖 **Asistente IA generativa** para soporte clínico contextualizado
+- 📡 **Telemetría de signos vitales** en tiempo real desde wearables
+- 🔔 **Sistema de alertas críticas** automatizadas y escaladas
+- 🧾 **OCR de recetas médicas** para digitalización y adherencia farmacológica
+- 🎵 **Módulo "Director Musical"** — interfaz cognitiva accesible para adultos mayores
+
+### Roles de usuario
 
 ```
-┌──────────────┐      HTTP/JSON       ┌──────────────────┐     asyncpg      ┌────────────────┐
-│  Cliente     │  ───────────────▶    │   API FastAPI    │  ─────────────▶  │  PostgreSQL 16 │
-│ (app / web / │                      │  (Python 3.12)   │                  │  (17 tablas)   │
-│  Swagger)    │  ◀───────────────    │  Uvicorn :8000   │  ◀─────────────  │                │
-└──────────────┘                      └──────────────────┘                  └────────────────┘
-                                              │
-                                              ▼
-                                       ┌──────────────┐
-                                       │   pgAdmin    │  (administración de la BD)
-                                       └──────────────┘
-```
-
-- La API **no gestiona el esquema**: las tablas las crea el SQL de la carpeta `sql/`,
-  que Postgres ejecuta automáticamente la primera vez que se levanta el contenedor.
-- La autorización de cada recurso se valida contra la membresía del usuario en el
-  paciente (tabla `patient_members`).
-
----
-
-## Stack tecnológico
-
-| Componente        | Tecnología                                   |
-|-------------------|----------------------------------------------|
-| API               | FastAPI 0.115 (Python 3.12)                  |
-| Validación        | Pydantic v2                                  |
-| Acceso a datos    | SQLAlchemy 2 (async) + asyncpg               |
-| Base de datos     | PostgreSQL 16                                |
-| Autenticación     | JWT (HS256) + refresh tokens rotatorios      |
-| Hash de claves    | bcrypt (passlib)                             |
-| Contenedores      | Docker / Podman Compose                      |
-| Administración BD | pgAdmin 4                                    |
-
----
-
-## Estructura del proyecto
-
-```
-agecare-backend/
-├── api/                       # La API FastAPI
-│   ├── app/
-│   │   ├── main.py            # Punto de entrada, registra routers y CORS
-│   │   ├── config.py          # Configuración desde variables de entorno
-│   │   ├── db.py              # Motor async y sesión de BD
-│   │   ├── deps.py            # Dependencias de auth y autorización por membresía
-│   │   ├── errors.py          # Formato estándar de errores
-│   │   ├── security.py        # JWT, bcrypt, tokens de refresco
-│   │   └── routers/
-│   │       ├── health.py      # Healthcheck
-│   │       ├── auth.py        # Módulo 3: autenticación
-│   │       ├── patients.py    # Módulo 4: pacientes y onboarding
-│   │       ├── vitals.py      # Módulo 5: vitals y semáforo
-│   │       ├── medications.py # Módulo 6: medicamentos y adherencia
-│   │       └── alerts.py      # Módulo 9: alertas y SOS
-│   ├── Dockerfile
-│   └── requirements.txt
-├── sql/                       # Esquema de la base de datos (se ejecuta en orden)
-│   ├── 001_base.sql           # Función compartida set_updated_at
-│   ├── 101_users.sql ...      # Bloque 1: identidad y acceso
-│   ├── 201_wearables.sql ...  # Bloque 2: vitals y wearable
-│   ├── 301_medications.sql ...# Bloque 3: medicación
-│   ├── 401_alerts.sql ...     # Bloque 4: alertas y emergencias
-│   └── 900_seed_dev.sql       # Datos de demostración (solo desarrollo)
-├── docker-compose.yml
-├── .env.example
-└── README.md
+┌──────────────────────────────────────────────────────────────────────┐
+│                          AgeCare Platform                              │
+├──────────────┬──────────────────┬────────────────────┬──────────────┤
+│ 👴 Adulto    │ 👩‍⚕️ Cuidador/a    │ 👨‍👩‍👧 Familiar       │ 🩺 Médico     │
+│   Mayor      │                  │                    │              │
+│ • Dictado voz│ • Historial      │ • Monitoreo remoto │ • Historial  │
+│ • Recordato- │   clínico        │ • Alertas críticas │   clínico    │
+│   rios       │ • Gestión meds   │ • Dashboard        │ • Recetas    │
+│ • Dir.Musical│ • Reportes       │ • Comunicación     │ • Evolución  │
+│ • Alertas    │ • Alertas        │ • OCR recetas      │ • Indicadores│
+└──────────────┴──────────────────┴────────────────────┴──────────────┘
 ```
 
 ---
 
-## Puesta en marcha
+## 🎯 Objetivos
 
-### Requisitos
+### Objetivo General
 
-- **Docker** o **Podman** con Compose. En este proyecto se usa Podman
-  (con alias `docker=podman`). Los comandos son equivalentes.
+> Desarrollar y desplegar la plataforma **AgeCare** para centralizar el monitoreo de salud, alertas y coordinación clínica entre familiares, cuidadores, médicos y el adulto mayor, garantizando seguridad de datos y optimizando tiempos de reacción ante eventos críticos de salud.
 
-### 1. Configurar variables de entorno
+### Objetivos Específicos
 
-Copia la plantilla y ajusta los valores:
+| # | Objetivo | Métrica de Éxito |
+|---|----------|-----------------|
+| 1 | ⚡ Reducir el tiempo de respuesta ante emergencias médicas | **-40%** en los primeros 3 meses (notificaciones push alta criticidad) |
+| 2 | 💊 Aumentar adherencia farmacológica mediante recordatorios y OCR | **+35%** en el primer semestre |
+| 3 | 👴 Lograr adopción diaria activa del adulto mayor | **80%** al segundo mes (interfaz accesible + dictado de voz) |
+| 4 | 🚀 Garantizar rendimiento y disponibilidad de la plataforma | Latencia **<500ms (p95)** · Uptime **99.9%** en Azure |
+
+---
+
+## 👥 Equipo
+
+<div align="center">
+
+| 👤 Integrante | 🛠️ Rol en el Proyecto | 💼 Perfil Técnico |
+|--------------|----------------------|------------------|
+| **Javier Cerna** | Tech Lead · Full Stack · IA · DevSecOps | Backend avanzado, hardware embebido, LLMs locales, CI/CD |
+| **Benjamín Camus** | Arquitecto de Datos · Data Engineering · Azure | DBA, modelado de datos, arquitectura híbrida PostgreSQL + NoSQL, optimización Cloud |
+| **Juan Mora** | DBA · Modelado Relacional | Administración de bases de datos, diseño ER, normalización |
+
+</div>
+
+**Carrera:** Ingeniería en Informática · **Sede:** San Andrés <br>
+**Asignatura:** PTY4614 Capstone · **Código:** APT122
+
+---
+
+## 🏗️ Arquitectura del Sistema
+
+```
+┌─────────────────────────────────────────┐
+│         MICROSOFT AZURE CLOUD            │
+│                                          │
+📱 Flutter App ───► │ ┌─────────────────────────────────┐ │
+(Adulto Mayor)      │ │     Azure Container Apps        │ │
+│                   │ │                                 │ │
+📱 Flutter App ───► │ │ ┌──────────┐   ┌─────────────┐  │ │
+(Cuidador/a)        │ │ │ FastAPI  │   │ AI Service  │  │ │
+│                   │ │ │ Backend  │◄─►│(Azure OpenAI│  │ │
+📱 Flutter App ───► │ │ │ (Python) │   │  / LLMs)    │  │ │
+(Familiar)          │ │ └────┬─────┘   └─────────────┘  │ │
+│                   │ │      │                          │ │
+🖥️ Web Panel  ───► │ │ ┌────▼────────────────────────┐ │ │
+(Admin)             │ │ │        Data Layer           │ │ │
+│                   │ │ │ ┌────────────┐ ┌────────┐   │ │ │
+⌚ Wearable   ───► │ │ │ │ PostgreSQL │ │ NoSQL  │   │ │ │
+(Telemetría)        │ │ │ │(Históricos)│ │(Teleme-│   │ │ │
+│                   │ │ │ │/Transacc.) │ │ tría)  │   │ │ │
+│                   │ │ │ └────────────┘ └────────┘   │ │ │
+│                   │ │ └─────────────────────────────┘ │ │
+│                   │ └─────────────────────────────────┘ │
+│       🔐 JWT · Cifrado E2E · DevSecOps   │
+└─────────────────────────────────────────┘
+
+Containerización: Docker + docker-compose
+Pruebas: Postman · PyTest
+OCR: Reconocimiento óptico de recetas médicas
+```
+
+### Capas del sistema
+
+| Capa | Tecnología | Descripción |
+|------|-----------|-------------|
+| 📱 Presentación | Flutter (Dart) | Apps móviles multi-rol + panel web |
+| ⌚ Captura | Kotlin (Wear OS) | App de reloj que envía telemetría de pulso al backend |
+| ⚙️ Lógica de Negocio | FastAPI (Python) | API REST, autenticación JWT, orquestación |
+| 🤖 Inteligencia Artificial | Azure OpenAI / LLMs | Asistente clínico contextual, OCR recetas |
+| 🗄️ Persistencia | PostgreSQL + NoSQL | Datos clínicos estructurados + telemetría |
+| ☁️ Infraestructura | Microsoft Azure | Container Apps, escalabilidad, alta disponibilidad |
+| 🔐 Seguridad | JWT + cifrado E2E | Autenticación, autorización, DevSecOps |
+
+---
+
+## 🛠️ Stack Tecnológico
+
+<div align="center">
+
+### Backend
+![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
+![JWT](https://img.shields.io/badge/JWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white)
+
+### Frontend / Mobile
+![Flutter](https://img.shields.io/badge/Flutter-02569B?style=flat-square&logo=flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-0175C2?style=flat-square&logo=dart&logoColor=white)
+![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=flat-square&logo=kotlin&logoColor=white)
+
+### Base de Datos
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?style=flat-square&logo=postgresql&logoColor=white)
+![NoSQL](https://img.shields.io/badge/NoSQL-E34F26?style=flat-square&logo=mongodb&logoColor=white)
+
+### Cloud e Infraestructura
+![Azure](https://img.shields.io/badge/Microsoft_Azure-0078D4?style=flat-square&logo=microsoftazure&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
+
+### IA y ML
+![OpenAI](https://img.shields.io/badge/Azure_OpenAI-412991?style=flat-square&logo=openai&logoColor=white)
+
+### Testing
+![Postman](https://img.shields.io/badge/Postman-FF6C37?style=flat-square&logo=postman&logoColor=white)
+![PyTest](https://img.shields.io/badge/PyTest-0A9EDC?style=flat-square&logo=pytest&logoColor=white)
+
+</div>
+
+### Detalle del stack
+
+| Categoría | Tecnología | Versión / Detalles |
+|-----------|-----------|-------------------|
+| 🐍 Lenguaje Backend | Python | 3.11+ |
+| ⚡ Framework API | FastAPI | REST API, async, OpenAPI docs |
+| 📱 Framework Mobile | Flutter | Dart, multiplataforma iOS/Android/Web |
+| ⌚ App de reloj | Kotlin + Wear OS | Captura de pulso y envío al backend |
+| 🗄️ BD Relacional | PostgreSQL | Historiales clínicos, transacciones |
+| 📡 BD No Relacional | NoSQL | Telemetría wearable en tiempo real |
+| ☁️ Cloud | Microsoft Azure | Azure Container Apps |
+| 🐳 Contenedores | Docker + docker-compose | Orquestación de servicios |
+| 🔐 Autenticación | JWT | JSON Web Tokens, cifrado E2E |
+| 🤖 IA Generativa | Azure OpenAI / LLMs | Asistente clínico contextual |
+| 📄 OCR | Azure OCR / Custom | Digitalización de recetas médicas |
+| 🧪 Testing Backend | PyTest | Pruebas unitarias e integración |
+| 🧪 Testing API | Postman | Pruebas funcionales y de carga |
+| 🔒 Seguridad | DevSecOps | Análisis en pipeline CI/CD |
+
+---
+
+## 📐 Metodología
+
+El proyecto sigue el **modelo de desarrollo en Cascada (Waterfall)**, elegido por la claridad y estabilidad de los requerimientos definidos desde el inicio del proyecto.
+
+```
+   S1─S3        S4─S6       S7─S11      S12─S14     S15─S16     S17─S18
+┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│ Análisis │─►│ Diseño   │─►│  Impl.   │─►│  Impl.   │─►│ Pruebas  │─►│Despliegue│
+│    y     │ │   del    │ │ Backend  │ │ Frontend │ │          │ │          │
+│Requisitos│ │ Sistema  │ │  e IA    │ │          │ │          │ │          │
+└──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
+```
+
+### Etapas detalladas
+
+| Etapa | Semanas | Actividades principales |
+|-------|---------|------------------------|
+| 📋 **Análisis y Definición de Requisitos** | S1 – S3 | ERS simplificado, alcance MVP, casos de uso, requisitos funcionales y no funcionales |
+| 📐 **Diseño del Sistema** | S4 – S6 | Arquitectura Azure, modelo ER en PostgreSQL, diagramas UML (clases, secuencia, casos de uso) |
+| ⚙️ **Implementación Backend e IA** | S7 – S11 | FastAPI, integración LLMs, OCR, simulador Wearable, API REST completa |
+| 📱 **Implementación Frontend** | S12 – S14 | Flutter apps (3 roles), módulo "Director Musical", integración con API |
+| 🧪 **Pruebas** | S15 – S16 | Unitarias, integración, rendimiento (p95 <500ms), seguridad (PyTest + Postman) |
+| 🚀 **Despliegue** | S17 – S18 | Docker, Azure Container Apps, Manual Técnico, presentación a comisión evaluadora |
+
+---
+
+## 📅 Carta Gantt
+
+> Duración total del proyecto: **18 semanas**
+
+| Actividad | **Fase 1 (S1-S4)** | | | | **Fase 2 (S5-S16)** | | | | | | | | | | | | **Fase 3 (S17-S18)** | |
+|-----------|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| | **1** | **2** | **3** | **4** | **5** | **6** | **7** | **8** | **9** | **10** | **11** | **12** | **13** | **14** | **15** | **16** | **17** | **18** |
+| **Análisis y ERS (Requisitos)** | 🟦 | 🟦 | 🟦 | | | | | | | | | | | | | | | |
+| **Diseño de Arquitectura y UML** | | | | 🟩 | 🟩 | 🟩 | | | | | | | | | | | | |
+| **Implementación: Backend e IA** | | | | | | | 🟨 | 🟨 | 🟨 | 🟨 | 🟨 | | | | | | | |
+| **Implementación: Frontend Flutter** | | | | | | | | | | | | 🟧 | 🟧 | 🟧 | | | | |
+| **Plan de Pruebas y Certificación** | | | | | | | | | | | | | | | 🟥 | 🟥 | | |
+| **Empaquetado Docker y Despliegue** | | | | | | | | | | | | | | | | | 🟪 | |
+| **Elaboración de Evidencias (Documental)** | 🟫 | | | 🟫 | | | | | 🟫 | | | | | | 🟫 | | 🟫 | 🟫 |
+
+**Leyenda:** 🟦 Análisis y ERS · 🟩 Diseño de Arquitectura y UML · 🟨 Implementación Backend e IA · 🟧 Implementación Frontend Flutter · 🟥 Pruebas y Certificación · 🟪 Empaquetado y Despliegue · 🟫 Elaboración de Evidencias
+
+---
+
+## 📦 Fases del Proyecto
+
+### Fase 1 — Definición del Proyecto ✅
+
+> **Estado:** Completada | **Naturaleza:** Formativa (0% nota final)
+
+Definición completa de la idea de proyecto, equipo, roles, objetivos, metodología y plan de trabajo.
+
+### Fase 2 — Diseño y Desarrollo 🔄
+
+> **Estado:** En progreso
+
+Arquitectura definitiva del sistema en Azure, modelo Entidad-Relación completo en PostgreSQL, diagramas UML, normalización 2FN, diccionario de datos y desarrollo del backend/frontend.
+
+**Entregables (avance):**
+
+- ✅ ERS simplificado (base Fase 1)
+- ✅ Documento de requerimientos funcionales
+- ✅ Modelo relacional definitivo + diccionario de datos
+- ✅ Normalización 2FN y análisis de decisiones de diseño
+- ✅ Esquema SQL completo + diagrama ER
+- 🔄 Backend FastAPI e integración con el frontend Flutter
+
+### Fase 3 — Cierre, Pruebas y Despliegue ⏳
+
+> **Estado:** Pendiente
+
+Pruebas unitarias/integración (PyTest + Postman), rendimiento (p95 <500ms), seguridad (DevSecOps), containerización con Docker, despliegue en Azure Container Apps, Manual Técnico y presentación final.
+
+---
+
+## 📂 Estructura del Código
+
+Esta carpeta (`Fase 2/Codigo/`) contiene el código fuente fullstack de AgeCare:
+
+```
+Fase 2/Codigo/
+│
+├── 📁 backend/                 # API FastAPI + PostgreSQL
+│   ├── api/
+│   │   ├── app/
+│   │   │   ├── routers/        # auth, patients, vitals, medications, alerts, health
+│   │   │   ├── config.py · db.py · deps.py · errors.py · security.py
+│   │   │   └── main.py
+│   │   ├── Dockerfile
+│   │   └── requirements.txt
+│   ├── sql/                    # Esquema normalizado + seed de desarrollo
+│   ├── docker-compose.yml
+│   └── .env.example
+│
+├── 📁 frontend/                # App Flutter (familiar, cuidadora, adulto mayor)
+│   ├── lib/
+│   │   ├── core/               # Config, red (Dio), tema, router, widgets
+│   │   └── features/           # auth, home, patients, health, medications,
+│   │                           # alerts, comms, documents, marketplace, etc.
+│   ├── assets/                 # Logo e imágenes de marca
+│   ├── android/ · ios/ · web/  # Plataformas
+│   ├── test/                   # Pruebas de widget y repositorios
+│   └── pubspec.yaml
+│
+├── 📁 watch_app/               # App de reloj (Wear OS, Kotlin)
+│   └── app/src/main/           # HeartRateService · VitalsUploader · MainActivity
+│
+├── 📄 README.md                # Este documento
+└── 📄 TESTING.md               # Guía de pruebas
+```
+
+---
+
+## ⚙️ Instalación y Ejecución
+
+### Prerrequisitos
 
 ```bash
+Python 3.11+
+Flutter 3.x
+Docker 24+ (o Podman)
+PostgreSQL 16+
+```
+
+### Backend (FastAPI + PostgreSQL)
+
+```bash
+cd backend
+# Configurar variables de entorno (nunca subas el .env real)
 cp .env.example .env
+# Edita .env con tus credenciales locales y un JWT_SECRET propio
+
+# Levantar la base de datos y la API con Docker/Podman
+docker compose up -d db api      # o: podman compose up -d db api
+
+# Servicios disponibles:
+#   - API Backend: http://localhost:8000
+#   - Docs API:    http://localhost:8000/docs
+#   - PostgreSQL:  localhost:5432
 ```
 
-Contenido esperado del `.env`:
-
-```env
-POSTGRES_USER=agecare
-POSTGRES_PASSWORD=agecare_local_2026
-POSTGRES_DB=agecare
-
-PGADMIN_EMAIL=admin@agecare.com
-PGADMIN_PASSWORD=admin_local_2026
-
-JWT_SECRET=dev-secret-local-cambiar-en-produccion
-```
-
-> El correo de pgAdmin no puede usar dominios reservados como `.local`
-> (pgAdmin los rechaza). Usa un dominio normal como `.com`.
-
-### 2. Levantar todo
+### Frontend (Flutter)
 
 ```bash
-podman compose up -d --build
+cd frontend
+flutter pub get
+
+# Modo demo (sin backend, datos simulados en memoria)
+flutter run --dart-define=USE_MOCKS=true
+
+# Conectado al backend local
+flutter run -d chrome \
+  --dart-define=USE_MOCKS=false \
+  --dart-define=API_BASE_URL=http://localhost:8000
 ```
 
-Esto levanta tres servicios:
-
-| Servicio           | Contenedor         | URL / Puerto                 |
-|--------------------|--------------------|------------------------------|
-| API                | `agecare-api`      | http://127.0.0.1:8000        |
-| Base de datos      | `agecare-db`       | `127.0.0.1:5432`             |
-| pgAdmin            | `agecare-pgadmin`  | http://127.0.0.1:5050        |
-
-La **primera vez**, Postgres ejecuta automáticamente todos los `.sql` de la carpeta
-`sql/` (crea las 17 tablas y carga 30 días de datos de demostración).
-
-### 3. Verificar que responde
+**Prueba en un teléfono Android por USB** (reenvía el puerto por el cable):
 
 ```bash
-curl http://127.0.0.1:8000/health       # {"status":"ok"}
-curl http://127.0.0.1:8000/health/db    # {"status":"ok","database":"up"}
+adb reverse tcp:8000 tcp:8000
+flutter run \
+  --dart-define=USE_MOCKS=false \
+  --dart-define=API_BASE_URL=http://localhost:8000
 ```
 
-### Comandos útiles
+**Credenciales del seed de desarrollo:**
 
-```bash
-podman ps                          # ver contenedores en ejecución
-podman compose logs -f api         # ver logs de la API en vivo
-podman compose up -d --build api   # reconstruir la API tras cambiar código
-podman compose down                # apagar todo (conserva los datos)
-podman compose down -v             # apagar y BORRAR los datos (re-ejecuta los .sql)
-```
-
-> Los scripts `.sql` solo se ejecutan cuando el volumen de datos está vacío. Si
-> editas un `.sql` y quieres reaplicarlo, usa `down -v` (esto borra todos los datos).
+| Rol | Correo | Contraseña |
+|-----|--------|------------|
+| Familiar | `ja.cernac@duocuc.cl` | `demo1234` |
+| Cuidadora | `rosa@cuidados.cl` | `demo1234` |
+| Adulto mayor | `elena@agecare.cl` | `demo1234` |
 
 ---
 
-## Cómo probar la API
+## 🔐 Seguridad
 
-### Opción A — Swagger UI (recomendado)
+AgeCare implementa múltiples capas de seguridad siguiendo el enfoque **DevSecOps**:
 
-FastAPI genera documentación interactiva automáticamente. No se instala nada:
+| Mecanismo | Descripción |
+|-----------|-------------|
+| 🔑 **JWT** | Autenticación stateless con tokens firmados y rotación de refresh tokens |
+| 🔒 **Cifrado E2E** | Cifrado de extremo a extremo en comunicaciones |
+| 🛡️ **DevSecOps** | Análisis de seguridad integrado en el pipeline CI/CD |
+| 🏥 **RBAC** | Control de acceso basado en roles (Familiar / Cuidador / Médico / Admin) |
+| 📋 **Auditoría** | Registro de acciones críticas sobre datos clínicos |
+| ☁️ **Azure Security** | Configuración de seguridad a nivel de infraestructura cloud |
 
-- **Swagger UI:** http://127.0.0.1:8000/docs
-- **ReDoc:** http://127.0.0.1:8000/redoc
-- **Esquema OpenAPI:** http://127.0.0.1:8000/openapi.json
-
-Flujo de prueba:
-
-1. Abre `/docs`.
-2. Ejecuta `POST /api/v1/auth/login` con un usuario de demo (ver más abajo).
-3. Copia el `access_token` de la respuesta.
-4. Clic en **Authorize** 🔒 (arriba a la derecha), pega el token y confirma.
-5. Ya puedes ejecutar cualquier endpoint. Donde pida `patient_id`, usa el de
-   Elena Rosales: `33333333-3333-4333-8333-333333333333`.
-
-### Opción B — curl
-
-```bash
-# 1. Login (guarda el token)
-TOKEN=$(curl -s -X POST http://127.0.0.1:8000/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"ja.cernac@duocuc.cl","password":"demo1234"}' \
-  | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
-
-# 2. Usar el token en llamadas protegidas
-curl http://127.0.0.1:8000/api/v1/patients \
-  -H "Authorization: Bearer $TOKEN"
-
-# 3. Semáforo del día de un paciente
-PID=33333333-3333-4333-8333-333333333333
-curl http://127.0.0.1:8000/api/v1/patients/$PID/summary/today \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### Opción C — Desde el frontend de un compañero (misma red WiFi)
-
-La API se publica en `0.0.0.0:8000`, accesible desde otras máquinas de la red local.
-El compañero apunta su HTML/JavaScript a la **IP local de quien corre el backend**,
-por ejemplo:
-
-```js
-const API = "http://192.168.18.31:8000/api/v1";
-```
-
-> Reemplaza `192.168.18.31` por la IP que tenga la máquina del backend
-> (`ip a` o `hostname -I` para averiguarla). **CORS** ya está habilitado en la API,
-> así que las llamadas desde el navegador funcionan. La base de datos y pgAdmin
-> siguen restringidos a `127.0.0.1` por seguridad.
+> ⚠️ Los datos de salud de adultos mayores se tratan conforme a estándares de privacidad y protección de datos sensibles. El archivo `.env` con credenciales reales **nunca** se versiona.
 
 ---
 
-## Usuarios y datos de demostración
+## 📖 Documentación Adicional
 
-Los datos de demostración se cargan desde `sql/900_seed_dev.sql`. **La contraseña de
-todos los usuarios de prueba es `demo1234`.**
-
-| Correo               | Rol        | Descripción                          |
-|----------------------|------------|--------------------------------------|
-| `ja.cernac@duocuc.cl` | family     | Familiar administrador (Javier Cerna)|
-| `rosa@cuidados.cl`   | caregiver  | Cuidadora                            |
-
-**Paciente de demostración:** Elena Rosales
-`patient_id = 33333333-3333-4333-8333-333333333333`
-
-Incluye 30 días de historia: ~720 lecturas de frecuencia cardíaca, saturación, sueño
-y pasos; plan de medicamentos (Losartán, Metformina) con dosis programadas; 8 alertas
-de distintos tipos; un evento SOS; y contactos de emergencia.
+| Documento | Descripción | Estado |
+|-----------|-------------|:------:|
+| 📋 ERS (Especificación de Requisitos) | Requisitos funcionales y no funcionales del sistema | ✅ Fase 2 |
+| 📐 Arquitectura del Sistema | Diagrama detallado de componentes y flujos | ✅ Fase 2 |
+| 🗄️ Modelo de Datos | Esquema ER completo de PostgreSQL + diccionario de datos | ✅ Fase 2 |
+| 🧪 Guía de Pruebas | Ver [`TESTING.md`](./TESTING.md) | ✅ Fase 2 |
+| 📊 Diagramas UML | Casos de uso, clases y secuencia | 🔄 En progreso |
+| 📖 Manual Técnico | Guía de despliegue y operación | ⏳ Pendiente |
+| 🎤 Presentación Final | Presentación para comisión evaluadora | ⏳ Pendiente |
 
 ---
 
-## Convenciones de la API
-
-- **URL base:** todas las rutas de negocio cuelgan de `/api/v1`.
-- **Autenticación:** salvo los endpoints públicos de `auth`, toda petición requiere
-  el encabezado `Authorization: Bearer <access_token>`.
-- **Tokens:** el access token es un JWT (HS256) con vigencia de 30 minutos. El refresh
-  token dura 30 días, es opaco (se guarda su hash SHA-256) y rota en cada uso.
-- **Fechas:** ISO 8601 UTC (sufijo `Z`) para fechas-hora; `YYYY-MM-DD` para fechas.
-- **Autorización por recurso:** cada endpoint de paciente valida que el usuario tenga
-  una membresía viva en ese paciente (tabla `patient_members`) con el rol requerido.
-
-### Formato estándar de error
-
-```json
-{
-  "error": {
-    "code": "INVALID_CREDENTIALS",
-    "message": "Correo o contraseña incorrectos.",
-    "details": null,
-    "request_id": "8f3a..."
-  }
-}
-```
-
-### Roles
-
-| Rol        | Idea                          |
-|------------|-------------------------------|
-| family     | Observa; el owner administra  |
-| caregiver  | Opera (registra vitals/dosis) |
-| doctor     | Prescribe                     |
-| elder      | El propio adulto mayor        |
+<div align="center">
 
 ---
 
-## Endpoints implementados
+**AgeCare** · Capstone APT122 · Grupo 1 · Sección 003D
+Ingeniería en Informática · Sede San Andrés · **Duoc UC** · 2026
 
-Estos módulos están implementados sobre las tablas que existen hoy en `sql/`.
-Todas las rutas cuelgan de `/api/v1`.
-
-### Salud del servicio
-
-| Método | Ruta          | Descripción                          |
-|--------|---------------|--------------------------------------|
-| GET    | `/health`     | Liveness (la API responde)           |
-| GET    | `/health/db`  | Readiness (conexión a la BD)         |
-
-### Módulo 3 — Autenticación (`auth`)
-
-| # | Método | Ruta                              | Roles      | Descripción                                    |
-|---|--------|-----------------------------------|------------|------------------------------------------------|
-| 3.1 | POST | `/auth/register`                  | Público    | Crear cuenta (acepta `invitation_token`)       |
-| 3.2 | POST | `/auth/login`                     | Público    | Login; devuelve tokens + membresías            |
-| 3.3 | POST | `/auth/refresh`                   | Público*   | Rota el refresh token (detecta reuso)          |
-| 3.4 | POST | `/auth/logout`                    | Autenticado| Revoca el refresh token; desactiva dispositivo |
-| 3.5 | POST | `/auth/password/recovery`         | Público    | Solicitar recuperación (siempre 202)           |
-| 3.6 | POST | `/auth/password/reset`            | Público    | Restablecer contraseña (ver nota)              |
-| 3.7 | GET  | `/users/me`                       | Autenticado| Perfil propio + membresías                     |
-| 3.8 | PATCH| `/users/me`                       | Autenticado| Actualizar perfil propio                       |
-| 3.9 | POST | `/users/me/devices`               | Autenticado| Registrar dispositivo push                     |
-
-> **Nota 3.6:** el restablecimiento de contraseña queda como stub hasta que exista
-> la tabla de tokens de recuperación en el esquema. Devuelve `INVALID_RESET_TOKEN`.
-
-**Ejemplo — login:**
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"ja.cernac@duocuc.cl","password":"demo1234"}'
-```
-
-### Módulo 4 — Pacientes y onboarding (`patients`)
-
-| # | Método | Ruta                                              | Roles             | Descripción                          |
-|---|--------|---------------------------------------------------|-------------------|--------------------------------------|
-| 4.1 | POST   | `/patients`                                     | family            | Crear paciente (queda como owner)    |
-| 4.2 | GET    | `/patients`                                     | Cualquiera        | Listar mis pacientes                 |
-| 4.3 | GET    | `/patients/{patient_id}`                        | Miembro           | Detalle del paciente + wearable      |
-| 4.4 | PATCH  | `/patients/{patient_id}`                        | family (owner)    | Actualizar paciente                  |
-| 4.5 | POST   | `/patients/{patient_id}/invitations`            | family (owner)    | Invitar al círculo de cuidado        |
-| 4.6 | POST   | `/invitations/accept`                           | Autenticado       | Aceptar invitación                   |
-| 4.7 | GET    | `/patients/{patient_id}/members`                | family, doctor    | Listar miembros + invitaciones       |
-| 4.8 | DELETE | `/patients/{patient_id}/members/{user_id}`      | family (owner)    | Quitar miembro                       |
-| 4.9 | POST   | `/patients/{patient_id}/wearable`               | family, caregiver | Vincular wearable                    |
-| 4.10| GET    | `/patients/{patient_id}/wearable/status`        | Miembro           | Estado de sincronización del wearable|
-
-### Módulo 5 — Vitals y semáforo (`vitals`)
-
-| # | Método | Ruta                                                    | Roles                    | Descripción                          |
-|---|--------|---------------------------------------------------------|--------------------------|--------------------------------------|
-| 5.1 | POST | `/patients/{patient_id}/vitals/batch`                   | caregiver, elder, family | Ingesta por lote (idempotente)       |
-| 5.2 | POST | `/patients/{patient_id}/vitals/manual`                  | caregiver                | Registrar vital manual               |
-| 5.3 | GET  | `/patients/{patient_id}/vitals`                         | Miembro                  | Series y tendencias                  |
-| 5.4 | GET  | `/patients/{patient_id}/vitals/latest`                  | Miembro                  | Últimos valores por tipo             |
-| 5.5 | GET  | `/patients/{patient_id}/vitals/thresholds`              | Miembro                  | Listar umbrales                      |
-| 5.6 | PUT  | `/patients/{patient_id}/vitals/thresholds/{type}`       | family, doctor           | Configurar umbral                    |
-| 5.7 | GET  | `/patients/{patient_id}/summary/today`                  | Miembro                  | Semáforo de bienestar del día        |
-| 5.8 | GET  | `/users/me/dashboard`                                   | Cualquiera               | Tablero multi-paciente               |
-
-**Tipos de vital:** `heart_rate`, `spo2`, `sleep`, `steps`, `sedentary_min`,
-`fall_event`, `blood_pressure`, `temperature`, `glucose`.
-
-### Módulo 6 — Medicamentos y adherencia (`medications`)
-
-| # | Método | Ruta                                                    | Roles             | Descripción                          |
-|---|--------|---------------------------------------------------------|-------------------|--------------------------------------|
-| 6.1 | POST   | `/patients/{patient_id}/medications`                  | caregiver, doctor | Crear medicamento del plan           |
-| 6.2 | GET    | `/patients/{patient_id}/medications`                  | Miembro           | Listar plan                          |
-| 6.3 | PATCH  | `/patients/{patient_id}/medications/{medication_id}`  | caregiver, doctor | Actualizar medicamento               |
-| 6.4 | DELETE | `/patients/{patient_id}/medications/{medication_id}`  | caregiver, doctor | Descontinuar (baja lógica)           |
-| 6.5 | GET    | `/patients/{patient_id}/doses`                        | Miembro           | Dosis del día + próxima toma         |
-| 6.6 | POST   | `/doses/{dose_id}/log`                                | caregiver         | Registrar administración de dosis    |
-| 6.7 | GET    | `/patients/{patient_id}/adherence`                    | Miembro           | Métricas de adherencia               |
-
-### Módulo 9 — Alertas y SOS (`alerts`)
-
-| # | Método | Ruta                                     | Roles             | Descripción                          |
-|---|--------|------------------------------------------|-------------------|--------------------------------------|
-| 9.1 | GET  | `/users/me/alerts`                       | Cualquiera        | Centro de alertas (todos los pacientes)|
-| 9.2 | POST | `/alerts/{alert_id}/acknowledge`         | family, caregiver | Marcar alerta como atendida          |
-| 9.3 | POST | `/alerts/{alert_id}/resolve`             | family, caregiver | Resolver alerta                      |
-| 9.4 | GET  | `/users/me/notification-settings`        | Cualquiera        | Preferencias de notificación         |
-| 9.5 | PUT  | `/users/me/notification-settings`        | Cualquiera        | Actualizar preferencias              |
-| 9.6 | POST | `/patients/{patient_id}/sos`             | caregiver, elder  | Disparar SOS (alerta crítica)        |
-
-> Las alertas de tipo `fall` y `sos` no se pueden silenciar (regla de negocio en la BD).
+*Cuidando a quienes cuidaron de nosotros* 💙
 
 ---
 
-## Endpoints faltantes
+<img src="https://thumb.wikimedia.org/wikipedia/commons/thumb/a/aa/Logo_DuocUC.svg/3840px-Logo_DuocUC.svg.png" alt="Duoc UC" width="120"/>
 
-Los siguientes módulos de la especificación **aún no están implementados** porque
-sus tablas no existen todavía en `sql/`. Se documentan aquí para dejar clara la hoja
-de ruta; se agregarán cuando el esquema incorpore las tablas correspondientes.
-
-### Módulo 7 — Observaciones, incidentes, relevos y check-in
-
-Requiere las tablas `observations`, `incidents`, `handover_notes`, `elder_checkins`.
-
-| # | Método | Ruta                                        | Descripción                                  |
-|---|--------|---------------------------------------------|----------------------------------------------|
-| 7.1 | POST | `/patients/{patient_id}/observations`       | Registrar observación (ánimo, sueño, etc.)   |
-| 7.2 | GET  | `/patients/{patient_id}/observations`       | Bitácora de observaciones (paginada)         |
-| 7.3 | POST | `/patients/{patient_id}/incidents`          | Registrar incidente (caída, dolor, etc.)     |
-| 7.4 | POST | `/patients/{patient_id}/handover-notes`     | Nota de relevo entre turnos                  |
-| 7.5 | GET  | `/patients/{patient_id}/handover-notes`     | Consultar notas de relevo                    |
-| 7.6 | POST | `/patients/{patient_id}/checkin`            | Check-in emocional del adulto mayor          |
-
-### Módulo 8 — Archivos y documentos médicos
-
-Requiere las tablas `uploads`, `documents` y almacenamiento tipo Blob con URLs firmadas.
-
-| # | Método | Ruta                                   | Descripción                              |
-|---|--------|----------------------------------------|------------------------------------------|
-| 8.1 | POST   | `/uploads`                            | Solicitar URL de subida firmada          |
-| 8.2 | POST   | `/patients/{patient_id}/documents`    | Registrar documento médico               |
-| 8.3 | GET    | `/patients/{patient_id}/documents`    | Listar documentos                        |
-| 8.4 | GET    | `/documents/{document_id}/download`   | Descargar (URL firmada)                  |
-| 8.5 | DELETE | `/documents/{document_id}`            | Eliminar documento                       |
-
-También pendiente **6.8** `POST /patients/{patient_id}/prescriptions/scan` (OCR de
-recetas), que requiere un servicio de reconocimiento de documentos.
-
-### Módulo 10 — Asistente IA
-
-Requiere `assistant_conversations`, `assistant_messages` y un modelo LLM.
-
-| # | Método | Ruta                                                        | Descripción                     |
-|---|--------|-------------------------------------------------------------|---------------------------------|
-| 10.1 | POST | `/patients/{patient_id}/assistant/messages`                 | Preguntar al asistente          |
-| 10.2 | GET  | `/patients/{patient_id}/assistant/conversations`            | Listar conversaciones           |
-| 10.3 | GET  | `/assistant/conversations/{conversation_id}/messages`       | Historial de una conversación   |
-
-### Módulo 11 — Mensajes / chat
-
-Requiere `chat_messages`, `chat_read_pointers` y WebSocket.
-
-| # | Método | Ruta                                        | Descripción                          |
-|---|--------|---------------------------------------------|--------------------------------------|
-| 11.1 | GET  | `/patients/{patient_id}/chat/messages`      | Historial del chat (cursor)          |
-| 11.2 | POST | `/patients/{patient_id}/chat/messages`      | Enviar mensaje                       |
-| 11.3 | WS   | `/ws/patients/{patient_id}/chat`            | Canal en tiempo real                 |
-| 11.4 | POST | `/patients/{patient_id}/chat/read`          | Marcar mensajes como leídos          |
-
-### Módulo 12 — Vista del adulto mayor (fotos y entretenimiento)
-
-Requiere `photos`, `photo_reactions`, `content_items` y servicios de TTS/STT.
-
-| # | Método | Ruta                                     | Descripción                          |
-|---|--------|------------------------------------------|--------------------------------------|
-| 12.1 | POST   | `/patients/{patient_id}/photos`        | Compartir foto a la galería          |
-| 12.2 | GET    | `/patients/{patient_id}/photos`        | Galería de fotos                     |
-| 12.3 | POST   | `/photos/{photo_id}/reactions`         | Reaccionar a una foto                |
-| 12.4 | DELETE | `/photos/{photo_id}`                   | Eliminar foto                        |
-| 12.5 | GET    | `/content/feed`                        | Feed de entretenimiento              |
-| 12.6 | POST   | `/tts`                                 | Sintetizar voz                       |
-| 12.7 | POST   | `/stt`                                 | Transcribir voz a texto              |
-
-### Módulos 13 y 14 — Vista de la cuidadora y marketplace
-
-Requieren `care_tasks`, `caregiver_profiles`, `caregiver_subscriptions`,
-`job_offers`, `marketplace_products`, `caregiver_reviews`, `contact_requests`.
-
-Incluyen: check-in del día de la cuidadora, tareas del día, perfil profesional,
-plan free/premium, ofertas de trabajo, reportes, búsqueda y contacto de cuidadoras,
-reseñas y catálogo de productos.
-
----
-
-## Solución de problemas
-
-| Síntoma                                   | Causa probable / solución                                            |
-|-------------------------------------------|----------------------------------------------------------------------|
-| `401 UNAUTHORIZED` en Swagger             | El access token expiró (30 min). Vuelve a hacer login y **Authorize**.|
-| `403 FORBIDDEN`                           | El rol del usuario no tiene permiso para esa acción (es lo esperado). |
-| La API no levanta / error de importación  | `podman compose logs api` para ver el traceback.                     |
-| Las tablas no existen                     | El volumen se creó vacío sin los `.sql`. Usa `down -v` y `up -d`.    |
-| pgAdmin no arranca                        | El `PGADMIN_EMAIL` usa un dominio reservado (`.local`). Usa `.com`.   |
-| El frontend del compañero no conecta      | Verifica misma red WiFi y la IP local correcta; CORS ya está activo. |
-| Cambié código y no se refleja             | Reconstruye: `podman compose up -d --build api`.                     |
-```
+</div>

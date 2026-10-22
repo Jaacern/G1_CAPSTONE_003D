@@ -22,7 +22,12 @@ INSERT INTO users (id, email, password_hash, first_name, last_name, phone, local
   ('22222222-2222-4222-8222-222222222222',
    'rosa@cuidados.cl',
    '$2b$12$PhFlUg1xEBTGKQuSYaBy.ODxdKlWAShWRiJxT0w85tC15kZaSNK/.',
-   'Rosa', 'Medina', '+56987654321', 'es');
+   'Rosa', 'Medina', '+56987654321', 'es'),
+  -- Cuenta del adulto mayor (la propia Elena). Rol 'elder' sobre su paciente.
+  ('99999999-9999-4999-8999-999999999999',
+   'elena@agecare.cl',
+   '$2b$12$PhFlUg1xEBTGKQuSYaBy.ODxdKlWAShWRiJxT0w85tC15kZaSNK/.',
+   'Elena', 'Rosales', '+56911112222', 'es');
 
 -- ---------------------------------------------------------------
 -- 2. Paciente  (first_name + last_name, sin conditions jsonb)
@@ -41,7 +46,9 @@ INSERT INTO patient_members (patient_id, user_id, role, is_owner) VALUES
   ('33333333-3333-4333-8333-333333333333',
    '11111111-1111-4111-8111-111111111111', 'family', true),
   ('33333333-3333-4333-8333-333333333333',
-   '22222222-2222-4222-8222-222222222222', 'caregiver', false);
+   '22222222-2222-4222-8222-222222222222', 'caregiver', false),
+  ('33333333-3333-4333-8333-333333333333',
+   '99999999-9999-4999-8999-999999999999', 'elder', false);
 
 INSERT INTO push_devices (id, user_id, push_token, platform, last_seen_at) VALUES
   ('55555555-5555-4555-8555-555555555555',

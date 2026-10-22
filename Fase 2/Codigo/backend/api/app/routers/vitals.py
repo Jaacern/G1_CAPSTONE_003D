@@ -125,6 +125,9 @@ class SeriesOut(BaseModel):
     unit: str
     points: list[SeriesPoint]
     threshold: ThresholdOut | None
+    # Resumen de orígenes presentes en el rango (transparencia de fuente).
+    # Ej: {"watch": 180, "health_connect": 40, "simulator": 10}.
+    sources: dict[str, int] = {}
 
 
 class LatestItem(BaseModel):
@@ -133,6 +136,10 @@ class LatestItem(BaseModel):
     unit: str
     measured_at: datetime
     in_range: bool
+    # Origen del dato (transparencia de fuente). source: wearable|manual.
+    # origin viene de meta.origin: simulator | health_connect | watch | ...
+    source: str | None = None
+    origin: str | None = None
 
 
 class LatestOut(BaseModel):
@@ -223,7 +230,8 @@ async def _latest_items(db: AsyncSession, patient_id: str) -> list[LatestItem]:
         await db.execute(
             text(
                 """
-                SELECT DISTINCT ON (type) type, value, measured_at
+                SELECT DISTINCT ON (type)
+                       type, value, measured_at, source, meta
                 FROM vital_readings
                 WHERE patient_id = :pid
                 ORDER BY type, measured_at DESC
@@ -240,6 +248,13 @@ async def _latest_items(db: AsyncSession, patient_id: str) -> list[LatestItem]:
         in_range = True
         if th is not None:
             in_range = _in_range(float(r["value"]), th["min_value"], th["max_value"])
+        meta = r["meta"]
+        if isinstance(meta, str):
+            try:
+                meta = json.loads(meta)
+            except (ValueError, TypeError):
+                meta = None
+        origin = meta.get("origin") if isinstance(meta, dict) else None
         items.append(
             LatestItem(
                 type=r["type"],
@@ -247,6 +262,8 @@ async def _latest_items(db: AsyncSession, patient_id: str) -> list[LatestItem]:
                 unit=await _get_unit(db, r["type"]),
                 measured_at=r["measured_at"],
                 in_range=in_range,
+                source=r["source"],
+                origin=origin,
             )
         )
     return items
@@ -561,11 +578,31 @@ async def get_series(
             updated_at=th["updated_at"],
         )
 
+    # Resumen de orígenes presentes en el rango (transparencia de fuente).
+    src_rows = (
+        await db.execute(
+            text(
+                """
+                SELECT COALESCE(meta->>'origin', source) AS origen, count(*) AS n
+                FROM vital_readings
+                WHERE patient_id = :pid
+                  AND type = :type
+                  AND measured_at >= :from
+                  AND measured_at < (cast(:to as date) + interval '1 day')
+                GROUP BY origen
+                """
+            ),
+            params,
+        )
+    ).mappings().all()
+    sources = {r["origen"]: int(r["n"]) for r in src_rows if r["origen"]}
+
     return SeriesOut(
         type=type.value,
         unit=await _get_unit(db, type.value),
         points=points,
         threshold=threshold,
+        sources=sources,
     )
 
 

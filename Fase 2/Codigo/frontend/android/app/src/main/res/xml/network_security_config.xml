@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Seguridad de red de AgeCare.
+  Por defecto (Android 9+) solo se permite HTTPS. Aquí se habilita HTTP en
+  texto plano ÚNICAMENTE para el backend de desarrollo:
+    - localhost / 127.0.0.1  -> vía `adb reverse tcp:8000 tcp:8000`
+    - 10.0.2.2               -> host desde el emulador Android
+  Si usas un dispositivo físico por WiFi, añade aquí la IP local de tu backend.
+  Cualquier otro dominio sigue exigiendo HTTPS.
+  PRODUCCIÓN: el backend debe ir por HTTPS y estas excepciones deben quitarse.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

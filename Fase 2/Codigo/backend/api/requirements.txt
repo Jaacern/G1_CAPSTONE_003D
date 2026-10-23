@@ -1,10 +1,32 @@
+# =============================================================================
+# DEUDA DE SEGURIDAD (DevSecOps) — pendiente de remediacion
+# -----------------------------------------------------------------------------
+# Dependabot reporto vulnerabilidades en las dependencias marcadas mas abajo con
+# "SEC". Politica del equipo: NO actualizar a ciegas. La remediacion se decide y
+# ejecuta en comitiva, levantando el backend (docker + Postgres) y validando el
+# flujo de autenticacion (login/refresh) y la subida de formularios/archivos
+# antes de subir el cambio. Fecha del hallazgo: 2026-10.
+#
+# Plan acordado (al remediar, actualizar estas versiones y quitar las notas SEC):
+#   - python-multipart: 0.0.12 -> 0.0.31  (resuelve 8 CVE; verificar rango que
+#     exige FastAPI 0.115.5 antes de fijar la version).
+#   - python-jose:      3.3.0  -> 3.4.0   (resuelve CVE-2024-33663 y CVE-2024-33664).
+#   - CVE-2026-85394 (critica) afecta a python-jose <= 3.5.0 y NO tiene parche
+#     upstream a la fecha. Opcion evaluada: migrar de python-jose a PyJWT (toca
+#     app/security.py y app/deps.py). Requiere pruebas de auth. Decision: comitiva.
+# =============================================================================
+
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
 pydantic[email]==2.10.3
 pydantic-settings==2.6.1
+# SEC: vulnerable. CVE-2024-33663 (critica), CVE-2024-33664 (media) -> fix 3.4.0.
+# SEC: CVE-2026-85394 (critica) sin fix upstream (<= 3.5.0); evaluar migrar a PyJWT.
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
+# SEC: vulnerable. 8 CVE (CVE-2024-53981, CVE-2026-24486/40347/42561/53537/53538/
+# SEC: 53539/53540). Rango afectado < 0.0.31 -> fix 0.0.31. Verificar compat FastAPI.
 python-multipart==0.0.12

@@ -117,7 +117,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           autofillHints: const [AutofillHints.givenName],
                           decoration: const InputDecoration(
                             labelText: 'Nombre',
-                            prefixIcon: Icon(Icons.person_outline),
                           ),
                           validator: (v) => v != null && v.trim().length >= 2
                               ? null

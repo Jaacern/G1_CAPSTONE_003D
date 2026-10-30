@@ -183,6 +183,50 @@ class WellbeingChip extends StatelessWidget {
   }
 }
 
+/// Error persistente dentro de un formulario. A diferencia del snackbar, no
+/// desaparece solo: el usuario puede leerlo mientras corrige los campos.
+class InlineError extends StatelessWidget {
+  const InlineError({super.key, required this.message, this.onDismiss});
+
+  final String message;
+  final VoidCallback? onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(12, 10, onDismiss == null ? 12 : 4, 10),
+      decoration: BoxDecoration(
+        color: AppColors.critical.withValues(alpha: .09),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.critical.withValues(alpha: .28)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.error_outline_rounded,
+              size: 20, color: AppColors.critical),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                  color: AppColors.critical, fontSize: 13, height: 1.35),
+            ),
+          ),
+          if (onDismiss != null)
+            IconButton(
+              onPressed: onDismiss,
+              icon: const Icon(Icons.close_rounded,
+                  size: 18, color: AppColors.critical),
+              visualDensity: VisualDensity.compact,
+              tooltip: 'Cerrar',
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 void showAppSnackBar(BuildContext context, String message, {bool error = false}) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
     content: Text(message),

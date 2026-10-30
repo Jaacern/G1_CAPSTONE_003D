@@ -24,20 +24,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       text: AppConfig.useMocks ? AuthRepositoryMock.demoPassword : '');
   bool _loading = false;
   bool _obscure = true;
+  String? _error;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       await ref
           .read(authControllerProvider.notifier)
           .login(_email.text.trim(), _password.text);
       // El redirect del router lleva al home.
     } on ApiException catch (e) {
-      if (mounted) showAppSnackBar(context, e.message, error: true);
+      if (mounted) setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _clearError() {
+    if (_error != null) setState(() => _error = null);
   }
 
   @override
@@ -45,90 +60,112 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Scaffold(
       body: SafeArea(
         child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Image.asset(
-                      'assets/images/Agecare.png',
-                      width: 160,
-                      height: 160,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text('La tranquilidad de saber que está bien',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.textSecondary)),
-                  const SizedBox(height: 40),
-                  TextFormField(
-                    controller: _email,
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.email],
-                    decoration: const InputDecoration(
-                        labelText: 'Correo electrónico',
-                        prefixIcon: Icon(Icons.mail_outline)),
-                    validator: (v) => v != null && v.contains('@')
-                        ? null
-                        : 'Escribe un correo válido',
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _password,
-                    obscureText: _obscure,
-                    autofillHints: const [AutofillHints.password],
-                    decoration: InputDecoration(
-                      labelText: 'Contraseña',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
-                        onPressed: () => setState(() => _obscure = !_obscure),
+          child: AutofillGroup(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Image.asset(
+                        'assets/images/Agecare.png',
+                        width: 160,
+                        height: 160,
+                        fit: BoxFit.contain,
                       ),
                     ),
-                    validator: (v) =>
-                        v != null && v.length >= 8 ? null : 'Mínimo 8 caracteres',
-                    onFieldSubmitted: (_) => _submit(),
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => context.push('/recover'),
-                      child: const Text('¿Olvidaste tu contraseña?'),
+                    const SizedBox(height: 4),
+                    const Text('La tranquilidad de saber que está bien',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.textSecondary)),
+                    const SizedBox(height: 40),
+                    TextFormField(
+                      controller: _email,
+                      enabled: !_loading,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      autocorrect: false,
+                      autofillHints: const [AutofillHints.email],
+                      onChanged: (_) => _clearError(),
+                      decoration: const InputDecoration(
+                          labelText: 'Correo electrónico',
+                          prefixIcon: Icon(Icons.mail_outline)),
+                      validator: (v) => v != null && v.contains('@')
+                          ? null
+                          : 'Escribe un correo válido',
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  FilledButton(
-                    onPressed: _loading ? null : _submit,
-                    child: _loading
-                        ? const SizedBox(
-                            width: 22, height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Text('Iniciar sesión'),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('¿No tienes cuenta?',
-                          style: TextStyle(color: AppColors.textSecondary)),
-                      TextButton(
-                        onPressed: () => context.push('/register'),
-                        child: const Text('Regístrate'),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _password,
+                      enabled: !_loading,
+                      obscureText: _obscure,
+                      textInputAction: TextInputAction.done,
+                      autofillHints: const [AutofillHints.password],
+                      onChanged: (_) => _clearError(),
+                      decoration: InputDecoration(
+                        labelText: 'Contraseña',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(_obscure
+                              ? Icons.visibility_off
+                              : Icons.visibility),
+                          onPressed: () => setState(() => _obscure = !_obscure),
+                        ),
                       ),
+                      validator: (v) => v != null && v.length >= 8
+                          ? null
+                          : 'Mínimo 8 caracteres',
+                      onFieldSubmitted: (_) => _submit(),
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed:
+                            _loading ? null : () => context.push('/recover'),
+                        child: const Text('¿Olvidaste tu contraseña?'),
+                      ),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 4),
+                      InlineError(message: _error!, onDismiss: _clearError),
                     ],
-                  ),
-                  if (AppConfig.useMocks)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Text('Modo demo: credenciales precargadas',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: _loading ? null : _submit,
+                      child: _loading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : const Text('Iniciar sesión'),
                     ),
-                ],
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text('¿No tienes cuenta?',
+                            style: TextStyle(color: AppColors.textSecondary)),
+                        TextButton(
+                          onPressed: _loading
+                              ? null
+                              : () => context.push('/register'),
+                          child: const Text('Regístrate'),
+                        ),
+                      ],
+                    ),
+                    if (AppConfig.useMocks)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text('Modo demo: credenciales precargadas',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                fontSize: 12, color: AppColors.textSecondary)),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -143,7 +180,8 @@ class RecoverPasswordScreen extends ConsumerStatefulWidget {
   const RecoverPasswordScreen({super.key});
 
   @override
-  ConsumerState<RecoverPasswordScreen> createState() => _RecoverPasswordScreenState();
+  ConsumerState<RecoverPasswordScreen> createState() =>
+      _RecoverPasswordScreenState();
 }
 
 class _RecoverPasswordScreenState extends ConsumerState<RecoverPasswordScreen> {
@@ -151,11 +189,19 @@ class _RecoverPasswordScreenState extends ConsumerState<RecoverPasswordScreen> {
   bool _sent = false;
   bool _loading = false;
 
+  @override
+  void dispose() {
+    _email.dispose();
+    super.dispose();
+  }
+
   Future<void> _submit() async {
     if (!_email.text.contains('@')) return;
     setState(() => _loading = true);
     try {
-      await ref.read(authControllerProvider.notifier).recoverPassword(_email.text.trim());
+      await ref
+          .read(authControllerProvider.notifier)
+          .recoverPassword(_email.text.trim());
       setState(() => _sent = true);
     } on ApiException catch (e) {
       if (mounted) showAppSnackBar(context, e.message, error: true);

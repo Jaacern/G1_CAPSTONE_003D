@@ -60,14 +60,16 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<void> register({
-    required String fullName,
+    required String firstName,
+    required String lastName,
     required String email,
     required String password,
     String? phone,
     String? invitationToken,
   }) async {
     final session = await _repo.register(
-      fullName: fullName,
+      firstName: firstName,
+      lastName: lastName,
       email: email,
       password: password,
       phone: phone,

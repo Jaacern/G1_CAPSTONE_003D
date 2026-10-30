@@ -9,7 +9,8 @@ abstract class AuthRepository {
   Future<AuthSession> login({required String email, required String password});
 
   Future<AuthSession> register({
-    required String fullName,
+    required String firstName,
+    required String lastName,
     required String email,
     required String password,
     String? phone,
@@ -47,14 +48,17 @@ class AuthRepositoryHttp implements AuthRepository {
 
   @override
   Future<AuthSession> register({
-    required String fullName,
+    required String firstName,
+    required String lastName,
     required String email,
     required String password,
     String? phone,
     String? invitationToken,
   }) async {
+    // RegisterIn exige first_name y last_name por separado (no full_name).
     final data = await _api.post<Map<String, dynamic>>('/auth/register', data: {
-      'full_name': fullName,
+      'first_name': firstName,
+      'last_name': lastName,
       'email': email,
       'password': password,
       if (phone != null && phone.isNotEmpty) 'phone': phone,
@@ -64,11 +68,10 @@ class AuthRepositoryHttp implements AuthRepository {
     return AuthSession(
       user: User(
         userId: data['user_id'] as String,
-        fullName: fullName,
+        fullName: '$firstName $lastName',
         email: email,
-        memberships: data['role'] != null
-            ? [/* la membresía real llega en /users/me tras registro con invitación */]
-            : const [],
+        // Las membresías no vienen en RegisterOut; llegan en /users/me.
+        memberships: const [],
       ),
       accessToken: data['access_token'] as String,
       refreshToken: data['refresh_token'] as String,
@@ -125,7 +128,8 @@ class AuthRepositoryMock implements AuthRepository {
 
   @override
   Future<AuthSession> register({
-    required String fullName,
+    required String firstName,
+    required String lastName,
     required String email,
     required String password,
     String? phone,
@@ -139,7 +143,12 @@ class AuthRepositoryMock implements AuthRepository {
         message: 'Ya existe una cuenta con este correo electrónico.',
       );
     }
-    _currentUser = User(userId: 'u-new', fullName: fullName, email: email);
+    _currentUser = User(
+      userId: 'u-new',
+      fullName: '$firstName $lastName',
+      email: email,
+      phone: phone,
+    );
     return AuthSession(
         user: _currentUser!, accessToken: 'mock-access', refreshToken: 'mock-refresh');
   }

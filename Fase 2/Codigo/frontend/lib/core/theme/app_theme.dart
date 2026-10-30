@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Design system de AgeCare: tokens de color, tipografía y tema Material 3.
 /// Paleta pensada para transmitir calma (azules/verdes suaves) con
@@ -65,6 +66,10 @@ class AppTheme {
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         foregroundColor: AppColors.textPrimary,
+        // El AppBar es transparente, así que Flutter no puede deducir el
+        // contraste de la barra de estado y usa íconos blancos sobre el fondo
+        // claro. Se fija explícitamente.
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
@@ -156,6 +161,7 @@ class AppTheme {
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,

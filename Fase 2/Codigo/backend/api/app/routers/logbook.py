@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +33,19 @@ _UUID = re.compile(
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
     r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 )
+
+
+def _texto_con_contenido(valor: str) -> str:
+    """Recorta y exige que quede algo.
+
+    min_length no alcanza: un texto de solo espacios lo pasa, y las columnas
+    de la base tienen CHECK btrim(...) <> '', asi que el motor lo rechaza
+    despues y el usuario recibe un 500 en vez de saber que le falto escribir.
+    """
+    limpio = valor.strip()
+    if not limpio:
+        raise ValueError("No puede quedar vacio.")
+    return limpio
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +192,8 @@ class ObservationIn(BaseModel):
     category:  str | None = None
     media_url: str | None = None
 
+    _limpiar = field_validator("text")(_texto_con_contenido)
+
 
 @router.get("/patients/{patient_id}/observations",
             response_model=ObservationsOut)
@@ -248,7 +263,7 @@ async def create_observation(
             ),
             {
                 "pid": ctx.patient_id, "uid": ctx.user.user_id,
-                "cat": categoria, "nota": payload.text.strip(), "fid": file_id,
+                "cat": categoria, "nota": payload.text, "fid": file_id,
             },
         )
     ).mappings().first()
@@ -260,5 +275,119 @@ async def create_observation(
         category=fila["category"],
         media_url=_media_url(fila["photo_file_id"]),
         created_at=fila["observed_at"],
+        author_name=ctx.user.full_name,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Incidentes (RF-36)
+# ---------------------------------------------------------------------------
+_TIPO_INCIDENTE = {
+    "caida":                  "fall",
+    "reaccion adversa":       "adverse_reaction",
+    "fuga / desorientacion":  "wandering",
+    "fuga/desorientacion":    "wandering",
+    "fuga":                   "wandering",
+    "desorientacion":         "disorientation",
+    "golpe o lesion":         "injury",
+    "lesion":                 "injury",
+    "emergencia medica":      "medical_emergency",
+    "agresion":               "aggression",
+    "rechazo":                "refusal",
+    "atragantamiento":        "choking",
+    "otro":                   "other",
+}
+_TIPOS_BASE = {"fall", "wandering", "aggression", "refusal", "injury",
+               "choking", "disorientation", "adverse_reaction",
+               "medical_emergency", "other"}
+
+# La pantalla ofrece tres niveles y la columna guarda cuatro. 'medium' y
+# 'moderate' son el mismo nivel con otro nombre.
+_SEVERIDAD = {"low": "low", "medium": "moderate", "moderate": "moderate",
+              "high": "high"}
+
+
+class IncidentIn(BaseModel):
+    type:        str
+    severity:    str
+    description: str = Field(min_length=1, max_length=1000)
+    media_url:   str | None = None
+
+    _limpiar = field_validator("description")(_texto_con_contenido)
+
+
+class IncidentOut(BaseModel):
+    id:          UUID
+    type:        str
+    severity:    str
+    description: str
+    media_url:   str | None
+    occurred_at: datetime
+    author_name: str
+
+
+@router.post("/patients/{patient_id}/incidents",
+             response_model=IncidentOut, status_code=201)
+async def create_incident(
+    payload: IncidentIn,
+    ctx: PatientContext = Depends(get_patient_member(["caregiver", "family"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reporta un incidente (RF-36)."""
+    plano = _sin_tildes(payload.type)
+    tipo = plano if plano in _TIPOS_BASE else _TIPO_INCIDENTE.get(plano)
+    if tipo is None:
+        raise ApiError(
+            status_code=422, code="VALIDATION_ERROR",
+            message="Ese tipo de incidente no existe.",
+            details=[{"field": "type", "message": f"Valor recibido: {payload.type}."}],
+        )
+
+    severidad = _SEVERIDAD.get(_sin_tildes(payload.severity))
+    if severidad is None:
+        # 'critical' obliga a crear la alerta asociada por
+        # ck_incidents_critical_has_alert, y las alertas tienen su propia
+        # lista cerrada de tipos y su propio flujo de escalamiento. Mientras
+        # ese flujo no exista, aceptar 'critical' aca dejaria incidentes que
+        # el motor rechaza o alertas a medias.
+        raise ApiError(
+            status_code=422, code="VALIDATION_ERROR",
+            message="Esa severidad no es valida.",
+            details=[{"field": "severity",
+                      "message": "Valores aceptados: low, medium, high."}],
+        )
+
+    file_id = await _archivo_del_paciente(db, payload.media_url, ctx.patient_id)
+
+    fila = (
+        await db.execute(
+            text(
+                """
+                INSERT INTO incidents (
+                    patient_id, reported_by, type, severity,
+                    occurred_at, description, photo_file_id
+                ) VALUES (
+                    :pid, :uid, :tipo, :sev, now(), :desc, :fid
+                )
+                RETURNING id, type, severity, description,
+                          photo_file_id, occurred_at
+                """
+            ),
+            {
+                "pid": ctx.patient_id, "uid": ctx.user.user_id,
+                "tipo": tipo, "sev": severidad,
+                "desc": payload.description, "fid": file_id,
+            },
+        )
+    ).mappings().first()
+    await db.commit()
+
+    return IncidentOut(
+        id=fila["id"],
+        type=fila["type"],
+        severity=fila["severity"],
+        description=fila["description"],
+        media_url=_media_url(fila["photo_file_id"]),
+        occurred_at=fila["occurred_at"],
         author_name=ctx.user.full_name,
     )

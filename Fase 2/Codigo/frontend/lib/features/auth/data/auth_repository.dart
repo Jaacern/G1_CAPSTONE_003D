@@ -98,6 +98,7 @@ class AuthRepositoryHttp implements AuthRepository {
 // ---------------------------------------------------------------------------
 class AuthRepositoryMock implements AuthRepository {
   static const demoEmail = 'demo@agecare.app';
+  static const demoDoctorEmail = 'doctor@agecare.app';
   static const demoPassword = 'agecare123';
 
   User? _currentUser;
@@ -112,18 +113,40 @@ class AuthRepositoryMock implements AuthRepository {
     ],
   );
 
+  static final _demoDoctor = User(
+    userId: 'u-demo-doctor',
+    fullName: 'Dra. Carolina Soto',
+    email: demoDoctorEmail,
+    memberships: const [
+      Membership(patientId: 'p-elena', patientName: 'Elena Ramírez', role: RoleType.doctor),
+      Membership(patientId: 'p-jose', patientName: 'José Ramírez', role: RoleType.doctor),
+    ],
+  );
+
   @override
   Future<AuthSession> login({required String email, required String password}) async {
     await Future.delayed(const Duration(milliseconds: 400));
-    if (email.toLowerCase() != demoEmail || password != demoPassword) {
+    if (password != demoPassword) {
       throw ApiException(
         statusCode: 401,
         code: 'INVALID_CREDENTIALS',
         message: 'Correo o contraseña incorrectos.',
       );
     }
-    _currentUser = _demoUser;
-    return AuthSession(user: _demoUser, accessToken: 'mock-access', refreshToken: 'mock-refresh');
+    final user = switch (email.toLowerCase()) {
+      demoEmail => _demoUser,
+      demoDoctorEmail => _demoDoctor,
+      _ => null,
+    };
+    if (user == null) {
+      throw ApiException(
+        statusCode: 401,
+        code: 'INVALID_CREDENTIALS',
+        message: 'Correo o contraseña incorrectos.',
+      );
+    }
+    _currentUser = user;
+    return AuthSession(user: user, accessToken: 'mock-access', refreshToken: 'mock-refresh');
   }
 
   @override

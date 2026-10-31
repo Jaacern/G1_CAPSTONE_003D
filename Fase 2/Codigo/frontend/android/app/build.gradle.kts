@@ -37,6 +37,13 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // R8 rompe la app al arrancar: WorkManager crea
+            // androidx.work.impl.WorkDatabase_Impl por reflexion y el
+            // optimizador elimina su constructor (NoSuchMethodException).
+            // Mientras no haya un archivo de reglas ProGuard mantenido, se
+            // desactiva la minificacion en release.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }

@@ -391,3 +391,166 @@ async def create_incident(
         occurred_at=fila["occurred_at"],
         author_name=ctx.user.full_name,
     )
+
+
+# ---------------------------------------------------------------------------
+# Notas de relevo (RF-37)
+# ---------------------------------------------------------------------------
+def _turno_de(momento: datetime) -> str:
+    """Turno al que corresponde una hora.
+
+    La pantalla manda solo el texto de la nota, pero shift_notes guarda la
+    fecha y el turno porque la nota de relevo es de un turno: es lo que la
+    cuidadora que entra tiene que leer. Se deduce de la hora, que es el
+    unico dato disponible.
+
+    Los cortes son los habituales del cuidado domiciliario, 7 a 15, 15 a 23
+    y el resto noche.
+    """
+    hora = momento.astimezone(timezone.utc).hour
+    if 7 <= hora < 15:
+        return "morning"
+    if 15 <= hora < 23:
+        return "afternoon"
+    return "night"
+
+
+class HandoverIn(BaseModel):
+    text:       str = Field(min_length=1, max_length=2000)
+    to_user_id: UUID | None = None
+
+    _limpiar = field_validator("text")(_texto_con_contenido)
+
+
+class HandoverOut(BaseModel):
+    id:          UUID
+    text:        str
+    author_name: str
+    created_at:  datetime
+    shift:       str
+    shift_date:  str
+
+
+class HandoversOut(BaseModel):
+    items: list[HandoverOut]
+
+
+@router.get("/patients/{patient_id}/handover-notes",
+            response_model=HandoversOut)
+async def list_handover_notes(
+    request: Request,
+    ctx: PatientContext = Depends(get_patient_member()),
+    db: AsyncSession = Depends(get_db),
+):
+    """Notas de relevo del paciente, lo mas reciente primero (RF-37)."""
+    filas = (
+        await db.execute(
+            text(
+                """
+                SELECT s.id, s.note, s.shift, s.shift_date, s.created_at,
+                       u.full_name
+                FROM shift_notes s
+                JOIN users u ON u.id = s.author_id
+                WHERE s.patient_id = :pid
+                  AND s.deleted_at IS NULL
+                ORDER BY s.shift_date DESC, s.created_at DESC
+                LIMIT 200
+                """
+            ),
+            {"pid": ctx.patient_id},
+        )
+    ).mappings().all()
+
+    await _registrar_lectura(db, ctx, request, seccion="logbook")
+    await db.commit()
+
+    return HandoversOut(items=[
+        HandoverOut(
+            id=f["id"],
+            text=f["note"],
+            author_name=f["full_name"],
+            created_at=f["created_at"],
+            shift=f["shift"],
+            shift_date=f["shift_date"].isoformat(),
+        )
+        for f in filas
+    ])
+
+
+@router.post("/patients/{patient_id}/handover-notes",
+             response_model=HandoverOut, status_code=201)
+async def create_handover_note(
+    payload: HandoverIn,
+    ctx: PatientContext = Depends(get_patient_member(["caregiver", "family"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Deja la nota de relevo del turno en curso (RF-37).
+
+    uq_shift_notes_turno deja una sola nota por paciente, fecha y turno. Un
+    segundo envio en el mismo turno no es un error del usuario ni algo que
+    convenga rechazar: la cuidadora esta corrigiendo o agregando a lo que ya
+    escribio. Se reemplaza el texto de esa nota.
+    """
+    ahora = datetime.now(timezone.utc)
+    turno = _turno_de(ahora)
+
+    if payload.to_user_id is not None:
+        # El relevo se entrega a alguien del mismo circulo. Si no se valida,
+        # handover_to podria apuntar a cualquier usuario de la aplicacion.
+        destino = (
+            await db.execute(
+                text(
+                    """
+                    SELECT 1
+                    FROM patient_members
+                    WHERE patient_id = :pid
+                      AND user_id = :uid
+                      AND removed_at IS NULL
+                    """
+                ),
+                {"pid": ctx.patient_id, "uid": str(payload.to_user_id)},
+            )
+        ).first()
+        if destino is None:
+            raise ApiError(
+                status_code=422, code="VALIDATION_ERROR",
+                message="La persona a la que entregas el relevo no es del circulo de cuidado.",
+                details=[{"field": "to_user_id",
+                          "message": f"Usuario: {payload.to_user_id}."}],
+            )
+
+    fila = (
+        await db.execute(
+            text(
+                """
+                INSERT INTO shift_notes (
+                    patient_id, author_id, shift_date, shift, note, handover_to
+                ) VALUES (
+                    :pid, :uid, (now() AT TIME ZONE 'UTC')::date, :turno,
+                    :nota, :destino
+                )
+                ON CONFLICT (patient_id, shift_date, shift) DO UPDATE
+                   SET note        = EXCLUDED.note,
+                       author_id   = EXCLUDED.author_id,
+                       handover_to = EXCLUDED.handover_to,
+                       updated_at  = now()
+                RETURNING id, note, shift, shift_date, created_at
+                """
+            ),
+            {
+                "pid": ctx.patient_id, "uid": ctx.user.user_id,
+                "turno": turno, "nota": payload.text,
+                "destino": str(payload.to_user_id) if payload.to_user_id else None,
+            },
+        )
+    ).mappings().first()
+    await db.commit()
+
+    return HandoverOut(
+        id=fila["id"],
+        text=fila["note"],
+        author_name=ctx.user.full_name,
+        created_at=fila["created_at"],
+        shift=fila["shift"],
+        shift_date=fila["shift_date"].isoformat(),
+    )

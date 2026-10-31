@@ -285,26 +285,30 @@ class _DemoBadge extends StatelessWidget {
     return Center(
       child: Container(
         margin: const EdgeInsets.only(top: 12),
+        constraints: const BoxConstraints(maxWidth: 340),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: AppColors.primary.withValues(alpha: dark ? .22 : .09),
           borderRadius: BorderRadius.circular(999),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.science_outlined,
-                size: 14, color: dark ? Colors.white : AppColors.primaryDark),
-            const SizedBox(width: 6),
-            Text(
-              'Modo demo · credenciales precargadas',
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-                color: dark ? Colors.white : AppColors.primaryDark,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.science_outlined,
+                  size: 14, color: dark ? Colors.white : AppColors.primaryDark),
+              const SizedBox(width: 6),
+              Text(
+                'Modo demo · demo@agecare.app o doctor@agecare.app · agecare123',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: dark ? Colors.white : AppColors.primaryDark,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -14,6 +14,7 @@ from app.routers import (
     logbook,
     medications,
     patients,
+    tasks,
     vitals,
 )
 
@@ -131,6 +132,7 @@ app.include_router(medications.router)
 app.include_router(alerts.router)
 app.include_router(files.router)
 app.include_router(logbook.router)
+app.include_router(tasks.router)
 
 
 @app.get("/", tags=["root"])

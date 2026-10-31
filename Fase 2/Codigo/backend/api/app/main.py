@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 
 from app.errors import register_error_handlers
-from app.routers import alerts, auth, health, medications, patients, vitals
+from app.routers import alerts, auth, files, health, medications, patients, vitals
 
 # Directorio de archivos estáticos del test client.
 # Está dentro de app/static/ → se copia al contenedor con el COPY de la imagen.
@@ -120,6 +120,7 @@ app.include_router(patients.router)
 app.include_router(vitals.router)
 app.include_router(medications.router)
 app.include_router(alerts.router)
+app.include_router(files.router)
 
 
 @app.get("/", tags=["root"])

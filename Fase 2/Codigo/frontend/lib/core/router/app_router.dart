@@ -17,6 +17,7 @@ import '../../features/caregiver/presentation/task_edit_screen.dart';
 import '../../features/comms/presentation/assistant_screen.dart';
 import '../../features/comms/presentation/chat_screen.dart';
 import '../../features/documents/presentation/documents_screen.dart';
+import '../../features/doctor/presentation/doctor_patient_screen.dart';
 import '../../features/health/presentation/vital_detail_screen.dart';
 import '../../features/health/presentation/thresholds_screen.dart';
 import '../../features/marketplace/presentation/caregiver_profile_screen.dart';
@@ -138,6 +139,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/cg/incident', builder: (_, st) => IncidentScreen(patientId: st.uri.queryParameters['patient']!)),
       GoRoute(path: '/cg/handover', builder: (_, st) => HandoverScreen(patientId: st.uri.queryParameters['patient']!)),
       GoRoute(path: '/cg/reports', builder: (_, __) => const CaregiverReportsScreen()),
+
+      // --- Médico ---
+      GoRoute(
+        path: '/doctor/patient',
+        builder: (_, st) => DoctorPatientScreen(
+            patientId: st.uri.queryParameters['patient']!),
+      ),
 
       // --- Marketplace ---
       GoRoute(path: '/marketplace', builder: (_, __) => const MarketplaceScreen()),

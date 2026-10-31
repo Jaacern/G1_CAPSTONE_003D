@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/widgets/common.dart';
 import '../auth/application/auth_controller.dart';
 import '../auth/domain/models.dart';
 import '../alerts/presentation/alerts_screen.dart';
 import '../caregiver/presentation/caregiver_home_screen.dart';
 import '../comms/presentation/comms_screen.dart';
+import '../doctor/presentation/doctor_home_screen.dart';
 import '../elder/presentation/elder_home_screen.dart';
 import '../health/presentation/health_screen.dart';
 import '../home/presentation/family_home_screen.dart';
@@ -20,7 +20,7 @@ import 'shell_providers.dart';
 /// - familiar:        Hoy · Salud · Comunicación · Marketplace · Más
 /// - cuidadora:       Hoy · Salud · Alertas · Más
 /// - adulto mayor:    experiencia de mosaico a pantalla completa
-/// - médico:          "Próximamente" (la vista del médico se construirá después)
+/// - médico:          Hoy (mis pacientes) · Salud · Más
 class MainShell extends ConsumerWidget {
   const MainShell({super.key});
 
@@ -33,13 +33,11 @@ class MainShell extends ConsumerWidget {
       return const ElderHomeScreen();
     }
 
-    // La vista del médico aún no está construida: se muestra "Próximamente"
-    // en lugar de caer en la vista familiar.
-    if (role == RoleType.doctor) {
-      return const _DoctorComingSoonShell();
-    }
-
-    final tabs = role == RoleType.caregiver ? _caregiverTabs : _familyTabs;
+    final tabs = switch (role) {
+      RoleType.caregiver => _caregiverTabs,
+      RoleType.doctor => _doctorTabs,
+      _ => _familyTabs,
+    };
     final index = ref.watch(shellTabIndexProvider);
     final safeIndex = index.clamp(0, tabs.length - 1);
 
@@ -93,6 +91,16 @@ class MainShell extends ConsumerWidget {
     _Tab('Alertas', '🔔', AlertsScreen()),
     _Tab('Más', '☰', MoreScreen()),
   ];
+
+  // Barra del médico: lectura del historial + recetas desde la ficha del
+  // paciente. Todos los GET del backend aceptan cualquier miembro (incluido
+  // doctor) y POST /medications acepta el rol doctor.
+  // 🏠 Hoy (mis pacientes) · ❤️ Salud · ☰ Más
+  static const _doctorTabs = <_Tab>[
+    _Tab('Hoy', '🏠', DoctorHomeScreen()),
+    _Tab('Salud', '❤️', HealthScreen()),
+    _Tab('Más', '☰', MoreScreen()),
+  ];
 }
 
 class _Tab {
@@ -114,36 +122,6 @@ class _EmojiTab extends StatelessWidget {
     return Opacity(
       opacity: active ? 1 : 0.55,
       child: Text(emoji, style: const TextStyle(fontSize: 22)),
-    );
-  }
-}
-
-/// Vista del médico: aún no construida. Se muestra "Próximamente" con la opción
-/// de cerrar sesión. PENDIENTE: panel del médico (historial, recetas, evolución).
-class _DoctorComingSoonShell extends ConsumerWidget {
-  const _DoctorComingSoonShell();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('AgeCare · Médico'),
-        actions: [
-          IconButton(
-            tooltip: 'Cerrar sesión',
-            icon: const Icon(Icons.logout_rounded),
-            onPressed: () =>
-                ref.read(authControllerProvider.notifier).logout(),
-          ),
-        ],
-      ),
-      body: const ComingSoonView(
-        icon: Icons.medical_services_rounded,
-        title: 'Panel del médico',
-        subtitle:
-            'La vista para el rol médico (historial clínico, recetas y '
-            'evolución del paciente) estará disponible en una próxima versión.',
-      ),
     );
   }
 }

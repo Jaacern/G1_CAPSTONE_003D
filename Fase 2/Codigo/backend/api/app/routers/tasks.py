@@ -133,3 +133,94 @@ async def list_tasks(
     ).mappings().all()
 
     return TasksOut(items=[_salida(f) for f in filas])
+
+
+class TaskIn(BaseModel):
+    title:       str = Field(min_length=1, max_length=150)
+    description: str | None = None
+    due:         datetime | None = None
+    category:    str | None = None
+
+    _limpiar = field_validator("title")(_texto_con_contenido)
+
+
+@router.post("/patients/{patient_id}/tasks", response_model=TaskOut,
+             status_code=201)
+async def create_task(
+    payload: TaskIn,
+    ctx: PatientContext = Depends(get_patient_member(["caregiver", "family"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Crea una tarea de cuidado.
+
+    due_date es obligatoria en la tabla y la pantalla permite no poner
+    fecha. Cuando no viene, la tarea es para hoy: es lo que significa una
+    tarea sin fecha en una pantalla que muestra el dia.
+    """
+    categoria = _resolver_categoria(payload.category)
+
+    if payload.due is None:
+        fecha, hora = datetime.now(timezone.utc).date(), None
+    else:
+        momento = payload.due
+        if momento.tzinfo is None:
+            momento = momento.replace(tzinfo=timezone.utc)
+        momento = momento.astimezone(timezone.utc)
+        fecha = momento.date()
+        # Medianoche exacta se guarda sin hora. Es lo que manda la pantalla
+        # cuando el usuario elige fecha y no elige hora, y guardarla como
+        # 00:00 haria aparecer una tarea "de la medianoche" que nadie puso.
+        hora = None if (momento.hour == 0 and momento.minute == 0) else momento.time()
+
+    descripcion = payload.description.strip() if payload.description else None
+
+    # assigned_to_user_id es obligatorio y la pantalla no pide a quien se le
+    # asigna. Si la crea la cuidadora, es para ella. Si la crea un familiar,
+    # lo que esta haciendo es pedirle algo a la cuidadora, asi que se le
+    # asigna a ella cuando hay una sola en el circulo. Con ninguna o con
+    # varias no hay forma de saber a cual, y queda a nombre de quien la creo.
+    asignado = ctx.user.user_id
+    if ctx.role != "caregiver":
+        cuidadoras = (
+            await db.execute(
+                text(
+                    """
+                    SELECT user_id
+                    FROM patient_members
+                    WHERE patient_id = :pid
+                      AND role = 'caregiver'
+                      AND removed_at IS NULL
+                    """
+                ),
+                {"pid": ctx.patient_id},
+            )
+        ).scalars().all()
+        if len(cuidadoras) == 1:
+            asignado = str(cuidadoras[0])
+
+    fila = (
+        await db.execute(
+            text(
+                """
+                INSERT INTO care_tasks (
+                    patient_id, assigned_to_user_id, created_by_user_id,
+                    title, description, due_date, due_time, status, category
+                ) VALUES (
+                    :pid, :asignado, :uid, :titulo, :desc, :fecha, :hora,
+                    'pending', :cat
+                )
+                RETURNING id, title, description, due_date, due_time,
+                          status, category
+                """
+            ),
+            {
+                "pid": ctx.patient_id, "uid": ctx.user.user_id,
+                "asignado": asignado,
+                "titulo": payload.title, "desc": descripcion or None,
+                "fecha": fecha, "hora": hora, "cat": categoria,
+            },
+        )
+    ).mappings().first()
+    await db.commit()
+
+    return _salida(fila)

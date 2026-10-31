@@ -49,8 +49,10 @@ class SpeechService {
   }
 
   /// Sube el audio y devuelve su URL (para adjuntar a un mensaje).
-  Future<String> uploadVoiceNote(File audio) async {
-    final uploaded = await _uploads.uploadFile(audio, kind: 'audio');
+  Future<String> uploadVoiceNote(File audio,
+      {required String patientId}) async {
+    final uploaded = await _uploads
+        .uploadFile(audio, kind: 'audio', patientId: patientId);
     return uploaded.fileUrl;
   }
 
@@ -62,8 +64,9 @@ class SpeechService {
   }
 
   /// Graba, sube y transcribe en un solo paso.
-  Future<({String text, String audioUrl})> recordAndTranscribe(File audio) async {
-    final url = await uploadVoiceNote(audio);
+  Future<({String text, String audioUrl})> recordAndTranscribe(File audio,
+      {required String patientId}) async {
+    final url = await uploadVoiceNote(audio, patientId: patientId);
     final text = await transcribe(url);
     return (text: text, audioUrl: url);
   }

@@ -310,7 +310,7 @@ class _UploadSheetState extends ConsumerState<_UploadSheet> {
     try {
       final uploaded = await ref
           .read(uploadServiceProvider)
-          .uploadFile(_file!, kind: 'document');
+          .uploadFile(_file!, kind: 'document', patientId: widget.patientId);
       await ref.read(documentsRepositoryProvider).addDocument(
             widget.patientId,
             fileUrl: uploaded.fileUrl,

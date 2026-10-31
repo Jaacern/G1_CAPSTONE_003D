@@ -117,7 +117,7 @@ class ElderPhotosScreen extends ConsumerWidget {
       showAppSnackBar(context, 'Subiendo la foto...');
       final uploaded = await ref
           .read(uploadServiceProvider)
-          .uploadFile(File(picked.path), kind: 'photo');
+          .uploadFile(File(picked.path), kind: 'photo', patientId: patientId);
       await ref.read(elderRepositoryProvider).addPhoto(
             patientId,
             fileUrl: uploaded.fileUrl,

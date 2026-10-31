@@ -205,7 +205,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       setState(() => _busyMedia = true);
       final uploaded = await ref
           .read(uploadServiceProvider)
-          .uploadFile(File(picked.path), kind: 'photo');
+          .uploadFile(File(picked.path), kind: 'photo', patientId: _patientId!);
       final sent = await ref.read(chatRepositoryProvider).sendMessage(
             _patientId!,
             type: MessageType.photo,
@@ -249,7 +249,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final speech = ref.read(speechServiceProvider);
       final file = await speech.stopRecording();
       if (file == null) return;
-      final url = await speech.uploadVoiceNote(file);
+      final url = await speech.uploadVoiceNote(file, patientId: _patientId!);
       final sent = await ref.read(chatRepositoryProvider).sendMessage(
             _patientId!,
             type: MessageType.voice,

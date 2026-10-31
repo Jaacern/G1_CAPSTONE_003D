@@ -60,7 +60,7 @@ class _PrescriptionScanScreenState
     try {
       final uploaded = await ref
           .read(uploadServiceProvider)
-          .uploadFile(_image!, kind: 'prescription');
+          .uploadFile(_image!, kind: 'prescription', patientId: widget.patientId);
       final draft = await ref
           .read(medicationsRepositoryProvider)
           .scanPrescription(widget.patientId, uploaded.fileUrl);

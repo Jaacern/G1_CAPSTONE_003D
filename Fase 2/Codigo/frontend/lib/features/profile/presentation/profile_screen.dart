@@ -79,7 +79,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       setState(() => _uploadingAvatar = true);
       final uploaded = await ref
           .read(uploadServiceProvider)
-          .uploadFile(File(picked.path), kind: 'photo');
+          .uploadFile(File(picked.path), kind: 'avatar');
       await ref
           .read(profileRepositoryProvider)
           .updateProfile(avatarUrl: uploaded.fileUrl);

@@ -65,7 +65,7 @@ class _ObservationScreenState extends ConsumerState<ObservationScreen> {
       if (_image != null) {
         final uploaded = await ref
             .read(uploadServiceProvider)
-            .uploadFile(_image!, kind: 'photo');
+            .uploadFile(_image!, kind: 'photo', patientId: widget.patientId);
         mediaUrl = uploaded.fileUrl;
       }
       await ref.read(caregiverRepositoryProvider).createObservation(

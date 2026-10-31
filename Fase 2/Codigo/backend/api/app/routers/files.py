@@ -361,21 +361,25 @@ async def _cargar_archivo(db: AsyncSession, file_id: UUID):
     return row
 
 
-async def _exigir_acceso(db: AsyncSession, row, user_id: str) -> None:
+async def _exigir_acceso(db: AsyncSession, row, user_id: str) -> str | None:
     """Control de acceso por ambito del archivo (spec 16.2).
 
     patient    solo los miembros vivos del circulo de ese paciente
     catalog    cualquier usuario autenticado, es contenido comun
     caregiver  cualquier usuario autenticado, son los certificados que la
                cuidadora publica en el marketplace para que los vean
+
+    Devuelve el rol que tiene el usuario sobre el paciente, o None si el
+    archivo no es de un expediente. El rol se necesita despues para dejar
+    el registro de acceso.
     """
     if row["scope"] != "patient":
-        return
+        return None
     miembro = (
         await db.execute(
             text(
                 """
-                SELECT 1
+                SELECT pm.role
                 FROM patient_members pm
                 JOIN patients p ON p.id = pm.patient_id
                 WHERE pm.patient_id = :pid
@@ -386,9 +390,48 @@ async def _exigir_acceso(db: AsyncSession, row, user_id: str) -> None:
             ),
             {"pid": str(row["patient_id"]), "uid": user_id},
         )
-    ).first()
+    ).mappings().first()
     if miembro is None:
         raise _NO_EXISTE
+    return miembro["role"]
+
+
+async def _registrar_acceso(db: AsyncSession, row, *, user_id: str,
+                            role: str | None, request: Request) -> None:
+    """Deja constancia de quien abrio un archivo del expediente (RNF-14).
+
+    Solo los archivos de un paciente se registran. El catalogo de cuentos y
+    los certificados del marketplace son contenido publico entre usuarios;
+    anotar cada vez que alguien ve la foto de un diploma llenaria la tabla
+    de ruido y no responde a ninguna pregunta.
+
+    La seccion es 'documents' porque es el valor que ck_record_access_log
+    acepta para el expediente documental, y entity_id es el archivo mismo,
+    asi que se puede reconstruir exactamente que se abrio.
+    """
+    if row["scope"] != "patient" or role is None:
+        return
+    await db.execute(
+        text(
+            """
+            INSERT INTO record_access_log (
+                patient_id, user_id, role, section, entity_id,
+                ip_address, user_agent
+            ) VALUES (
+                :pid, :uid, :role, 'documents', :eid, :ip, :ua
+            )
+            """
+        ),
+        {
+            "pid": str(row["patient_id"]),
+            "uid": user_id,
+            "role": role,
+            "eid": str(row["id"]),
+            "ip": request.client.host if request.client else None,
+            "ua": (request.headers.get("user-agent") or "")[:300] or None,
+        },
+    )
+    await db.commit()
 
 
 def _content_disposition(nombre: str) -> str:
@@ -401,6 +444,7 @@ def _content_disposition(nombre: str) -> str:
 @router.get("/files/{file_id}")
 async def read_file(
     file_id: UUID,
+    request: Request,
     t: str | None = None,
     creds: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
@@ -431,7 +475,11 @@ async def read_file(
 
     row = await _cargar_archivo(db, file_id)
     if user is not None:
-        await _exigir_acceso(db, row, user.user_id)
+        role = await _exigir_acceso(db, row, user.user_id)
+        await _registrar_acceso(db, row, user_id=user.user_id,
+                                role=role, request=request)
+    # Por ?t= no se registra: el acceso ya quedo anotado cuando el usuario
+    # pidio el enlace con su sesion, y aca no hay forma de saber quien es.
 
     storage = get_storage()
     try:
@@ -469,6 +517,7 @@ class DownloadLinkOut(BaseModel):
 @router.get("/files/{file_id}/download", response_model=DownloadLinkOut)
 async def download_link(
     file_id: UUID,
+    request: Request,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -479,7 +528,12 @@ async def download_link(
     mandar cabeceras.
     """
     row = await _cargar_archivo(db, file_id)
-    await _exigir_acceso(db, row, user.user_id)
+    role = await _exigir_acceso(db, row, user.user_id)
+    # Se registra aca y no al bajar el binario porque este es el punto donde
+    # hay una sesion identificada. En Azure el enlace va directo al blob y
+    # la API no vuelve a enterarse de nada.
+    await _registrar_acceso(db, row, user_id=user.user_id,
+                            role=role, request=request)
 
     storage = get_storage()
     return DownloadLinkOut(

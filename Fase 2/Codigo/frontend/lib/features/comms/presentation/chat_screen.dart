@@ -10,6 +10,7 @@ import '../../../core/network/upload_service.dart';
 import '../../../core/speech/speech_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../../core/widgets/remote_file_image.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../patients/application/patients_providers.dart';
 import '../application/comms_providers.dart';
@@ -277,7 +278,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
     setState(() => _playingUrl = url);
     try {
-      await speech.playUrl(url);
+      // La nota de voz tambien vive detras de la API: hay que pedir el
+      // enlace firmado antes de pasarselo al reproductor.
+      final firmada = await ref.read(uploadServiceProvider).signedUrl(url);
+      await speech.playUrl(firmada);
     } catch (_) {
       if (mounted) {
         showAppSnackBar(context, 'No se pudo reproducir la nota de voz.',
@@ -464,17 +468,16 @@ class _MessageBubble extends StatelessWidget {
   Widget _content(Color fg) {
     switch (message.type) {
       case MessageType.photo:
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: message.mediaUrl != null
-              ? Image.network(
-                  message.mediaUrl!,
-                  width: 200,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _photoFallback(fg),
-                )
-              : _photoFallback(fg),
-        );
+        return message.mediaUrl != null
+            ? RemoteFileImage(
+                message.mediaUrl!,
+                width: 200,
+                borderRadius: BorderRadius.circular(10),
+              )
+            : ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: _photoFallback(fg),
+              );
       case MessageType.voice:
         return Row(
           mainAxisSize: MainAxisSize.min,

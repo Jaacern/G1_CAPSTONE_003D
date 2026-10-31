@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../../core/widgets/remote_file_image.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/models.dart';
 import '../application/marketplace_providers.dart';
@@ -290,24 +291,24 @@ class _ProductCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(.08),
-              borderRadius: BorderRadius.circular(12),
-              image: product.imageUrl != null
-                  ? DecorationImage(
-                      image: NetworkImage(product.imageUrl!),
-                      fit: BoxFit.cover)
-                  : null,
-            ),
-            alignment: Alignment.center,
-            child: product.imageUrl == null
-                ? const Icon(Icons.medical_services_outlined,
-                    color: AppColors.primary)
-                : null,
-          ),
+          product.imageUrl != null
+              ? RemoteFileImage(
+                  product.imageUrl!,
+                  width: 64,
+                  height: 64,
+                  borderRadius: BorderRadius.circular(12),
+                )
+              : Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.medical_services_outlined,
+                      color: AppColors.primary),
+                ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../../core/widgets/remote_file_image.dart';
 import '../../patients/application/patients_providers.dart';
 import '../application/caregiver_providers.dart';
 import '../domain/models.dart';
@@ -138,13 +139,11 @@ class _ObservationCard extends StatelessWidget {
           Text(obs.text),
           if (obs.mediaUrl != null && obs.mediaUrl!.isNotEmpty) ...[
             const SizedBox(height: 10),
-            ClipRRect(
+            RemoteFileImage(
+              obs.mediaUrl!,
+              height: 140,
+              width: double.infinity,
               borderRadius: BorderRadius.circular(12),
-              child: Image.network(obs.mediaUrl!,
-                  height: 140,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink()),
             ),
           ],
           const SizedBox(height: 8),

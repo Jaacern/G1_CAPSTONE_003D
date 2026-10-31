@@ -5,6 +5,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/speech/speech_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../../core/widgets/remote_file_image.dart';
 import '../application/elder_providers.dart';
 import '../domain/models.dart';
 
@@ -83,13 +84,7 @@ class _ContentCard extends StatelessWidget {
                   const BorderRadius.vertical(top: Radius.circular(16)),
               child: AspectRatio(
                 aspectRatio: 16 / 9,
-                child: Image.network(
-                  item.imageUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: item.type.color.withOpacity(.08),
-                  ),
-                ),
+                child: RemoteFileImage(item.imageUrl!),
               ),
             ),
           Padding(

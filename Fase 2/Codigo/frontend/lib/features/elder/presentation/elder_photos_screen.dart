@@ -9,6 +9,7 @@ import '../../../core/network/upload_service.dart';
 import '../../../core/speech/speech_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../../core/widgets/remote_file_image.dart';
 import '../application/elder_providers.dart';
 import '../data/elder_repository.dart';
 import '../domain/models.dart';
@@ -186,16 +187,7 @@ class _PhotoCard extends StatelessWidget {
                 const BorderRadius.vertical(top: Radius.circular(16)),
             child: AspectRatio(
               aspectRatio: 4 / 3,
-              child: Image.network(
-                photo.url,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  color: AppColors.primary.withOpacity(.06),
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.broken_image_rounded,
-                      size: 56, color: AppColors.textSecondary),
-                ),
-              ),
+              child: RemoteFileImage(photo.url),
             ),
           ),
           Padding(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import 'remote_file_image.dart';
 
 /// Widgets compartidos del design system.
 
@@ -132,7 +133,12 @@ class InitialsAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (photoUrl != null && photoUrl!.isNotEmpty) {
-      return CircleAvatar(radius: radius, backgroundImage: NetworkImage(photoUrl!));
+      // La foto viene de la API y necesita un enlace firmado, asi que no
+      // se puede pasar a NetworkImage directo.
+      return ClipOval(
+        child: RemoteFileImage(photoUrl!,
+            width: radius * 2, height: radius * 2),
+      );
     }
     final initials = name
         .trim()

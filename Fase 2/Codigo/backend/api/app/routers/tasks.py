@@ -224,3 +224,102 @@ async def create_task(
     await db.commit()
 
     return _salida(fila)
+
+
+class TaskStatusIn(BaseModel):
+    status: str
+
+
+@router.post("/tasks/{task_id}/status", response_model=TaskOut)
+async def set_task_status(
+    task_id: UUID,
+    payload: TaskStatusIn,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cambia el estado de una tarea.
+
+    La ruta no lleva el paciente, asi que no sirve la dependencia de
+    membresia: hay que llegar al paciente desde la tarea y recien ahi
+    comprobar que quien pide el cambio es del circulo. Sin eso, cualquier
+    usuario autenticado que tuviera un id de tarea podria marcarla.
+    """
+    estado = _ESTADO_A_BASE.get(_sin_tildes(payload.status))
+    if estado is None:
+        raise ApiError(
+            status_code=422, code="VALIDATION_ERROR",
+            message="Ese estado de tarea no existe.",
+            details=[{"field": "status",
+                      "message": "Valores aceptados: pending, in_progress, done, cancelled."}],
+        )
+
+    tarea = (
+        await db.execute(
+            text(
+                """
+                SELECT t.patient_id
+                FROM care_tasks t
+                JOIN patients p ON p.id = t.patient_id
+                WHERE t.id = :tid
+                  AND t.deleted_at IS NULL
+                  AND p.deleted_at IS NULL
+                """
+            ),
+            {"tid": str(task_id)},
+        )
+    ).mappings().first()
+
+    # 404 y no 403 tambien aca: que la respuesta no cambie segun si la tarea
+    # existe evita que alguien averigue ids ajenos probando (spec 2.5).
+    no_existe = ApiError(
+        status_code=404, code="NOT_FOUND",
+        message="El recurso solicitado no existe o no esta disponible.",
+    )
+    if tarea is None:
+        raise no_existe
+
+    miembro = (
+        await db.execute(
+            text(
+                """
+                SELECT 1
+                FROM patient_members
+                WHERE patient_id = :pid
+                  AND user_id = :uid
+                  AND removed_at IS NULL
+                """
+            ),
+            {"pid": str(tarea["patient_id"]), "uid": user.user_id},
+        )
+    ).first()
+    if miembro is None:
+        raise no_existe
+
+    # completed_at va junto con el estado en la misma sentencia, porque
+    # chk_care_tasks_completed exige que coincidan: con la fecha en una
+    # sentencia y el estado en otra, la primera ya fallaria.
+    fila = (
+        await db.execute(
+            text(
+                """
+                UPDATE care_tasks
+                   SET status = :estado,
+                       completed_at = CASE WHEN :completada
+                                           THEN coalesce(completed_at, now())
+                                           ELSE NULL END,
+                       updated_at = now()
+                 WHERE id = :tid
+                RETURNING id, title, description, due_date, due_time,
+                          status, category
+                """
+            ),
+            # La condicion va como booleano ya resuelto y no comparando el
+            # parametro de estado otra vez: usado en dos lugares con tipos
+            # distintos, el motor no logra deducir de que tipo es.
+            {"tid": str(task_id), "estado": estado,
+             "completada": estado == "completed"},
+        )
+    ).mappings().first()
+    await db.commit()
+
+    return _salida(fila)

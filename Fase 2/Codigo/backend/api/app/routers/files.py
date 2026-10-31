@@ -17,18 +17,21 @@ gastado su conexion subiendo 20 MB que se van a rechazar.
 """
 import hashlib
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
-from app.deps import CurrentUser, get_current_user
+from app.deps import CurrentUser, bearer_scheme, get_current_user
 from app.errors import ApiError
 from app.storage import (
     ALLOWED_CONTENT_TYPES,
+    DOWNLOAD_TTL_MINUTES,
     MAX_SIZE_BYTES,
     UPLOAD_TTL_MINUTES,
     build_storage_key,
@@ -325,4 +328,168 @@ async def complete_upload(
         size=len(data),
         checksum=checksum,
         status="stored",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Lectura
+# ---------------------------------------------------------------------------
+_NO_EXISTE = ApiError(
+    status_code=404, code="NOT_FOUND",
+    message="El recurso solicitado no existe o no esta disponible.",
+)
+
+
+async def _cargar_archivo(db: AsyncSession, file_id: UUID):
+    row = (
+        await db.execute(
+            text(
+                """
+                SELECT id, patient_id, scope, storage_key, original_name,
+                       mime_type, size_bytes, status
+                FROM files
+                WHERE id = :id
+                """
+            ),
+            {"id": str(file_id)},
+        )
+    ).mappings().first()
+    # Un archivo pending todavia no tiene bytes y uno purged ya no los tiene.
+    # En los dos casos la respuesta honesta es que no esta disponible.
+    if row is None or row["status"] != "stored":
+        raise _NO_EXISTE
+    return row
+
+
+async def _exigir_acceso(db: AsyncSession, row, user_id: str) -> None:
+    """Control de acceso por ambito del archivo (spec 16.2).
+
+    patient    solo los miembros vivos del circulo de ese paciente
+    catalog    cualquier usuario autenticado, es contenido comun
+    caregiver  cualquier usuario autenticado, son los certificados que la
+               cuidadora publica en el marketplace para que los vean
+    """
+    if row["scope"] != "patient":
+        return
+    miembro = (
+        await db.execute(
+            text(
+                """
+                SELECT 1
+                FROM patient_members pm
+                JOIN patients p ON p.id = pm.patient_id
+                WHERE pm.patient_id = :pid
+                  AND pm.user_id = :uid
+                  AND pm.removed_at IS NULL
+                  AND p.deleted_at IS NULL
+                """
+            ),
+            {"pid": str(row["patient_id"]), "uid": user_id},
+        )
+    ).first()
+    if miembro is None:
+        raise _NO_EXISTE
+
+
+def _content_disposition(nombre: str) -> str:
+    # El nombre original puede traer acentos, comillas o saltos de linea.
+    # Va en el formato de RFC 5987 y ademas una version ascii de respaldo.
+    seguro = "".join(c for c in nombre if c.isalnum() or c in "._- ") or "archivo"
+    return f"inline; filename=\"{seguro}\"; filename*=UTF-8''{quote(nombre)}"
+
+
+@router.get("/files/{file_id}")
+async def read_file(
+    file_id: UUID,
+    t: str | None = None,
+    creds: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: AsyncSession = Depends(get_db),
+):
+    """Entrega el binario (RF-42).
+
+    Acepta dos formas de credencial, y hacen falta las dos:
+
+        cabecera Bearer  las llamadas que hace Dio desde el repositorio
+        ?t=<token>       Image.network, que no manda cabeceras
+
+    El token de descarga vale 5 minutos y para un solo archivo, asi que no
+    sirve para pasearse por el expediente de nadie.
+    """
+    # Primero la credencial y despues la fila, en ese orden: si se mirara la
+    # fila antes, quien no esta autenticado distinguiria un archivo que
+    # existe (401) de uno que no (404).
+    user: CurrentUser | None = None
+    if t:
+        claims = read_token(t, purpose="download")
+        if claims is None or claims.get("fid") != str(file_id):
+            raise ApiError(
+                status_code=401, code="DOWNLOAD_TOKEN_INVALID",
+                message="El enlace del archivo no es valido o ya vencio.",
+            )
+    else:
+        user = await get_current_user(creds, db)
+
+    row = await _cargar_archivo(db, file_id)
+    if user is not None:
+        await _exigir_acceso(db, row, user.user_id)
+
+    storage = get_storage()
+    try:
+        data = await storage.load(storage_key=row["storage_key"])
+    except FileNotFoundError:
+        # La fila dice stored y el binario no esta. Es una inconsistencia que
+        # hay que ver en los registros, no un 404 silencioso.
+        raise ApiError(
+            status_code=500, code="STORAGE_ERROR",
+            message="El archivo no se pudo leer del almacenamiento.",
+        )
+
+    return Response(
+        content=data,
+        media_type=row["mime_type"],
+        headers={
+            "Content-Disposition": _content_disposition(row["original_name"]),
+            # Privado y corto: es contenido de salud, no se guarda en caches
+            # intermedias ni en el disco del dispositivo mas de lo necesario.
+            "Cache-Control": "private, max-age=300",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+class DownloadLinkOut(BaseModel):
+    file_id:    UUID
+    name:       str
+    mime_type:  str
+    size:       int
+    url:        str
+    expires_at: datetime
+
+
+@router.get("/files/{file_id}/download", response_model=DownloadLinkOut)
+async def download_link(
+    file_id: UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Entrega un enlace de lectura de vida corta (RF-42, RNF-13).
+
+    Es el paso que le falta al front para mostrar imagenes: pide el enlace
+    con su sesion y recien despues se lo pasa a Image.network, que no sabe
+    mandar cabeceras.
+    """
+    row = await _cargar_archivo(db, file_id)
+    await _exigir_acceso(db, row, user.user_id)
+
+    storage = get_storage()
+    return DownloadLinkOut(
+        file_id=row["id"],
+        name=row["original_name"],
+        mime_type=row["mime_type"],
+        size=row["size_bytes"],
+        url=storage.download_url(
+            file_id=str(row["id"]), storage_key=row["storage_key"],
+            content_type=row["mime_type"], size=row["size_bytes"],
+        ),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=DOWNLOAD_TTL_MINUTES),
     )

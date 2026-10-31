@@ -15,10 +15,11 @@ La validacion de tipo y tamano ocurre ANTES de entregar la URL. Es la unica
 forma de que sirva: si se validara al recibir el binario, el usuario ya habria
 gastado su conexion subiendo 20 MB que se van a rechazar.
 """
+import hashlib
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +33,7 @@ from app.storage import (
     UPLOAD_TTL_MINUTES,
     build_storage_key,
     get_storage,
+    read_token,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["files"])
@@ -178,4 +180,149 @@ async def create_upload(
         ),
         file_url=storage.file_url(file_id=file_id, storage_key=storage_key),
         expires_at=expires_at,
+    )
+
+
+class UploadDoneOut(BaseModel):
+    file_id:  UUID
+    file_url: str
+    size:     int
+    checksum: str
+    status:   str
+
+
+@router.put("/uploads/{token}", response_model=UploadDoneOut)
+async def complete_upload(
+    token: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Recibe los bytes y deja el archivo en estado stored (RF-39).
+
+    No pide cabecera Authorization, a proposito. El token ES la credencial,
+    igual que una SAS de Azure: va firmado, dura 15 minutos, sirve para un
+    solo archivo y no se puede alterar sin invalidar la firma. Asi el front
+    usa el mismo codigo contra las dos implementaciones de almacenamiento,
+    que es justamente lo que upload_service.dart ya hace.
+    """
+    claims = read_token(token, purpose="upload")
+    if claims is None:
+        raise ApiError(
+            status_code=401,
+            code="UPLOAD_TOKEN_INVALID",
+            message="El enlace de subida no es valido o ya vencio.",
+        )
+
+    file_id = claims["fid"]
+    row = (
+        await db.execute(
+            text(
+                """
+                SELECT storage_key, mime_type, size_bytes, status,
+                       upload_expires_at
+                FROM files
+                WHERE id = :id
+                """
+            ),
+            {"id": file_id},
+        )
+    ).first()
+
+    if row is None:
+        raise ApiError(
+            status_code=404, code="NOT_FOUND",
+            message="El recurso solicitado no existe o no esta disponible.",
+        )
+
+    # Reintento sobre un archivo ya subido. No es un error del cliente ni
+    # motivo para sobrescribir el binario: se responde que ya esta.
+    if row.status == "stored":
+        raise ApiError(
+            status_code=409, code="ALREADY_UPLOADED",
+            message="Ese archivo ya fue subido.",
+        )
+    if row.status != "pending":
+        raise ApiError(
+            status_code=409, code="INVALID_STATE",
+            message=f"El archivo esta en estado '{row.status}' y no admite subida.",
+        )
+
+    # Doble vencimiento a proposito: el del token y el de la fila. El token
+    # puede estar vivo y la fila vencida si alguien cambio el TTL, y al
+    # reves si se reemplazo la llave de firma. Vale el mas estricto.
+    if row.upload_expires_at <= datetime.now(timezone.utc):
+        raise ApiError(
+            status_code=410, code="UPLOAD_EXPIRED",
+            message="El enlace de subida vencio. Pide uno nuevo.",
+        )
+
+    # El tipo lo manda el cliente en la cabecera; tiene que ser el mismo que
+    # se declaro al pedir el enlace, porque es el que la fila ya tiene
+    # guardado y el que el CHECK del motor acepto.
+    declarado = claims["ct"]
+    enviado = (request.headers.get("content-type") or "").split(";")[0].strip()
+    if enviado and enviado != declarado:
+        raise ApiError(
+            status_code=415, code="CONTENT_TYPE_MISMATCH",
+            message="El tipo de contenido no coincide con el declarado al pedir el enlace.",
+            details=[{"field": "content-type",
+                      "message": f"Declarado: {declarado}. Enviado: {enviado}."}],
+        )
+
+    # Se corta antes de leer el cuerpo si el propio cliente avisa que trae
+    # mas de lo permitido: no tiene sentido juntar 100 MB en memoria para
+    # despues rechazarlos.
+    largo = request.headers.get("content-length")
+    if largo and largo.isdigit() and int(largo) > MAX_SIZE_BYTES:
+        raise ApiError(
+            status_code=413, code="FILE_TOO_LARGE",
+            message=f"El archivo supera el maximo de {MAX_SIZE_BYTES // (1024*1024)} MB.",
+        )
+
+    data = await request.body()
+    if not data:
+        raise ApiError(
+            status_code=422, code="VALIDATION_ERROR",
+            message="No llegaron bytes del archivo.",
+        )
+    if len(data) > MAX_SIZE_BYTES:
+        raise ApiError(
+            status_code=413, code="FILE_TOO_LARGE",
+            message=f"El archivo supera el maximo de {MAX_SIZE_BYTES // (1024*1024)} MB.",
+        )
+
+    # El tamano real manda sobre el declarado. El declarado sirvio para
+    # rechazar temprano; una vez que los bytes estan aca, lo que la fila
+    # tiene que decir es cuanto pesa el archivo de verdad.
+    checksum = hashlib.sha256(data).hexdigest()
+
+    storage = get_storage()
+    await storage.save(storage_key=row.storage_key, data=data)
+
+    # El binario se guarda ANTES de marcar la fila. Si falla el guardado la
+    # fila sigue pending y se puede reintentar; al reves quedaria una fila
+    # que dice stored apuntando a un archivo que no existe.
+    await db.execute(
+        text(
+            """
+            UPDATE files
+               SET status = 'stored',
+                   stored_at = now(),
+                   size_bytes = :size,
+                   checksum_sha256 = :sum,
+                   updated_at = now()
+             WHERE id = :id
+               AND status = 'pending'
+            """
+        ),
+        {"id": file_id, "size": len(data), "sum": checksum},
+    )
+    await db.commit()
+
+    return UploadDoneOut(
+        file_id=UUID(file_id),
+        file_url=storage.file_url(file_id=file_id, storage_key=row.storage_key),
+        size=len(data),
+        checksum=checksum,
+        status="stored",
     )

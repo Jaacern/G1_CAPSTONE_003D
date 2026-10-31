@@ -162,6 +162,16 @@ class StorageBackend(ABC):
         """URL con la que se referencia el archivo ya guardado."""
 
     @abstractmethod
+    def download_url(self, *, file_id: str, storage_key: str,
+                     content_type: str, size: int) -> str:
+        """URL de lectura de vida corta, usable sin cabecera de sesion.
+
+        Hace falta porque el front muestra las imagenes con Image.network,
+        que no manda cabeceras. Sin un enlace firmado, la unica alternativa
+        seria dejar los archivos del expediente abiertos a cualquiera.
+        """
+
+    @abstractmethod
     async def save(self, *, storage_key: str, data: bytes) -> None: ...
 
     @abstractmethod
@@ -201,6 +211,15 @@ class LocalStorage(StorageBackend):
 
     def file_url(self, *, file_id: str, storage_key: str) -> str:
         return f"{self.base}/api/v1/files/{file_id}"
+
+    def download_url(self, *, file_id: str, storage_key: str,
+                     content_type: str, size: int) -> str:
+        token = issue_token(
+            purpose="download", file_id=file_id, storage_key=storage_key,
+            content_type=content_type, size=size,
+            ttl_minutes=DOWNLOAD_TTL_MINUTES,
+        )
+        return f"{self.base}/api/v1/files/{file_id}?t={token}"
 
     async def save(self, *, storage_key: str, data: bytes) -> None:
         p = self._path(storage_key)
@@ -270,7 +289,10 @@ class AzureStorage(StorageBackend):
         return (f"{get_storage_settings().storage_public_base_url.rstrip('/')}"
                 f"/api/v1/files/{file_id}")
 
-    def download_url(self, *, storage_key: str) -> str:
+    def download_url(self, *, file_id: str, storage_key: str,
+                     content_type: str, size: int) -> str:
+        # En Azure el enlace de lectura es una SAS que apunta al blob, asi
+        # que el binario no pasa por la API: el cliente lo baja directo.
         return self._sas(storage_key, write=False, ttl=DOWNLOAD_TTL_MINUTES)
 
     async def save(self, *, storage_key: str, data: bytes) -> None:

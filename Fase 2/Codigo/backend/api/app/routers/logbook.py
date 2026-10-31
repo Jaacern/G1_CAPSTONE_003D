@@ -554,3 +554,160 @@ async def create_handover_note(
         shift=fila["shift"],
         shift_date=fila["shift_date"].isoformat(),
     )
+
+
+# ---------------------------------------------------------------------------
+# Turno: entrada y salida
+# ---------------------------------------------------------------------------
+class CheckinIn(BaseModel):
+    type: str
+    lat:  float | None = Field(default=None, ge=-90, le=90)
+    lng:  float | None = Field(default=None, ge=-180, le=180)
+
+
+class CheckinOut(BaseModel):
+    shift_status:     str
+    shift_id:         UUID
+    checked_in_at:    datetime
+    checked_out_at:   datetime | None
+    duration_seconds: int | None
+
+
+@router.post("/patients/{patient_id}/checkin", response_model=CheckinOut)
+async def checkin(
+    payload: CheckinIn,
+    ctx: PatientContext = Depends(get_patient_member(["caregiver"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Marca entrada o salida del turno.
+
+    El estado que la aplicacion muestra no es una columna: es si existe o no
+    una fila sin cerrar. Las dos operaciones son idempotentes, porque el
+    boton de la pantalla decide que mandar segun el estado que tiene en
+    memoria, y ese estado puede estar viejo si la aplicacion estuvo sin
+    conexion o se abrio en otro telefono.
+    """
+    if payload.type not in ("in", "out"):
+        raise ApiError(
+            status_code=422, code="VALIDATION_ERROR",
+            message="El tipo de marca debe ser 'in' o 'out'.",
+            details=[{"field": "type", "message": f"Valor recibido: {payload.type}."}],
+        )
+    if (payload.lat is None) != (payload.lng is None):
+        raise ApiError(
+            status_code=422, code="VALIDATION_ERROR",
+            message="Hay que mandar latitud y longitud juntas.",
+        )
+
+    abierto = (
+        await db.execute(
+            text(
+                """
+                SELECT id, patient_id, checked_in_at
+                FROM care_shifts
+                WHERE caregiver_id = :uid AND checked_out_at IS NULL
+                """
+            ),
+            {"uid": ctx.user.user_id},
+        )
+    ).mappings().first()
+
+    if payload.type == "in":
+        if abierto is not None:
+            if str(abierto["patient_id"]) == ctx.patient_id:
+                # Ya estaba en turno con este paciente. Se devuelve el turno
+                # que ya existe en vez de abrir otro.
+                return CheckinOut(
+                    shift_status="checked_in",
+                    shift_id=abierto["id"],
+                    checked_in_at=abierto["checked_in_at"],
+                    checked_out_at=None,
+                    duration_seconds=None,
+                )
+            raise ApiError(
+                status_code=409, code="SHIFT_ALREADY_OPEN",
+                message="Tienes un turno abierto con otro paciente. "
+                        "Marca la salida de ese turno antes de entrar a este.",
+            )
+
+        fila = (
+            await db.execute(
+                text(
+                    """
+                    INSERT INTO care_shifts (
+                        patient_id, caregiver_id, checked_in_at,
+                        in_latitude, in_longitude
+                    ) VALUES (:pid, :uid, now(), :lat, :lng)
+                    RETURNING id, checked_in_at, checked_out_at, duration_seconds
+                    """
+                ),
+                {"pid": ctx.patient_id, "uid": ctx.user.user_id,
+                 "lat": payload.lat, "lng": payload.lng},
+            )
+        ).mappings().first()
+        await db.commit()
+        return CheckinOut(
+            shift_status="checked_in",
+            shift_id=fila["id"],
+            checked_in_at=fila["checked_in_at"],
+            checked_out_at=fila["checked_out_at"],
+            duration_seconds=fila["duration_seconds"],
+        )
+
+    # type == 'out'
+    if abierto is None or str(abierto["patient_id"]) != ctx.patient_id:
+        # No hay turno que cerrar con este paciente. Se informa el ultimo
+        # turno cerrado, que es lo que la pantalla necesita para quedar
+        # mostrando 'fuera de turno'.
+        ultimo = (
+            await db.execute(
+                text(
+                    """
+                    SELECT id, checked_in_at, checked_out_at, duration_seconds
+                    FROM care_shifts
+                    WHERE caregiver_id = :uid AND patient_id = :pid
+                    ORDER BY checked_in_at DESC
+                    LIMIT 1
+                    """
+                ),
+                {"uid": ctx.user.user_id, "pid": ctx.patient_id},
+            )
+        ).mappings().first()
+        if ultimo is None:
+            raise ApiError(
+                status_code=409, code="NO_OPEN_SHIFT",
+                message="No tienes un turno abierto con este paciente.",
+            )
+        return CheckinOut(
+            shift_status="checked_out",
+            shift_id=ultimo["id"],
+            checked_in_at=ultimo["checked_in_at"],
+            checked_out_at=ultimo["checked_out_at"],
+            duration_seconds=ultimo["duration_seconds"],
+        )
+
+    fila = (
+        await db.execute(
+            text(
+                """
+                UPDATE care_shifts
+                   SET checked_out_at = now(),
+                       out_latitude  = :lat,
+                       out_longitude = :lng,
+                       updated_at = now()
+                 WHERE id = :id AND checked_out_at IS NULL
+                RETURNING id, checked_in_at, checked_out_at, duration_seconds
+                """
+            ),
+            {"id": str(abierto["id"]), "lat": payload.lat, "lng": payload.lng},
+        )
+    ).mappings().first()
+    await db.commit()
+
+    return CheckinOut(
+        shift_status="checked_out",
+        shift_id=fila["id"],
+        checked_in_at=fila["checked_in_at"],
+        checked_out_at=fila["checked_out_at"],
+        duration_seconds=fila["duration_seconds"],
+    )

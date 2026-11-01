@@ -295,6 +295,14 @@ Future<void> _discontinuarReceta(BuildContext context, WidgetRef ref,
         .read(medicationsRepositoryProvider)
         .deleteMedication(patientId, medication.id);
     ref.invalidate(medicationsProvider);
+    // Las dosis de hoy se generan desde la medicación activa: al salir una del
+    // plan, su dosis pendiente ya no debe aparecer en el día.
+    ref.invalidate(todayDosesProvider);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${medication.name} salió del plan.')),
+      );
+    }
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

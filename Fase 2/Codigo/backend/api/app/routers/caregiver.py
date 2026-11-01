@@ -23,6 +23,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.deps import CurrentUser, get_current_user
 from app.errors import ApiError
+# hoy() entra con nombre propio: en este modulo 'hoy' ya es una variable.
+from app.fechas import hoy as hoy_local
+from app.fechas import instante
 
 router = APIRouter(prefix="/api/v1/caregiver", tags=["caregiver"])
 
@@ -99,7 +102,7 @@ async def today(
         )
 
     patient_id = str(elegido["id"])
-    hoy = datetime.now(timezone.utc).date()
+    hoy = hoy_local()
 
     en_turno = (
         await db.execute(
@@ -160,8 +163,9 @@ async def today(
                   AND observed_at >= :desde
                 """
             ),
-            {"pid": patient_id, "desde": datetime.combine(
-                hoy, datetime.min.time(), tzinfo=timezone.utc)},
+            # Desde la medianoche chilena, no la UTC: si no, "las
+            # observaciones de hoy" arrancan a las nueve de la noche de ayer.
+            {"pid": patient_id, "desde": instante(hoy)},
         )
     ).scalar()
 
@@ -201,8 +205,9 @@ async def today(
         pending_tasks=[
             TaskResumen(
                 id=t["id"], title=t["title"], description=t["description"],
-                due=(datetime.combine(t["due_date"], t["due_time"] or datetime.min.time(),
-                                      tzinfo=timezone.utc)),
+                # due_date y due_time se guardaron como hora de pared;
+                # marcarlas UTC las corre tres o cuatro horas en el telefono.
+                due=instante(t["due_date"], t["due_time"]),
                 status="done" if t["status"] == "completed" else t["status"],
                 category=t["category"],
             )
@@ -709,7 +714,10 @@ async def reports(
             await db.execute(
                 text(
                     """
-                    SELECT (completed_at AT TIME ZONE 'UTC')::date AS dia,
+                    -- El dia sale de la zona de la conexion (db.py). Antes
+                    -- decia AT TIME ZONE 'UTC' y agrupaba por dia UTC, que
+                    -- no es el dia en que la cuidadora hizo el trabajo.
+                    SELECT completed_at::date AS dia,
                            count(*) AS cuantas
                     FROM care_tasks
                     WHERE assigned_to_user_id = :uid
@@ -724,7 +732,9 @@ async def reports(
         ).mappings().all()
     }
 
-    hoy = datetime.now(timezone.utc).date()
+    # Tiene que ser el mismo dia con el que agrupa la consulta de arriba,
+    # o las etiquetas de la grafica no calzan con sus valores.
+    hoy = hoy_local()
     semana = [
         ReportPoint(
             label=_DIAS[(hoy - timedelta(days=i)).weekday()],

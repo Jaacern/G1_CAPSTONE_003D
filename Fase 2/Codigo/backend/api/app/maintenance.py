@@ -5,6 +5,7 @@ Se corren desde afuera, no desde un request:
     python -m app.maintenance barrer-subidas
     python -m app.maintenance generar-dosis
     python -m app.maintenance marcar-vencidas
+    python -m app.maintenance alertar-dosis
 
 No se exponen como endpoints a proposito: no son acciones de un usuario,
 no tienen a quien responderle, y un endpoint de mantenimiento abierto es
@@ -14,6 +15,7 @@ datos de salud.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sys
 
@@ -281,10 +283,126 @@ async def marcar_dosis_vencidas(*, verbose: bool = True) -> dict[str, int]:
     return {"marcadas": marcadas}
 
 
+async def alertar_dosis_omitidas(*, verbose: bool = True) -> dict[str, int]:
+    """Crea la alerta de dosis no administrada que nadie estaba creando.
+
+    POR QUE HACE FALTA
+        El tipo 'missed_dose' esta en la tabla, en el catalogo de tipos del
+        router y en las preferencias de notificacion, donde la familia
+        puede activarlo o apagarlo. Lo unico que faltaba era que alguien lo
+        creara: la unica alerta que nacia sola era el SOS. Una familia que
+        prendia el aviso de dosis no administrada no recibia ninguno nunca.
+
+    UNA ALERTA POR DOSIS, Y UNA SOLA
+        La condicion es la toma concreta, asi que el dose_id va en payload
+        y se consulta ahi antes de crear. Una dosis no puede juntar dos
+        alertas ni hoy ni dentro de un mes, por mas veces que corra el
+        proceso.
+
+        Encima de eso se respeta alert_dedup_minutes de system_parameters,
+        que es el parametro escrito para esto: si al paciente ya se le
+        creo una alerta de dosis en esa ventana, las siguientes esperan.
+        Y esperan, no se pierden: como el que manda es el dose_id, en la
+        corrida siguiente, con la ventana cumplida, se crean igual. Sirve
+        para no mandarle siete avisos de golpe a la familia cuando la
+        cuidadora no fue en todo el dia, sin dejar ninguna toma sin avisar.
+
+    El texto sigue el formato que ya tienen las alertas sembradas, para
+    que el centro de alertas se lea parejo: "Metformina 850 mg de las
+    14:00 sin registro."
+    """
+    creadas = omitidas = 0
+
+    async with engine.begin() as conn:
+        ventana = await _parametro(conn, "alert_dedup_minutes", 30)
+
+        pendientes = (
+            await conn.execute(
+                text(
+                    """
+                    SELECT sd.id, sd.scheduled_at, m.patient_id,
+                           m.id AS medication_id, m.name, m.dose_text,
+                           to_char(sd.scheduled_at AT TIME ZONE
+                                   CAST(:zona AS text), 'HH24:MI') AS hora
+                    FROM scheduled_doses sd
+                    JOIN medications m ON m.id = sd.medication_id
+                    JOIN patients   p ON p.id = m.patient_id
+                    WHERE sd.status = 'missed'
+                      AND p.deleted_at IS NULL
+                      -- Las de la cuidadora no llevan alerta: ella ya sabe
+                      -- que no la dio, lo acaba de escribir con su motivo.
+                      AND sd.logged_by IS NULL
+                      AND NOT EXISTS (
+                            SELECT 1 FROM alerts a
+                             WHERE a.type = 'missed_dose'
+                               AND a.payload ->> 'dose_id' = CAST(sd.id AS text)
+                          )
+                    ORDER BY sd.scheduled_at
+                    """
+                ),
+                {"zona": ZONA},
+            )
+        ).mappings().all()
+
+        for d in pendientes:
+            reciente = (
+                await conn.execute(
+                    text(
+                        """
+                        SELECT 1 FROM alerts
+                         WHERE patient_id = :pid
+                           AND dedup_key = 'missed_dose'
+                           AND created_at > now()
+                               - make_interval(mins => CAST(:ventana AS integer))
+                         LIMIT 1
+                        """
+                    ),
+                    {"pid": str(d["patient_id"]), "ventana": ventana},
+                )
+            ).first()
+            if reciente is not None:
+                omitidas += 1
+                continue
+
+            detalle = (f"{d['name']} {d['dose_text']} de las {d['hora']} "
+                       "sin registro.")
+            await conn.execute(
+                text(
+                    """
+                    INSERT INTO alerts
+                        (patient_id, type, severity, title, detail,
+                         payload, dedup_key, status)
+                    VALUES
+                        (:pid, 'missed_dose', 'warning',
+                         'Dosis no administrada', :detalle,
+                         CAST(:payload AS jsonb), 'missed_dose', 'active')
+                    """
+                ),
+                {
+                    "pid": str(d["patient_id"]),
+                    "detalle": detalle,
+                    "payload": json.dumps({
+                        "dose_id": str(d["id"]),
+                        "medication_id": str(d["medication_id"]),
+                        "medication": d["name"],
+                        "dose": d["dose_text"],
+                        "scheduled_at": d["scheduled_at"].isoformat(),
+                    }),
+                },
+            )
+            creadas += 1
+
+    if verbose:
+        print(f"alertas de dosis creadas : {creadas}")
+        print(f"en espera por la ventana : {omitidas}")
+    return {"creadas": creadas, "en_espera": omitidas}
+
+
 async def _main(argv: list[str]) -> int:
     tareas = {"barrer-subidas": barrer_subidas_vencidas,
               "generar-dosis": generar_dosis,
-              "marcar-vencidas": marcar_dosis_vencidas}
+              "marcar-vencidas": marcar_dosis_vencidas,
+              "alertar-dosis": alertar_dosis_omitidas}
     if len(argv) != 1 or argv[0] not in tareas:
         print(f"uso: python -m app.maintenance <{' | '.join(tareas)}>")
         return 2

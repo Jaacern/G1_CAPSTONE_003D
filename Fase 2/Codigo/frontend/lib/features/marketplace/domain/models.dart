@@ -122,8 +122,11 @@ class Review {
         authorName: (json['author_name'] ?? 'Anónimo') as String,
         rating: (json['rating'] ?? 0) as int,
         comment: (json['comment'] ?? '') as String,
+        // /caregivers/{id} devuelve la hora con su desplazamiento y
+        // DateTime.parse la deja en UTC; sin toLocal la reseña aparecería con
+        // la hora del servidor y, pasada la medianoche local, con otro día.
         createdAt: json['created_at'] != null
-            ? DateTime.parse(json['created_at'] as String)
+            ? DateTime.parse(json['created_at'] as String).toLocal()
             : DateTime.now(),
       );
 }

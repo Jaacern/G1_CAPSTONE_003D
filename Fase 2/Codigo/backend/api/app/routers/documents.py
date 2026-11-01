@@ -130,3 +130,68 @@ async def list_documents(
     await db.commit()
 
     return DocumentsOut(items=[_salida(f) for f in filas])
+
+
+class DocumentIn(BaseModel):
+    file_url: str = Field(min_length=1)
+    title:    str = Field(min_length=1, max_length=160)
+    category: str | None = None
+
+    _limpiar = field_validator("title")(_texto_con_contenido)
+
+
+@router.post("/patients/{patient_id}/documents", response_model=DocumentOut,
+             status_code=201)
+async def add_document(
+    payload: DocumentIn,
+    ctx: PatientContext = Depends(get_patient_member(["family", "caregiver", "doctor"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Agrega un documento ya subido al expediente del paciente."""
+    categoria = _categoria_a_base(payload.category)
+    file_id = await _archivo_del_paciente(db, payload.file_url, ctx.patient_id)
+    if file_id is None:
+        raise ApiError(
+            status_code=422, code="VALIDATION_ERROR",
+            message="Falta el archivo del documento.",
+            details=[{"field": "file_url", "message": "No puede ir vacio."}],
+        )
+
+    # uq_medical_documents_file deja un documento por archivo. Si el mismo
+    # archivo ya esta en el expediente, es un reintento de la pantalla
+    # despues de un error de red, no un documento nuevo: se devuelve el que
+    # ya existe en vez de reventar con un 500 del motor.
+    repetido = (
+        await db.execute(
+            text(
+                """
+                SELECT d.id, d.title, d.category, d.file_id, d.created_at,
+                       u.full_name
+                FROM medical_documents d
+                JOIN users u ON u.id = d.added_by
+                WHERE d.file_id = :fid AND d.deleted_at IS NULL
+                """
+            ),
+            {"fid": file_id},
+        )
+    ).mappings().first()
+    if repetido is not None:
+        return _salida(repetido)
+
+    fila = (
+        await db.execute(
+            text(
+                """
+                INSERT INTO medical_documents (
+                    patient_id, file_id, category, title, added_by
+                ) VALUES (:pid, :fid, :cat, :titulo, :uid)
+                RETURNING id, title, category, file_id, created_at
+                """
+            ),
+            {"pid": ctx.patient_id, "fid": file_id, "cat": categoria,
+             "titulo": payload.title, "uid": ctx.user.user_id},
+        )
+    ).mappings().first()
+    await db.commit()
+
+    return _salida({**dict(fila), "full_name": ctx.user.full_name})

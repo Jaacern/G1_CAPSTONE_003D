@@ -19,8 +19,8 @@ class MarketplaceScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // El módulo de marketplace aún no existe en el backend: en modo real se
-    // muestra "Próximamente" en lugar de llamar endpoints inexistentes (404).
+    // El módulo ya existe en el backend; la bandera queda por si se mueve,
+    // para no llamar a un endpoint que de pronto deja de estar.
     if (!AppConfig.hasMarketplace) {
       return Scaffold(
         appBar: AppBar(title: const Text('Marketplace')),

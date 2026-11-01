@@ -34,6 +34,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET:-dev-secret-cambiar-en-produccion}
 
+      # Zona horaria de la operacion. Decide a que DIA pertenece cada
+      # instante guardado: "las dosis de hoy", "las tareas completadas
+      # hoy". Dejarla sin poner significaba calcular los dias en UTC.
+      TIMEZONE: ${TIMEZONE:-America/Santiago}
+
       # Almacenamiento de archivos subidos (fotos, documentos, notas de voz).
       # 'local' guarda en disco dentro del contenedor, en la ruta de abajo,
       # que está montada como volumen para que no se pierda al reiniciar.

@@ -12,6 +12,17 @@ class Settings(BaseSettings):
     postgres_host: str = "127.0.0.1"
     postgres_port: int = 5432
 
+    # --- Zona horaria de la operacion ---
+    # AgeCare opera en Chile. No es un detalle de presentacion: la base
+    # guarda timestamptz, que es un instante, y para saber a que DIA
+    # pertenece ese instante hay que decir en que pais. "Las dosis de hoy"
+    # y "las tareas completadas hoy" no significan nada sin esto.
+    #
+    # Queda como variable de entorno porque es lo unico que cambiaria si
+    # manana el servicio opera en otro pais, pero el valor por defecto es
+    # el real.
+    timezone: str = "America/Santiago"
+
     # --- Seguridad / JWT ---
     # OJO: en producción el secreto debe venir del entorno, nunca hardcodeado.
     jwt_secret: str = "dev-secret-cambiar-en-produccion"

@@ -23,11 +23,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import sys
 
 from sqlalchemy import text
 
+from app.config import get_settings
 from app.db import engine
 from app.storage import get_storage
 
@@ -38,12 +38,15 @@ from app.storage import get_storage
 # subida que iba bien.
 GRACIA_MINUTOS = 30
 
-# Zona horaria de la operacion. medication_times guarda "las 8 de la manana"
-# como hora local, no como instante, asi que para convertirla hace falta
-# saber de que pais se habla. Se deja en una variable de entorno porque es
-# lo unico de aca que cambiaria si manana el servicio opera en otro pais,
-# pero el valor por defecto es el real: AgeCare opera en Chile.
-ZONA = os.getenv("AGECARE_TIMEZONE", "America/Santiago")
+# Zona horaria de la operacion, la misma que fija la conexion en db.py.
+# Sale de ahi y no de un getenv propio: dos fuentes para el mismo dato es
+# como se termina con el proceso generando la dosis en un dia y la pantalla
+# buscandola en otro.
+#
+# Aca se escribe explicita en cada consulta igual, aunque la sesion ya la
+# traiga puesta. Un proceso que corre solo de madrugada no deberia depender
+# de un ajuste de conexion para que las dosis caigan en el dia correcto.
+ZONA = get_settings().timezone
 
 
 async def barrer_subidas_vencidas(*, verbose: bool = True) -> dict[str, int]:

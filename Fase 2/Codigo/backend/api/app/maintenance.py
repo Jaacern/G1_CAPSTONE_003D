@@ -6,6 +6,7 @@ Se corren desde afuera, no desde un request:
     python -m app.maintenance generar-dosis
     python -m app.maintenance marcar-vencidas
     python -m app.maintenance alertar-dosis
+    python -m app.maintenance alertar-vitales
 
 No se exponen como endpoints a proposito: no son acciones de un usuario,
 no tienen a quien responderle, y un endpoint de mantenimiento abierto es
@@ -398,11 +399,198 @@ async def alertar_dosis_omitidas(*, verbose: bool = True) -> dict[str, int]:
     return {"creadas": creadas, "en_espera": omitidas}
 
 
+def _numero(v) -> str:
+    """Formatea una medicion como la escribiria una persona.
+
+    En la base los valores son numeric, asi que 89 llega como 89.00 y
+    escribirlo tal cual en una alerta ("SpO2 89.00%") se lee a maquina.
+    Los decimales se conservan cuando existen de verdad: 90.5 importa.
+    """
+    f = float(v)
+    return str(int(f)) if f == int(f) else f"{f:g}"
+
+
+async def alertar_vitales_fuera_de_rango(*, verbose: bool = True) -> dict[str, int]:
+    """Crea la alerta cuando la ultima medicion se sale del umbral.
+
+    POR QUE HACE FALTA
+        Los umbrales existen, la familia los configura desde la aplicacion
+        y el semaforo los usa. Pero nadie avisaba: la pantalla pintaba el
+        valor en rojo si uno entraba a mirarla, y eso es al reves de para
+        que sirve un umbral. El sentido de poner un minimo de saturacion
+        es que alguien se entere sin tener que estar mirando.
+
+        El propio router lo dice donde recibe las mediciones del wearable:
+        "el motor de alertas es un componente aparte; aun no dispara nada
+        aqui". Esto es ese componente.
+
+    LA MISMA REGLA QUE LA PANTALLA
+        Fuera de rango es valor < minimo o valor > maximo, estricto: el
+        valor justo en el borde esta dentro. Es la regla de _in_range en
+        vitals.py, y tiene que ser la misma o la pantalla y la alerta se
+        contradicen delante de la familia.
+
+        Se mira solo la ultima medicion de cada tipo, no el historial. Un
+        valor de hace tres dias que ya se corrigio no es una alerta, es
+        historia.
+
+        Solo la medicion principal. La presion arterial guarda la diastolica
+        en value_secondary, pero vital_thresholds no tiene umbral para
+        ella, asi que no hay contra que compararla. La pantalla tampoco la
+        compara.
+
+    LO VIEJO NO ALERTA
+        Una medicion vieja no genera alerta: se usa wearable_offline_minutes
+        como limite, que es el punto en que el propio sistema ya considera
+        que del wearable no estan llegando datos. Sin ese corte, la primera
+        corrida en una base con historial abriria alertas por mediciones
+        de hace semanas.
+
+    Una alerta por medicion, igual que con las dosis: el reading_id va en
+    payload y se consulta ahi. Encima, alert_dedup_minutes por paciente y
+    condicion, para que una saturacion que oscila alrededor del minimo no
+    abra una alerta por cada lectura del reloj.
+    """
+    creadas = omitidas = 0
+
+    async with engine.begin() as conn:
+        ventana  = await _parametro(conn, "alert_dedup_minutes", 30)
+        vigencia = await _parametro(conn, "wearable_offline_minutes", 120)
+
+        fuera = (
+            await conn.execute(
+                text(
+                    """
+                    WITH ultimas AS (
+                        SELECT DISTINCT ON (vr.patient_id, vr.type)
+                               vr.id, vr.patient_id, vr.type, vr.value,
+                               vr.measured_at
+                        FROM vital_readings vr
+                        JOIN patients p ON p.id = vr.patient_id
+                        WHERE p.deleted_at IS NULL
+                          AND vr.measured_at > now()
+                              - make_interval(mins => CAST(:vigencia AS integer))
+                        ORDER BY vr.patient_id, vr.type, vr.measured_at DESC
+                    )
+                    SELECT u.id, u.patient_id, u.type, u.value, u.measured_at,
+                           t.min_value, t.max_value,
+                           coalesce(vt.label, u.type) AS etiqueta,
+                           coalesce(vt.unit, '')      AS unidad
+                    FROM ultimas u
+                    JOIN vital_thresholds t
+                      ON t.patient_id = u.patient_id AND t.type = u.type
+                     AND t.deleted_at IS NULL
+                    LEFT JOIN vital_types vt ON vt.code = u.type
+                    WHERE (t.min_value IS NOT NULL AND u.value < t.min_value)
+                       OR (t.max_value IS NOT NULL AND u.value > t.max_value)
+                    ORDER BY u.measured_at
+                    """
+                ),
+                {"vigencia": vigencia},
+            )
+        ).mappings().all()
+
+        for m in fuera:
+            bajo = (m["min_value"] is not None
+                    and m["value"] < m["min_value"])
+            # La clave sale del codigo del catalogo y no de una lista de
+            # abreviaturas a mano, que es de las cosas que se desactualizan
+            # calladas. Su unico trabajo es agrupar "la misma condicion"
+            # para la ventana de deduplicacion.
+            clave = f"{m['type']}_{'low' if bajo else 'high'}"
+
+            reciente = (
+                await conn.execute(
+                    text(
+                        """
+                        SELECT 1 FROM alerts
+                         WHERE patient_id = :pid
+                           AND dedup_key = :clave
+                           AND created_at > now()
+                               - make_interval(mins => CAST(:ventana AS integer))
+                         LIMIT 1
+                        """
+                    ),
+                    {"pid": str(m["patient_id"]), "clave": clave,
+                     "ventana": ventana},
+                )
+            ).first()
+            if reciente is not None:
+                omitidas += 1
+                continue
+
+            ya = (
+                await conn.execute(
+                    text(
+                        """
+                        SELECT 1 FROM alerts
+                         WHERE type = 'vital_out_of_range'
+                           AND payload ->> 'reading_id' = CAST(:rid AS text)
+                         LIMIT 1
+                        """
+                    ),
+                    {"rid": str(m["id"])},
+                )
+            ).first()
+            if ya is not None:
+                continue
+
+            unidad = (" " + m["unidad"]) if m["unidad"] else ""
+            limite = m["min_value"] if bajo else m["max_value"]
+            # Este texto lo lee la familia, asi que va con sus tildes.
+            titulo = (f"{m['etiqueta']} bajo el mínimo" if bajo
+                      else f"{m['etiqueta']} sobre el máximo")
+            detalle = (
+                f"{m['etiqueta']} {_numero(m['value'])}{unidad} "
+                f"({'mínimo' if bajo else 'máximo'} configurado "
+                f"{_numero(limite)}{unidad})."
+            )
+
+            await conn.execute(
+                text(
+                    """
+                    INSERT INTO alerts
+                        (patient_id, type, severity, title, detail,
+                         payload, dedup_key, status)
+                    VALUES
+                        (:pid, 'vital_out_of_range', 'warning',
+                         :titulo, :detalle,
+                         CAST(:payload AS jsonb), :clave, 'active')
+                    """
+                ),
+                {
+                    "pid": str(m["patient_id"]),
+                    # title es varchar(120): una etiqueta larga del catalogo
+                    # no puede reventar el INSERT.
+                    "titulo": titulo[:120],
+                    "detalle": detalle,
+                    "clave": clave,
+                    "payload": json.dumps({
+                        "reading_id": str(m["id"]),
+                        "type": m["type"],
+                        "value": float(m["value"]),
+                        "min_value": (float(m["min_value"])
+                                      if m["min_value"] is not None else None),
+                        "max_value": (float(m["max_value"])
+                                      if m["max_value"] is not None else None),
+                        "measured_at": m["measured_at"].isoformat(),
+                    }),
+                },
+            )
+            creadas += 1
+
+    if verbose:
+        print(f"alertas de vitales creadas : {creadas}")
+        print(f"en espera por la ventana   : {omitidas}")
+    return {"creadas": creadas, "en_espera": omitidas}
+
+
 async def _main(argv: list[str]) -> int:
     tareas = {"barrer-subidas": barrer_subidas_vencidas,
               "generar-dosis": generar_dosis,
               "marcar-vencidas": marcar_dosis_vencidas,
-              "alertar-dosis": alertar_dosis_omitidas}
+              "alertar-dosis": alertar_dosis_omitidas,
+              "alertar-vitales": alertar_vitales_fuera_de_rango}
     if len(argv) != 1 or argv[0] not in tareas:
         print(f"uso: python -m app.maintenance <{' | '.join(tareas)}>")
         return 2

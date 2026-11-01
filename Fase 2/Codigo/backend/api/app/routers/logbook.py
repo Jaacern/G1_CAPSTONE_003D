@@ -15,7 +15,7 @@ cerrada. La traduccion ocurre aca: el CHECK del motor es lo que mantiene la
 columna analizable, y la pantalla no tiene por que saber de codigos.
 """
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
@@ -26,6 +26,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.deps import PatientContext, get_patient_member
 from app.errors import ApiError
+# ahora() entra con nombre propio: 'ahora' ya se usa como variable.
+from app.fechas import ahora as ahora_local
+from app.fechas import zona
 
 router = APIRouter(prefix="/api/v1", tags=["logbook"])
 
@@ -406,8 +409,14 @@ def _turno_de(momento: datetime) -> str:
 
     Los cortes son los habituales del cuidado domiciliario, 7 a 15, 15 a 23
     y el resto noche.
+
+    La hora es la del reloj de la pared de la casa, no la UTC. Esos cortes
+    estan escritos en hora chilena, y Chile va tres horas detras: leida en
+    UTC, una nota escrita a la una de la tarde caia en el turno de tarde
+    cuando todavia era la manana, y una de las cinco de la madrugada caia
+    en el de manana. El turno salia corrido para todos.
     """
-    hora = momento.astimezone(timezone.utc).hour
+    hora = momento.astimezone(zona()).hour
     if 7 <= hora < 15:
         return "morning"
     if 15 <= hora < 23:
@@ -491,7 +500,7 @@ async def create_handover_note(
     convenga rechazar: la cuidadora esta corrigiendo o agregando a lo que ya
     escribio. Se reemplaza el texto de esa nota.
     """
-    ahora = datetime.now(timezone.utc)
+    ahora = ahora_local()
     turno = _turno_de(ahora)
 
     if payload.to_user_id is not None:
@@ -526,7 +535,12 @@ async def create_handover_note(
                 INSERT INTO shift_notes (
                     patient_id, author_id, shift_date, shift, note, handover_to
                 ) VALUES (
-                    :pid, :uid, (now() AT TIME ZONE 'UTC')::date, :turno,
+                    -- El dia del turno sale de la zona de la conexion
+                    -- (db.py). Antes decia AT TIME ZONE 'UTC': un relevo
+                    -- entregado a las 21:30 en Chile se anotaba con la
+                    -- fecha de manana, y el ON CONFLICT de abajo
+                    -- actualizaba el turno del dia equivocado.
+                    :pid, :uid, current_date, :turno,
                     :nota, :destino
                 )
                 ON CONFLICT (patient_id, shift_date, shift) DO UPDATE

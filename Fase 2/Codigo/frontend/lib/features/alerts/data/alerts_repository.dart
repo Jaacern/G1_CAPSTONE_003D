@@ -4,10 +4,44 @@ import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
 import '../domain/models.dart';
 
+/// Una página de alertas tal como la devuelve 9.1: los ítems de esa página,
+/// cuántas alertas hay en total y cuántas siguen activas.
+class AlertsPage {
+  const AlertsPage({
+    required this.items,
+    required this.total,
+    required this.unreadCount,
+    required this.page,
+    required this.pageSize,
+  });
+
+  final List<Alert> items;
+
+  /// Alertas que cumplen el filtro, en todas las páginas.
+  final int total;
+
+  /// Alertas activas del usuario (el backend las cuenta aparte del filtro).
+  final int unreadCount;
+
+  final int page;
+  final int pageSize;
+
+  bool get hasMore => page * pageSize < total;
+
+  static const vacio =
+      AlertsPage(items: [], total: 0, unreadCount: 0, page: 1, pageSize: 20);
+}
+
 abstract class AlertsRepository {
   /// Lista las alertas del usuario. Si [activeOnly] es true solo devuelve las
-  /// activas; [patientId] filtra por paciente.
-  Future<List<Alert>> listAlerts({String? patientId, bool activeOnly = false});
+  /// activas; [patientId] filtra por paciente. El backend devuelve 20 alertas
+  /// por página, así que se pide de a una y [AlertsPage.hasMore] dice si falta.
+  Future<AlertsPage> listAlerts({
+    String? patientId,
+    bool activeOnly = false,
+    int page = 1,
+    int pageSize = 20,
+  });
 
   /// Marca una alerta como reconocida (acknowledged).
   Future<void> acknowledge(String alertId);
@@ -28,18 +62,30 @@ class AlertsRepositoryHttp implements AlertsRepository {
   final ApiClient _api;
 
   @override
-  Future<List<Alert>> listAlerts(
-      {String? patientId, bool activeOnly = false}) async {
+  Future<AlertsPage> listAlerts(
+      {String? patientId,
+      bool activeOnly = false,
+      int page = 1,
+      int pageSize = 20}) async {
     final data = await _api.get<Map<String, dynamic>>(
       '/users/me/alerts',
       query: {
         'status': activeOnly ? 'active' : 'all',
+        'page': page,
+        'page_size': pageSize,
         if (patientId != null) 'patient_id': patientId,
       },
     );
-    return ((data['items'] ?? data['alerts'] ?? []) as List)
+    final items = ((data['items'] ?? []) as List)
         .map((e) => Alert.fromJson(e as Map<String, dynamic>))
         .toList();
+    return AlertsPage(
+      items: items,
+      total: (data['total'] as num?)?.toInt() ?? items.length,
+      unreadCount: (data['unread_count'] as num?)?.toInt() ?? 0,
+      page: page,
+      pageSize: pageSize,
+    );
   }
 
   @override
@@ -138,15 +184,30 @@ class AlertsRepositoryMock implements AlertsRepository {
   late final List<Alert> _alerts;
 
   @override
-  Future<List<Alert>> listAlerts(
-      {String? patientId, bool activeOnly = false}) async {
+  Future<AlertsPage> listAlerts(
+      {String? patientId,
+      bool activeOnly = false,
+      int page = 1,
+      int pageSize = 20}) async {
     await Future.delayed(const Duration(milliseconds: 350));
-    return _alerts.where((a) {
+    final filtradas = _alerts.where((a) {
       if (patientId != null && a.patientId != patientId) return false;
       if (activeOnly && !a.isActive) return false;
       return true;
     }).toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    // El demo también pagina, para que 'Cargar más' se vea igual que con el
+    // backend conectado.
+    final desde = ((page - 1) * pageSize).clamp(0, filtradas.length);
+    final hasta = (desde + pageSize).clamp(0, filtradas.length);
+    return AlertsPage(
+      items: filtradas.sublist(desde, hasta),
+      total: filtradas.length,
+      unreadCount: filtradas.where((a) => a.isActive).length,
+      page: page,
+      pageSize: pageSize,
+    );
   }
 
   @override

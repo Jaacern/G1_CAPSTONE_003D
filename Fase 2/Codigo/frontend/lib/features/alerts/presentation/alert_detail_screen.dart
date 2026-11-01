@@ -11,16 +11,6 @@ import '../application/alerts_providers.dart';
 import '../data/alerts_repository.dart';
 import '../domain/models.dart';
 
-/// Carga una alerta puntual buscándola en la lista del usuario.
-final _alertByIdProvider =
-    FutureProvider.autoDispose.family<Alert?, String>((ref, alertId) async {
-  final list = await ref.watch(alertsRepositoryProvider).listAlerts();
-  for (final a in list) {
-    if (a.id == alertId) return a;
-  }
-  return null;
-});
-
 class AlertDetailScreen extends ConsumerStatefulWidget {
   const AlertDetailScreen({super.key, required this.alertId});
 
@@ -37,8 +27,8 @@ class _AlertDetailScreenState extends ConsumerState<AlertDetailScreen> {
     setState(() => _busy = true);
     try {
       await action();
-      ref.invalidate(activeAlertsProvider);
-      ref.invalidate(_alertByIdProvider(widget.alertId));
+      ref.invalidate(alertsControllerProvider);
+      ref.invalidate(alertByIdProvider(widget.alertId));
       if (!mounted) return;
       showAppSnackBar(context, okMessage);
       if (context.canPop()) context.pop();
@@ -56,7 +46,7 @@ class _AlertDetailScreenState extends ConsumerState<AlertDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final async = ref.watch(_alertByIdProvider(widget.alertId));
+    final async = ref.watch(alertByIdProvider(widget.alertId));
 
     return Scaffold(
       appBar: AppBar(title: const Text('Detalle de alerta')),
@@ -65,7 +55,7 @@ class _AlertDetailScreenState extends ConsumerState<AlertDetailScreen> {
         error: (e, _) => ErrorView(
           message:
               e is ApiException ? e.message : 'No pudimos cargar la alerta.',
-          onRetry: () => ref.invalidate(_alertByIdProvider(widget.alertId)),
+          onRetry: () => ref.invalidate(alertByIdProvider(widget.alertId)),
         ),
         data: (alert) {
           if (alert == null) {

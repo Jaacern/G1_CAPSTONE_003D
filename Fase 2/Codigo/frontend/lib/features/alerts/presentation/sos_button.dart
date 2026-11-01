@@ -72,7 +72,7 @@ class _SosButtonState extends ConsumerState<SosButton> {
             lat: pos?.latitude,
             lng: pos?.longitude,
           );
-      ref.invalidate(activeAlertsProvider);
+      ref.invalidate(alertsControllerProvider);
       if (!mounted) return;
       showAppSnackBar(
         context,

@@ -15,23 +15,23 @@ class AlertsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final alertsAsync = ref.watch(activeAlertsProvider);
+    final alertsAsync = ref.watch(alertsControllerProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Centro de alertas')),
       body: RefreshIndicator(
-        onRefresh: () async => ref.invalidate(activeAlertsProvider),
+        onRefresh: () => ref.read(alertsControllerProvider.notifier).recargar(),
         child: alertsAsync.when(
           loading: () => const LoadingView(),
           error: (e, _) => ErrorView(
             message: e is ApiException
                 ? e.message
                 : 'No pudimos cargar las alertas.',
-            onRetry: () => ref.invalidate(activeAlertsProvider),
+            onRetry: () =>
+                ref.read(alertsControllerProvider.notifier).recargar(),
           ),
-          data: (alerts) {
-            final active = alerts.where((a) => a.isActive).toList();
-            if (active.isEmpty) {
+          data: (state) {
+            if (state.items.isEmpty) {
               return ListView(
                 children: const [
                   SizedBox(height: 80),
@@ -46,7 +46,7 @@ class AlertsScreen extends ConsumerWidget {
             }
 
             final groups = <AlertSeverity, List<Alert>>{};
-            for (final a in active) {
+            for (final a in state.items) {
               groups.putIfAbsent(a.severity, () => []).add(a);
             }
             const order = [
@@ -68,11 +68,47 @@ class AlertsScreen extends ConsumerWidget {
                         )),
                     const SizedBox(height: 8),
                   ],
+                if (state.hasMore)
+                  _CargarMas(
+                    cargando: state.cargandoMas,
+                    restante: state.total - state.items.length,
+                    onPressed: () =>
+                        ref.read(alertsControllerProvider.notifier).cargarMas(),
+                  ),
               ],
             );
           },
         ),
       ),
+    );
+  }
+}
+
+/// Botón que trae la página siguiente de alertas. Sin él, el centro mostraba
+/// como mucho las 20 primeras y el resto quedaba inaccesible.
+class _CargarMas extends StatelessWidget {
+  const _CargarMas(
+      {required this.cargando,
+      required this.restante,
+      required this.onPressed});
+
+  final bool cargando;
+  final int restante;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: cargando ? null : onPressed,
+      icon: cargando
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.expand_more_rounded, size: 18),
+      label: Text(cargando
+          ? 'Cargando...'
+          : 'Cargar $restante alerta${restante == 1 ? '' : 's'} más'),
     );
   }
 }
@@ -127,7 +163,7 @@ class _AlertCardState extends ConsumerState<_AlertCard> {
     setState(() => _busy = true);
     try {
       await action();
-      ref.invalidate(activeAlertsProvider);
+      ref.invalidate(alertsControllerProvider);
       if (mounted) showAppSnackBar(context, okMessage);
     } on ApiException catch (e) {
       if (mounted) showAppSnackBar(context, e.message, error: true);

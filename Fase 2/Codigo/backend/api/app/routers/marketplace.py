@@ -23,6 +23,11 @@ from app.errors import ApiError
 
 router = APIRouter(prefix="/api/v1/marketplace", tags=["marketplace"])
 
+# Las ofertas de trabajo cuelgan de /jobs y no de /marketplace/jobs, que es
+# como las pide la aplicacion. Van en un router aparte para no inventarles
+# una ruta que el front no consulta.
+jobs_router = APIRouter(prefix="/api/v1", tags=["marketplace"])
+
 _NO_EXISTE = ApiError(
     status_code=404, code="NOT_FOUND",
     message="El recurso solicitado no existe o no esta disponible.",
@@ -565,3 +570,86 @@ async def get_product(
         raise _NO_EXISTE
 
     return _producto(f)
+
+
+# ---------------------------------------------------------------------------
+# Ofertas de trabajo
+# ---------------------------------------------------------------------------
+class JobOut(BaseModel):
+    id:          UUID
+    title:       str
+    zone:        str
+    pay:         str
+    description: str
+
+
+class JobsOut(BaseModel):
+    items: list[JobOut]
+
+
+_PERIODO = {
+    "hour":  "por hora",
+    "day":   "por dia",
+    "shift": "por turno",
+    "month": "mensual",
+}
+
+
+def _plata(monto) -> str:
+    """Formato chileno: separador de miles con punto y sin decimales."""
+    return f"${int(monto):,}".replace(",", ".")
+
+
+def _pago(f) -> str:
+    """El texto de pago que la pantalla muestra.
+
+    Se arma aca y no en la pantalla porque depende de tres columnas y de
+    si el rango esta completo. Si no hay monto, se dice que se conversa,
+    que es lo que pasa de verdad, en vez de mostrar un cero.
+    """
+    periodo = _PERIODO.get(f["pay_period"], f["pay_period"])
+    minimo, maximo = f["pay_min"], f["pay_max"]
+    if minimo is None and maximo is None:
+        return "A convenir"
+    if minimo is not None and maximo is not None and minimo != maximo:
+        return f"{_plata(minimo)} a {_plata(maximo)} {periodo}"
+    return f"Desde {_plata(minimo)} {periodo}" if maximo is None \
+        else f"{_plata(maximo)} {periodo}"
+
+
+@jobs_router.get("/jobs", response_model=JobsOut)
+async def list_jobs(
+    zone: str | None = Query(default=None, max_length=8),
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Ofertas de trabajo abiertas, lo mas nuevo primero."""
+    filas = (
+        await db.execute(
+            text(
+                """
+                SELECT id, title, description, commune_code,
+                       pay_min, pay_max, pay_period
+                FROM job_offers
+                WHERE status = 'published'
+                  AND deleted_at IS NULL
+                  AND (CAST(:zona AS text) IS NULL
+                       OR commune_code = CAST(:zona AS text))
+                ORDER BY published_at DESC
+                LIMIT 100
+                """
+            ),
+            {"zona": zone},
+        )
+    ).mappings().all()
+
+    return JobsOut(items=[
+        JobOut(
+            id=f["id"],
+            title=f["title"],
+            zone=f["commune_code"],
+            pay=_pago(f),
+            description=f["description"],
+        )
+        for f in filas
+    ])

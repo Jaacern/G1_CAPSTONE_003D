@@ -208,7 +208,17 @@ async def _get_unit(db: AsyncSession, vital_type: str) -> str:
 
 
 async def _load_thresholds_map(db: AsyncSession, patient_id: str) -> dict[str, dict]:
-    """Umbrales del paciente indexados por tipo."""
+    """Umbrales vigentes del paciente, indexados por tipo.
+
+    Se descartan los que tienen deleted_at. Faltaba ese filtro, y sin el un
+    umbral dado de baja seguia pintando el valor en rojo: el borrado suave
+    existe para dejar de aplicar la regla sin perder el registro de que
+    alguna vez estuvo. Hoy ninguna ruta escribe esa columna, asi que no
+    cambia nada todavia; el dia que se agregue dar de baja un umbral, esto
+    ya esta de este lado. El proceso que crea las alertas por medicion
+    fuera de rango tambien lo filtra, y los dos tienen que coincidir o la
+    pantalla y la alerta se contradicen.
+    """
     rows = (
         await db.execute(
             text(
@@ -216,6 +226,7 @@ async def _load_thresholds_map(db: AsyncSession, patient_id: str) -> dict[str, d
                 SELECT type, min_value, max_value, updated_by, updated_at
                 FROM vital_thresholds
                 WHERE patient_id = :pid
+                  AND deleted_at IS NULL
                 """
             ),
             {"pid": patient_id},
@@ -632,6 +643,7 @@ async def list_thresholds(
                 SELECT type, min_value, max_value, updated_by, updated_at
                 FROM vital_thresholds
                 WHERE patient_id = :pid
+                  AND deleted_at IS NULL
                 ORDER BY type
                 """
             ),
@@ -689,7 +701,15 @@ async def set_threshold(
                 INSERT INTO vital_thresholds
                     (patient_id, type, min_value, max_value, updated_by)
                 VALUES (:pid, :type, :min_value, :max_value, :uid)
-                ON CONFLICT (patient_id, type) DO UPDATE
+                -- El WHERE va aqui porque el indice unico de la tabla es
+                -- PARCIAL: uq_vital_thresholds_patient_type solo cubre las
+                -- filas con deleted_at IS NULL. Un ON CONFLICT sin repetir
+                -- esa condicion no infiere ningun indice, y Postgres
+                -- rechaza la sentencia SIEMPRE, no solo cuando hay
+                -- conflicto. Sin esto el endpoint devolvia 500 en cada
+                -- llamada y la familia no podia guardar ningun umbral.
+                ON CONFLICT (patient_id, type) WHERE deleted_at IS NULL
+                DO UPDATE
                     SET min_value = EXCLUDED.min_value,
                         max_value = EXCLUDED.max_value,
                         updated_by = EXCLUDED.updated_by,

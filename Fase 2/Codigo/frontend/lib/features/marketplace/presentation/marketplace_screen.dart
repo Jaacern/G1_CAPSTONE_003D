@@ -79,13 +79,14 @@ class _CaregiversTab extends ConsumerStatefulWidget {
 }
 
 class _CaregiversTabState extends ConsumerState<_CaregiversTab> {
-  final _zoneCtrl = TextEditingController();
+  // El backend filtra por código territorial (zone=08101); escribir el nombre
+  // de la comuna nunca coincidía con nada.
+  String? _zone;
   final _specialtyCtrl = TextEditingController();
   CaregiverFilters _filters = const CaregiverFilters();
 
   @override
   void dispose() {
-    _zoneCtrl.dispose();
     _specialtyCtrl.dispose();
     super.dispose();
   }
@@ -93,7 +94,7 @@ class _CaregiversTabState extends ConsumerState<_CaregiversTab> {
   void _apply() {
     setState(() {
       _filters = CaregiverFilters(
-        zone: _zoneCtrl.text.trim().isEmpty ? null : _zoneCtrl.text.trim(),
+        zone: _zone,
         specialty: _specialtyCtrl.text.trim().isEmpty
             ? null
             : _specialtyCtrl.text.trim(),
@@ -109,25 +110,37 @@ class _CaregiversTabState extends ConsumerState<_CaregiversTab> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
-                child: TextField(
-                  controller: _zoneCtrl,
-                  onSubmitted: (_) => _apply(),
+                child: DropdownButtonFormField<String>(
+                  initialValue: _zone,
+                  isExpanded: true,
                   decoration: const InputDecoration(
-                    labelText: 'Zona',
+                    labelText: 'Comuna',
                     prefixIcon: Icon(Icons.location_on_outlined),
                   ),
+                  hint: const Text('Todas las comunas'),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      child: Text('Todas las comunas'),
+                    ),
+                    for (final (codigo, nombre) in comunasConocidas)
+                      DropdownMenuItem(value: codigo, child: Text(nombre)),
+                  ],
+                  onChanged: (codigo) => setState(() => _zone = codigo),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: TextField(
                   controller: _specialtyCtrl,
+                  maxLength: 40,
                   onSubmitted: (_) => _apply(),
                   decoration: const InputDecoration(
                     labelText: 'Especialidad',
                     prefixIcon: Icon(Icons.medical_services_outlined),
+                    counterText: '',
                   ),
                 ),
               ),

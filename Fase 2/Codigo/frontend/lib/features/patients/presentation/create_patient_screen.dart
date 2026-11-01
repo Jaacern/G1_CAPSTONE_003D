@@ -52,7 +52,7 @@ class _CreatePatientScreenState extends ConsumerState<CreatePatientScreen> {
             NewPatient(
               fullName: _name.text.trim(),
               birthDate: _birthDate!,
-              sex: _sex,
+              sex: _sex!,
               conditions: _conditions.text
                   .split(',')
                   .map((c) => c.trim())
@@ -117,14 +117,17 @@ class _CreatePatientScreenState extends ConsumerState<CreatePatientScreen> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: _sex,
+                  initialValue: _sex,
                   decoration: const InputDecoration(
-                      labelText: 'Sexo (opcional)', prefixIcon: Icon(Icons.wc_outlined)),
+                      labelText: 'Sexo', prefixIcon: Icon(Icons.wc_outlined)),
                   items: const [
                     DropdownMenuItem(value: 'female', child: Text('Mujer')),
                     DropdownMenuItem(value: 'male', child: Text('Hombre')),
                     DropdownMenuItem(value: 'other', child: Text('Otro')),
                   ],
+                  // La columna patients.sex es NOT NULL con CHECK ('M','F','O')
+                  // y el alta la pide siempre: sin sexo el backend contesta 422.
+                  validator: (v) => v == null ? 'Selecciona el sexo' : null,
                   onChanged: (v) => setState(() => _sex = v),
                 ),
                 const SizedBox(height: 16),

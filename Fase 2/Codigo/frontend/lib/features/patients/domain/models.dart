@@ -110,13 +110,16 @@ class NewPatient {
   const NewPatient({
     required this.fullName,
     required this.birthDate,
-    this.sex,
+    required this.sex,
     this.conditions = const [],
   });
 
   final String fullName;
   final DateTime birthDate;
-  final String? sex;
+
+  /// `female`, `male` u `other`. No es opcional: `patients.sex` es NOT NULL y
+  /// `POST /patients` responde 422 si falta.
+  final String sex;
   final List<String> conditions;
 
   /// Divide el nombre completo en (first_name, last_name) para el backend.
@@ -137,7 +140,7 @@ class NewPatient {
       'last_name': lastName,
       'birth_date':
           '${birthDate.year.toString().padLeft(4, '0')}-${birthDate.month.toString().padLeft(2, '0')}-${birthDate.day.toString().padLeft(2, '0')}',
-      if (sex != null) 'sex': sex,
+      'sex': sex,
       if (conditions.isNotEmpty) 'conditions': conditions,
     };
   }

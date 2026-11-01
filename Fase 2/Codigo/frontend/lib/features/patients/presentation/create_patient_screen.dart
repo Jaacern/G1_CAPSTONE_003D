@@ -23,10 +23,16 @@ class _CreatePatientScreenState extends ConsumerState<CreatePatientScreen> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _conditions = TextEditingController();
-  final _notes = TextEditingController();
   DateTime? _birthDate;
   String? _sex;
   bool _loading = false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _conditions.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickBirthDate() async {
     final now = DateTime.now();
@@ -138,13 +144,6 @@ class _CreatePatientScreenState extends ConsumerState<CreatePatientScreen> {
                     prefixIcon: Icon(Icons.medical_information_outlined),
                     helperText: 'Ej. hipertensión, diabetes',
                   ),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _notes,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                      labelText: 'Notas generales (opcional)', alignLabelWithHint: true),
                 ),
                 const SizedBox(height: 28),
                 FilledButton(

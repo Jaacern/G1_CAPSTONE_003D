@@ -327,3 +327,69 @@ async def get_plan(
 ):
     """Plan vigente del usuario, con lo que incluye y sus topes."""
     return await _plan_del_usuario(db, user.user_id)
+
+
+@router.post("/plan/upgrade", response_model=PlanOut)
+async def upgrade_plan(
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pasa la cuenta al plan premium.
+
+    No hay cobro todavia. Cuando Alloxentric conecte la pasarela, el pago
+    ocurre antes de llamar aca y este endpoint pasa a recibir la referencia
+    del proveedor, que es para lo que existe subscriptions.provider_ref. Se
+    deja el periodo en un mes, que es lo que dura el ciclo en plan_prices.
+
+    No se borra ni se reemplaza la suscripcion anterior: billing_events
+    apunta a ella y el historial de cobros no se pisa. Se reusa la fila del
+    usuario si ya existe, cambiandole el plan.
+    """
+    premium = (
+        await db.execute(text("SELECT id FROM plans WHERE code = 'premium'"))
+    ).scalar()
+    if premium is None:
+        raise ApiError(
+            status_code=500, code="PLAN_NOT_CONFIGURED",
+            message="El plan premium no esta configurado.",
+        )
+
+    actual = (
+        await db.execute(
+            text("SELECT id FROM subscriptions WHERE user_id = :uid "
+                 "ORDER BY started_at DESC LIMIT 1"),
+            {"uid": user.user_id},
+        )
+    ).scalar()
+
+    if actual is None:
+        await db.execute(
+            text(
+                """
+                INSERT INTO subscriptions (
+                    user_id, plan_id, status, started_at, current_period_end
+                ) VALUES (
+                    :uid, :pid, 'active', now(), now() + interval '1 month'
+                )
+                """
+            ),
+            {"uid": user.user_id, "pid": str(premium)},
+        )
+    else:
+        await db.execute(
+            text(
+                """
+                UPDATE subscriptions
+                   SET plan_id = :pid,
+                       status = 'active',
+                       cancelled_at = NULL,
+                       current_period_end = now() + interval '1 month',
+                       updated_at = now()
+                 WHERE id = :sid
+                """
+            ),
+            {"pid": str(premium), "sid": str(actual)},
+        )
+
+    await db.commit()
+    return await _plan_del_usuario(db, user.user_id)

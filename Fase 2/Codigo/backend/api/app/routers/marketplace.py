@@ -126,3 +126,114 @@ async def list_caregivers(
         )
         for f in filas
     ])
+
+
+class ReviewOut(BaseModel):
+    author_name: str
+    rating:      int
+    comment:     str
+    created_at:  datetime
+
+
+class CaregiverDetail(CaregiverSummary):
+    bio:              str
+    years_experience: int
+    languages:        list[str]
+    certifications:   list[str]
+    reviews:          list[ReviewOut]
+
+
+@router.get("/caregivers/{profile_id}", response_model=CaregiverDetail)
+async def get_caregiver(
+    profile_id: UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Ficha completa de una cuidadora, con sus resenas."""
+    f = (
+        await db.execute(
+            text(
+                """
+                SELECT cp.id, cp.headline, cp.bio, cp.years_experience,
+                       cp.rating_avg, cp.rating_count, cp.hourly_rate,
+                       u.full_name, u.avatar_url
+                FROM caregiver_profiles cp
+                JOIN users u ON u.id = cp.user_id
+                WHERE cp.id = :pid
+                  AND cp.status = 'published'
+                  AND cp.suspended_at IS NULL
+                  AND cp.deleted_at IS NULL
+                  AND u.is_active
+                  AND u.deleted_at IS NULL
+                """
+            ),
+            {"pid": str(profile_id)},
+        )
+    ).mappings().first()
+
+    if f is None:
+        raise _NO_EXISTE
+
+    pid = str(f["id"])
+
+    async def _lista(consulta: str) -> list[str]:
+        return list(
+            (await db.execute(text(consulta), {"pid": pid})).scalars().all()
+        )
+
+    zonas = await _lista(
+        "SELECT commune_code FROM caregiver_zones "
+        "WHERE profile_id = :pid ORDER BY commune_code")
+    especialidades = await _lista(
+        "SELECT s.label FROM caregiver_specialties cs "
+        "JOIN specialties s ON s.code = cs.specialty_code "
+        "WHERE cs.profile_id = :pid ORDER BY s.label")
+    idiomas = await _lista(
+        "SELECT language_code FROM caregiver_languages "
+        "WHERE profile_id = :pid ORDER BY language_code")
+
+    # Solo las certificaciones verificadas. En la ficha publica son una
+    # credencial, y mostrar como tal un titulo que nadie reviso seria
+    # exactamente lo que la familia no puede permitirse creer.
+    certificaciones = await _lista(
+        "SELECT name FROM caregiver_certifications "
+        "WHERE profile_id = :pid AND deleted_at IS NULL "
+        "AND verified_at IS NOT NULL "
+        "ORDER BY issued_at DESC NULLS LAST, name")
+
+    resenas = (
+        await db.execute(
+            text(
+                """
+                SELECT u.full_name, r.rating, r.comment, r.created_at
+                FROM caregiver_reviews r
+                JOIN users u ON u.id = r.author_id
+                WHERE r.profile_id = :pid AND r.deleted_at IS NULL
+                ORDER BY r.created_at DESC
+                LIMIT 50
+                """
+            ),
+            {"pid": pid},
+        )
+    ).mappings().all()
+
+    return CaregiverDetail(
+        profile_id=f["id"],
+        name=f["full_name"],
+        photo_url=f["avatar_url"],
+        headline=f["headline"],
+        rating=float(f["rating_avg"] or 0),
+        reviews_count=f["rating_count"],
+        zones=zonas,
+        specialties=especialidades,
+        price_per_hour=float(f["hourly_rate"]) if f["hourly_rate"] is not None else None,
+        bio=f["bio"] or "",
+        years_experience=f["years_experience"],
+        languages=idiomas,
+        certifications=certificaciones,
+        reviews=[
+            ReviewOut(author_name=r["full_name"], rating=r["rating"],
+                      comment=r["comment"] or "", created_at=r["created_at"])
+            for r in resenas
+        ],
+    )

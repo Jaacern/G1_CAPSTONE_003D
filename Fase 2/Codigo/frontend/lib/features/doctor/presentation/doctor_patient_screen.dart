@@ -9,6 +9,7 @@ import '../../caregiver/domain/models.dart';
 import '../../health/application/health_providers.dart';
 import '../../health/domain/models.dart' as health;
 import '../../medications/application/medications_providers.dart';
+import '../../medications/data/medications_repository.dart';
 import '../../medications/domain/models.dart';
 import '../../patients/application/patients_providers.dart';
 
@@ -127,7 +128,10 @@ class DoctorPatientScreen extends ConsumerWidget {
                     for (var i = 0; i < active.length; i++) ...[
                       if (i != 0) const Divider(height: 1),
                       _MedicationTile(
-                          medication: active[i], patientId: patientId),
+                          medication: active[i],
+                          patientId: patientId,
+                          onDiscontinue: () => _discontinuarReceta(
+                              context, ref, patientId, active[i])),
                     ],
                   ],
                 ),
@@ -260,11 +264,33 @@ class _VitalTile extends StatelessWidget {
   }
 }
 
+/// Saca una medicación del plan del paciente. El backend responde 204 y deja
+/// la receta con discontinued_at, conservando las dosis ya registradas.
+Future<void> _discontinuarReceta(BuildContext context, WidgetRef ref,
+    String patientId, Medication medication) async {
+  try {
+    await ref
+        .read(medicationsRepositoryProvider)
+        .deleteMedication(patientId, medication.id);
+    ref.invalidate(medicationsProvider);
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo discontinuar la receta.')),
+      );
+    }
+  }
+}
+
 class _MedicationTile extends StatelessWidget {
-  const _MedicationTile({required this.medication, required this.patientId});
+  const _MedicationTile(
+      {required this.medication,
+      required this.patientId,
+      required this.onDiscontinue});
 
   final Medication medication;
   final String patientId;
+  final VoidCallback onDiscontinue;
 
   @override
   Widget build(BuildContext context) {
@@ -277,12 +303,23 @@ class _MedicationTile extends StatelessWidget {
         style: const TextStyle(
             fontSize: 12, color: AppColors.textSecondary),
       ),
-      trailing: IconButton(
-        tooltip: 'Editar receta',
-        icon: const Icon(Icons.edit_outlined,
-            color: AppColors.textSecondary),
-        onPressed: () => context.push(
-            '/meds/plan?patient=$patientId&medication=${medication.id}'),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: 'Editar receta',
+            icon: const Icon(Icons.edit_outlined,
+                color: AppColors.textSecondary),
+            onPressed: () => context.push(
+                '/meds/plan?patient=$patientId&medication=${medication.id}'),
+          ),
+          IconButton(
+            tooltip: 'Discontinuar receta',
+            icon: const Icon(Icons.delete_outline_rounded,
+                color: AppColors.critical),
+            onPressed: onDiscontinue,
+          ),
+        ],
       ),
     );
   }

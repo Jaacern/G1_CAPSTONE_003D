@@ -186,7 +186,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                             ],
                           ),
-                          if (AppConfig.useMocks) const _DemoBadge(),
+                          if (AppConfig.useMocks)
+                            _DemoBadge(
+                                onSelect: (correo) => _email.text = correo),
                         ],
                       ),
                     ),
@@ -276,40 +278,71 @@ class _FormPanel extends StatelessWidget {
 }
 
 /// Aviso de que la app corre con datos simulados.
+/// Aviso de modo demo con las cuatro personas de prueba. Cada ficha escribe su
+/// correo en el formulario, así que no hay que teclear para cambiar de rol.
 class _DemoBadge extends StatelessWidget {
-  const _DemoBadge();
+  const _DemoBadge({required this.onSelect});
+
+  final ValueChanged<String> onSelect;
+
+  static const _personas = <(String, String)>[
+    ('Familiar', AuthRepositoryMock.demoEmail),
+    ('Cuidadora', AuthRepositoryMock.demoCaregiverEmail),
+    ('Médico', AuthRepositoryMock.demoDoctorEmail),
+    ('Adulto mayor', AuthRepositoryMock.demoElderEmail),
+  ];
 
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.only(top: 12),
-        constraints: const BoxConstraints(maxWidth: 340),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: dark ? .22 : .09),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+    final tint = dark ? Colors.white : AppColors.primaryDark;
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: dark ? .22 : .09),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.science_outlined,
-                  size: 14, color: dark ? Colors.white : AppColors.primaryDark),
+              Icon(Icons.science_outlined, size: 14, color: tint),
               const SizedBox(width: 6),
-              Text(
-                'Modo demo · demo@agecare.app o doctor@agecare.app · agecare123',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: dark ? Colors.white : AppColors.primaryDark,
-                ),
-              ),
+              Text('Modo demo · contraseña ${AuthRepositoryMock.demoPassword}',
+                  style: TextStyle(
+                      fontSize: 11.5, fontWeight: FontWeight.w600, color: tint)),
             ],
           ),
-        ),
+          const SizedBox(height: 6),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final (rol, correo) in _personas)
+                InkWell(
+                  onTap: () => onSelect(correo),
+                  borderRadius: BorderRadius.circular(999),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: tint.withValues(alpha: .45)),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(rol,
+                        style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: tint)),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

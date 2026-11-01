@@ -99,6 +99,7 @@ class AuthRepositoryHttp implements AuthRepository {
 class AuthRepositoryMock implements AuthRepository {
   static const demoEmail = 'demo@agecare.app';
   static const demoDoctorEmail = 'doctor@agecare.app';
+  static const demoCaregiverEmail = 'cuidadora@agecare.app';
   static const demoPassword = 'agecare123';
 
   User? _currentUser;
@@ -123,6 +124,22 @@ class AuthRepositoryMock implements AuthRepository {
     ],
   );
 
+  static const _demoCaregiver = User(
+    userId: 'u-demo-caregiver',
+    fullName: 'Rosa Millán',
+    email: demoCaregiverEmail,
+    memberships: const [
+      Membership(
+          patientId: 'p-elena',
+          patientName: 'Elena Ramírez',
+          role: RoleType.caregiver),
+      Membership(
+          patientId: 'p-jose',
+          patientName: 'José Ramírez',
+          role: RoleType.caregiver),
+    ],
+  );
+
   @override
   Future<AuthSession> login({required String email, required String password}) async {
     await Future.delayed(const Duration(milliseconds: 400));
@@ -136,6 +153,7 @@ class AuthRepositoryMock implements AuthRepository {
     final user = switch (email.toLowerCase()) {
       demoEmail => _demoUser,
       demoDoctorEmail => _demoDoctor,
+      demoCaregiverEmail => _demoCaregiver,
       _ => null,
     };
     if (user == null) {

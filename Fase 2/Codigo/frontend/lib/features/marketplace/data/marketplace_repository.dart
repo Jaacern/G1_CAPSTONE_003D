@@ -116,7 +116,7 @@ class MarketplaceRepositoryMock implements MarketplaceRepository {
         reviewsCount: 34,
         zones: ['08101', '08103', '08108'],
         specialties: ['Alzheimer', 'Movilidad reducida', 'Postoperatorio'],
-        pricePerHour: 120,
+        pricePerHour: 12000,
       ),
       const CaregiverProfileSummary(
         profileId: 'cg-2',
@@ -127,7 +127,7 @@ class MarketplaceRepositoryMock implements MarketplaceRepository {
         reviewsCount: 21,
         zones: ['13120', '13123', '13114'],
         specialties: ['Diabetes', 'Control de medicación', 'Curaciones'],
-        pricePerHour: 150,
+        pricePerHour: 15000,
       ),
       const CaregiverProfileSummary(
         profileId: 'cg-3',
@@ -138,7 +138,7 @@ class MarketplaceRepositoryMock implements MarketplaceRepository {
         reviewsCount: 52,
         zones: ['13119', '13105'],
         specialties: ['Estimulación cognitiva', 'Acompañamiento', 'Parkinson'],
-        pricePerHour: 110,
+        pricePerHour: 11000,
       ),
     ]);
 

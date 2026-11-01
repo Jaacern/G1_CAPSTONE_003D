@@ -455,3 +455,85 @@ async def add_review(
         comment=fila["comment"] or "",
         created_at=fila["created_at"],
     )
+
+
+# ---------------------------------------------------------------------------
+# Catalogo de ayudas tecnicas
+# ---------------------------------------------------------------------------
+class ProductOut(BaseModel):
+    id:           UUID
+    name:         str
+    description:  str
+    category:     str
+    price:        float
+    currency:     str
+    supplier:     str | None
+    supplier_url: str | None
+    image_url:    str | None
+
+
+class ProductsOut(BaseModel):
+    items: list[ProductOut]
+
+
+_CATEGORIAS = {"mobility", "bathroom", "bedroom", "hygiene",
+               "monitoring", "nutrition", "other"}
+
+
+def _producto(f) -> ProductOut:
+    from app.storage import get_storage
+    return ProductOut(
+        id=f["id"],
+        name=f["name"],
+        description=f["description"],
+        category=f["category"],
+        # La pantalla espera un numero y muestra el precio formateado. Un
+        # producto sin precio de referencia sale en cero, que ella ya sabe
+        # dibujar, en vez de romperle el modelo con un nulo.
+        price=float(f["price"]) if f["price"] is not None else 0.0,
+        currency=f["currency"],
+        supplier=f["supplier"],
+        supplier_url=f["supplier_url"],
+        image_url=(get_storage().file_url(file_id=str(f["image_file_id"]),
+                                          storage_key="")
+                   if f["image_file_id"] else None),
+    )
+
+
+_COLUMNAS = ("id, name, description, category, price, currency, "
+             "supplier, supplier_url, image_file_id")
+
+
+@router.get("/products", response_model=ProductsOut)
+async def list_products(
+    category: str | None = Query(default=None, max_length=20),
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Catalogo de ayudas tecnicas, con filtro por categoria."""
+    if category is not None and category not in _CATEGORIAS:
+        raise ApiError(
+            status_code=422, code="VALIDATION_ERROR",
+            message="Esa categoria de producto no existe.",
+            details=[{"field": "category",
+                      "message": f"Valores aceptados: {', '.join(sorted(_CATEGORIAS))}."}],
+        )
+
+    filas = (
+        await db.execute(
+            text(
+                f"""
+                SELECT {_COLUMNAS}
+                FROM market_products
+                WHERE status = 'published'
+                  AND deleted_at IS NULL
+                  AND (CAST(:cat AS text) IS NULL OR category = CAST(:cat AS text))
+                ORDER BY category, name
+                LIMIT 200
+                """  # noqa: S608
+            ),
+            {"cat": category},
+        )
+    ).mappings().all()
+
+    return ProductsOut(items=[_producto(f) for f in filas])

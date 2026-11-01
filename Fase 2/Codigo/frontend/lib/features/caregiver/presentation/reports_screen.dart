@@ -37,8 +37,7 @@ class CaregiverReportsScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(caregiverReportProvider),
         ),
         data: (report) {
-          final isFree =
-              planAsync.valueOrNull?.tier.isFree ?? true;
+          final isFree = planAsync.valueOrNull?.tier.isFree ?? true;
           return RefreshIndicator(
             onRefresh: () async {
               ref.invalidate(caregiverReportProvider);
@@ -124,8 +123,8 @@ class _MetricCard extends StatelessWidget {
           Icon(data.icon, color: data.color, size: 26),
           const SizedBox(height: 8),
           Text(data.value,
-              style: const TextStyle(
-                  fontSize: 24, fontWeight: FontWeight.w700)),
+              style:
+                  const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
           const SizedBox(height: 2),
           Text(data.label,
               style: const TextStyle(
@@ -228,8 +227,8 @@ class _PremiumUpsell extends StatelessWidget {
               const SizedBox(width: 12),
               const Expanded(
                 child: Text('Desbloquea reportes avanzados con Premium',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700)),
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               ),
             ],
           ),

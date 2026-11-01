@@ -22,8 +22,7 @@ class CaregiverHomeScreen extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final patient = ref.watch(selectedPatientProvider);
     final summary = ref.watch(todaySummaryProvider);
-    final firstName =
-        (user?.fullName ?? '').trim().split(RegExp(r'\s+')).first;
+    final firstName = (user?.fullName ?? '').trim().split(RegExp(r'\s+')).first;
 
     if (patient == null) {
       return const EmptyView(
@@ -60,8 +59,7 @@ class CaregiverHomeScreen extends ConsumerWidget {
                           children: [
                             Text(patient.fullName,
                                 style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700)),
+                                    fontSize: 16, fontWeight: FontWeight.w700)),
                             if ((s.topReason ?? '').isNotEmpty) ...[
                               const SizedBox(height: 2),
                               Text(s.topReason!,

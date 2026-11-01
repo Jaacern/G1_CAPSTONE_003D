@@ -129,8 +129,8 @@ class _TaskCardState extends ConsumerState<_TaskCard> {
   Widget build(BuildContext context) {
     final task = widget.task;
     return AppCard(
-      onTap: () => context
-          .push('/cg/task?patient=${widget.patientId}&task=${task.id}'),
+      onTap: () =>
+          context.push('/cg/task?patient=${widget.patientId}&task=${task.id}'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -148,8 +148,8 @@ class _TaskCardState extends ConsumerState<_TaskCard> {
           if (task.description != null && task.description!.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(task.description!,
-                style:
-                    const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                style: const TextStyle(
+                    fontSize: 13, color: AppColors.textSecondary)),
           ],
           const SizedBox(height: 10),
           Row(

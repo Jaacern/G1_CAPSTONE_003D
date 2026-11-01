@@ -22,7 +22,8 @@ class CaregiverTodayScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Hola${user != null ? ', ${user.fullName.split(' ').first}' : ''}'),
+        title: Text(
+            'Hola${user != null ? ', ${user.fullName.split(' ').first}' : ''}'),
       ),
       body: todayAsync.when(
         loading: () => const LoadingView(),
@@ -110,8 +111,7 @@ class _ShiftCard extends StatelessWidget {
                 textStyle:
                     const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
-              icon: Icon(
-                  entering ? Icons.login_rounded : Icons.logout_rounded,
+              icon: Icon(entering ? Icons.login_rounded : Icons.logout_rounded,
                   size: 26),
               label: Text(entering ? 'Check-in' : 'Check-out'),
             ),
@@ -273,9 +273,7 @@ class _ActionButton extends StatelessWidget {
               const SizedBox(height: 6),
               Text(label,
                   style: TextStyle(
-                      color: color,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12)),
+                      color: color, fontWeight: FontWeight.w700, fontSize: 12)),
             ],
           ),
         ),
@@ -349,8 +347,7 @@ class _TaskTileState extends ConsumerState<_TaskTile> {
                     style: const TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2),
                 Text('${task.timeLabel} · ${task.status.label}',
-                    style: TextStyle(
-                        fontSize: 12, color: task.status.color)),
+                    style: TextStyle(fontSize: 12, color: task.status.color)),
               ],
             ),
           ),

@@ -76,9 +76,8 @@ class CaregiverRepositoryHttp implements CaregiverRepository {
         if (lng != null) 'lng': lng,
       },
     );
-    return ShiftStatus.fromApi(
-        (res['shift_status'] ?? (type == 'in' ? 'checked_in' : 'checked_out'))
-            as String);
+    return ShiftStatus.fromApi((res['shift_status'] ??
+        (type == 'in' ? 'checked_in' : 'checked_out')) as String);
   }
 
   @override
@@ -310,8 +309,7 @@ class CaregiverRepositoryMock implements CaregiverRepository {
   @override
   Future<CaregiverToday> getToday() async {
     await Future.delayed(const Duration(milliseconds: 300));
-    final pending =
-        _tasks.where((t) => t.status != TaskStatus.done).toList();
+    final pending = _tasks.where((t) => t.status != TaskStatus.done).toList();
     return CaregiverToday(
       patientId: _patientId,
       patientName: _patientName,

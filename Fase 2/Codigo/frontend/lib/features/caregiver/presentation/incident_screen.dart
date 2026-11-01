@@ -54,8 +54,8 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
 
   Future<void> _pick(ImageSource source) async {
     try {
-      final picked =
-          await _picker.pickImage(source: source, imageQuality: 85, maxWidth: 2000);
+      final picked = await _picker.pickImage(
+          source: source, imageQuality: 85, maxWidth: 2000);
       if (picked == null) return;
       setState(() => _image = File(picked.path));
     } catch (_) {
@@ -162,8 +162,9 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                 labelText: 'Descripción de lo ocurrido',
                 alignLabelWithHint: true,
               ),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Describe el incidente' : null,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Describe el incidente'
+                  : null,
             ),
             const SizedBox(height: 16),
             if (_image != null)
@@ -172,9 +173,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Image.file(_image!,
-                        height: 180,
-                        width: double.infinity,
-                        fit: BoxFit.cover),
+                        height: 180, width: double.infinity, fit: BoxFit.cover),
                   ),
                   Positioned(
                     top: 8,

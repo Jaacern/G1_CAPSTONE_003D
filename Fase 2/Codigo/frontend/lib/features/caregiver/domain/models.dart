@@ -15,8 +15,8 @@ enum TaskStatus {
   pending('pending', 'Pendiente', AppColors.textSecondary),
   inProgress('in_progress', 'En curso', AppColors.statusWarning),
   done('done', 'Completada', AppColors.statusOk),
-  cancelled('cancelled', 'Cancelada', AppColors.textFaint,
-      Icons.cancel_outlined);
+  cancelled(
+      'cancelled', 'Cancelada', AppColors.textFaint, Icons.cancel_outlined);
 
   const TaskStatus(this.apiValue, this.label, this.color,
       [this.icon = Icons.circle]);
@@ -37,8 +37,7 @@ enum TaskStatus {
 /// Estado del turno de la cuidadora.
 enum ShiftStatus {
   checkedIn('checked_in', 'En turno', AppColors.statusOk, Icons.login_rounded),
-  checkedOut(
-      'checked_out', 'Fuera de turno', AppColors.textSecondary,
+  checkedOut('checked_out', 'Fuera de turno', AppColors.textSecondary,
       Icons.logout_rounded);
 
   const ShiftStatus(this.apiValue, this.label, this.color, this.icon);
@@ -286,10 +285,10 @@ class CaregiverToday {
   factory CaregiverToday.fromJson(Map<String, dynamic> json) => CaregiverToday(
         patientId: (json['patient_id'] ?? '').toString(),
         patientName: (json['patient_name'] ?? '') as String,
-        shiftStatus:
-            ShiftStatus.fromApi((json['shift_status'] ?? 'checked_out') as String),
-        wellbeingStatus:
-            WellbeingStatus.fromApi((json['wellbeing_status'] ?? 'ok') as String),
+        shiftStatus: ShiftStatus.fromApi(
+            (json['shift_status'] ?? 'checked_out') as String),
+        wellbeingStatus: WellbeingStatus.fromApi(
+            (json['wellbeing_status'] ?? 'ok') as String),
         pendingTasks: ((json['pending_tasks'] ?? []) as List)
             .map((e) => CareTask.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -490,7 +489,8 @@ class CaregiverReport {
   /// Serie semanal de tareas completadas (para la gráfica).
   final List<ReportPoint> weeklyTasks;
 
-  factory CaregiverReport.fromJson(Map<String, dynamic> json) => CaregiverReport(
+  factory CaregiverReport.fromJson(Map<String, dynamic> json) =>
+      CaregiverReport(
         period: (json['period'] ?? '') as String,
         tasksCompleted: (json['tasks_completed'] ?? 0) as int,
         punctualityPct: (json['punctuality_pct'] ?? 0) is num

@@ -100,6 +100,7 @@ class AuthRepositoryMock implements AuthRepository {
   static const demoEmail = 'demo@agecare.app';
   static const demoDoctorEmail = 'doctor@agecare.app';
   static const demoCaregiverEmail = 'cuidadora@agecare.app';
+  static const demoElderEmail = 'adultomayor@agecare.app';
   static const demoPassword = 'agecare123';
 
   User? _currentUser;
@@ -128,7 +129,7 @@ class AuthRepositoryMock implements AuthRepository {
     userId: 'u-demo-caregiver',
     fullName: 'Rosa Millán',
     email: demoCaregiverEmail,
-    memberships: const [
+    memberships: [
       Membership(
           patientId: 'p-elena',
           patientName: 'Elena Ramírez',
@@ -137,6 +138,18 @@ class AuthRepositoryMock implements AuthRepository {
           patientId: 'p-jose',
           patientName: 'José Ramírez',
           role: RoleType.caregiver),
+    ],
+  );
+
+  static const _demoElder = User(
+    userId: 'u-demo-elder',
+    fullName: 'Elena Ramírez',
+    email: demoElderEmail,
+    memberships: [
+      Membership(
+          patientId: 'p-elena',
+          patientName: 'Elena Ramírez',
+          role: RoleType.elder),
     ],
   );
 
@@ -154,6 +167,7 @@ class AuthRepositoryMock implements AuthRepository {
       demoEmail => _demoUser,
       demoDoctorEmail => _demoDoctor,
       demoCaregiverEmail => _demoCaregiver,
+      demoElderEmail => _demoElder,
       _ => null,
     };
     if (user == null) {

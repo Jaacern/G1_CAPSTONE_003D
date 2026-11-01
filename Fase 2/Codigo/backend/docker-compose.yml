@@ -33,6 +33,20 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET:-dev-secret-cambiar-en-produccion}
+
+      # Almacenamiento de archivos subidos (fotos, documentos, notas de voz).
+      # 'local' guarda en disco dentro del contenedor, en la ruta de abajo,
+      # que está montada como volumen para que no se pierda al reiniciar.
+      # Con 'azure' se usa Blob Storage y estas dos dejan de importar.
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      STORAGE_LOCAL_DIR: /var/agecare/files
+      # URL pública de la API. Es la que se arma en los enlaces temporales
+      # de subida y descarga, así que tiene que ser la que el teléfono
+      # alcanza, no localhost.
+      STORAGE_PUBLIC_BASE_URL: ${STORAGE_PUBLIC_BASE_URL:-http://localhost:8000}
+      AZURE_STORAGE_ACCOUNT: ${AZURE_STORAGE_ACCOUNT:-}
+      AZURE_STORAGE_KEY: ${AZURE_STORAGE_KEY:-}
+      AZURE_STORAGE_CONTAINER: ${AZURE_STORAGE_CONTAINER:-agecare}
     ports:
       # 0.0.0.0 = accesible desde otras máquinas de la red local (para que el
       # frontend de un compañero pueda probar). Solo la API se expone; la BD
@@ -41,6 +55,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      # Sin esto los archivos que la gente sube viven dentro del contenedor
+      # y se pierden en cada reinicio.
+      - archivos:/var/agecare/files
     restart: unless-stopped
     networks: [agecare-net]
 
@@ -76,6 +94,7 @@ services:
 
 volumes:
   pgdata:
+  archivos:
 
 networks:
   agecare-net:

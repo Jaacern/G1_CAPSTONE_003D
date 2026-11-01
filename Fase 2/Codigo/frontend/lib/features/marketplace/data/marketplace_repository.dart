@@ -38,8 +38,7 @@ class MarketplaceRepositoryHttp implements MarketplaceRepository {
       },
     );
     return ((data['items'] ?? []) as List)
-        .map((e) =>
-            CaregiverProfileSummary.fromJson(e as Map<String, dynamic>))
+        .map((e) => CaregiverProfileSummary.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
@@ -201,8 +200,7 @@ class MarketplaceRepositoryMock implements MarketplaceRepository {
         imageUrl: null,
         price: 480,
         category: 'seguridad',
-        description:
-            'Barra de sujeción antideslizante para regadera o tina. '
+        description: 'Barra de sujeción antideslizante para regadera o tina. '
             'Instalación con ventosas de fijación rápida.',
       ),
     ]);
@@ -275,13 +273,12 @@ class MarketplaceRepositoryMock implements MarketplaceRepository {
       zones: c.zones,
       specialties: c.specialties,
       pricePerHour: c.pricePerHour,
-      bio:
-          'Soy ${c.name}, cuidadora con vocación de servicio. Me dedico al '
+      bio: 'Soy ${c.name}, cuidadora con vocación de servicio. Me dedico al '
           'cuidado de adultos mayores con paciencia, cariño y responsabilidad. '
           'Ofrezco apoyo en actividades diarias, higiene, alimentación y '
           'acompañamiento.',
       yearsExperience: 8,
-      languages: const ['Español', 'Inglés básico'],
+      languages: const ['es', 'en'],
       certifications: const [
         'Certificado en cuidados geriátricos',
         'Primeros auxilios y RCP',

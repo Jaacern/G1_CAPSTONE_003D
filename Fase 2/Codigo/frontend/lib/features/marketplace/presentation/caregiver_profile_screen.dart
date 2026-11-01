@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/config/comunas.dart';
+import '../../../core/config/idiomas.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../application/marketplace_providers.dart';
@@ -65,7 +66,7 @@ class CaregiverProfileScreen extends ConsumerWidget {
               if (c.languages.isNotEmpty)
                 _InfoRow(
                   icon: Icons.translate_rounded,
-                  label: 'Idiomas: ${c.languages.join(', ')}',
+                  label: 'Idiomas: ${c.languages.map(nombreIdioma).join(', ')}',
                 ),
               if (c.pricePerHour != null)
                 _InfoRow(

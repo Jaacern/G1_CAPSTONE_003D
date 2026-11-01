@@ -31,7 +31,7 @@ from app.routers.logbook import (
     _sin_tildes,
     _texto_con_contenido,
 )
-from app.storage import DOWNLOAD_TTL_MINUTES, get_storage
+from app.storage import get_storage
 
 router = APIRouter(prefix="/api/v1", tags=["documents"])
 
@@ -195,3 +195,97 @@ async def add_document(
     await db.commit()
 
     return _salida({**dict(fila), "full_name": ctx.user.full_name})
+
+
+# ---------------------------------------------------------------------------
+# Un documento suelto: la ruta no lleva el paciente
+# ---------------------------------------------------------------------------
+_NO_EXISTE = ApiError(
+    status_code=404, code="NOT_FOUND",
+    message="El recurso solicitado no existe o no esta disponible.",
+)
+
+
+async def _documento_del_usuario(db: AsyncSession, document_id: UUID,
+                                 user_id: str):
+    """Carga el documento comprobando que quien pide sea del circulo.
+
+    Estas dos rutas no llevan el paciente, asi que no sirve la dependencia
+    de membresia: hay que llegar al paciente desde el documento. La
+    respuesta es 404 tanto si el documento no existe como si es de un
+    paciente ajeno, para que no se puedan averiguar ids probando.
+    """
+    fila = (
+        await db.execute(
+            text(
+                """
+                SELECT d.id, d.patient_id, d.title, d.category, d.file_id,
+                       d.created_at, f.storage_key, f.mime_type, f.size_bytes,
+                       f.status AS file_status
+                FROM medical_documents d
+                JOIN patients p ON p.id = d.patient_id
+                JOIN files f    ON f.id = d.file_id
+                WHERE d.id = :did
+                  AND d.deleted_at IS NULL
+                  AND p.deleted_at IS NULL
+                """
+            ),
+            {"did": str(document_id)},
+        )
+    ).mappings().first()
+    if fila is None:
+        raise _NO_EXISTE
+
+    miembro = (
+        await db.execute(
+            text(
+                """
+                SELECT pm.role
+                FROM patient_members pm
+                WHERE pm.patient_id = :pid
+                  AND pm.user_id = :uid
+                  AND pm.removed_at IS NULL
+                """
+            ),
+            {"pid": str(fila["patient_id"]), "uid": user_id},
+        )
+    ).mappings().first()
+    if miembro is None:
+        raise _NO_EXISTE
+
+    return fila, miembro["role"]
+
+
+@router.delete("/documents/{document_id}", status_code=204)
+async def delete_document(
+    document_id: UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Quita un documento del expediente.
+
+    Es borrado logico. El archivo binario no se toca y la fila queda con
+    deleted_at y deleted_by, que el CHECK exige juntos. Es la misma regla
+    del resto del esquema: del expediente de un paciente no se borra nada
+    de verdad, se marca quien lo quito y cuando.
+    """
+    fila, rol = await _documento_del_usuario(db, document_id, user.user_id)
+
+    # El medico lee el expediente pero no lo edita.
+    if rol not in ("family", "caregiver"):
+        raise ApiError(
+            status_code=403, code="FORBIDDEN",
+            message="No tienes permisos para quitar documentos de este expediente.",
+        )
+
+    await db.execute(
+        text(
+            """
+            UPDATE medical_documents
+               SET deleted_at = now(), deleted_by = :uid, updated_at = now()
+             WHERE id = :did AND deleted_at IS NULL
+            """
+        ),
+        {"did": str(document_id), "uid": user.user_id},
+    )
+    await db.commit()

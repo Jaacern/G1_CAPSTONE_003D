@@ -14,6 +14,18 @@ class MarketplaceRepoFake implements MarketplaceRepository {
   String? zonaEnviada;
   String? categoriaEnviada;
 
+  /// Las ofertas que la pantalla de trabajos va a ver. Se pueden reemplazar
+  /// antes de montar la vista.
+  List<JobOffer> ofertas = const [
+    JobOffer(
+      id: 'j-9',
+      title: 'Cuidadora de día',
+      zone: '08101',
+      pay: '\$600.000 / mes',
+      description: 'Acompañamiento diurno.',
+    ),
+  ];
+
   @override
   Future<List<CaregiverProfileSummary>> listCaregivers({
     String? zone,
@@ -30,7 +42,7 @@ class MarketplaceRepoFake implements MarketplaceRepository {
   }
 
   @override
-  Future<List<JobOffer>> listJobs() async => const [];
+  Future<List<JobOffer>> listJobs() async => ofertas;
 
   @override
   Future<CaregiverProfileDetail> getCaregiver(String profileId) =>
@@ -49,14 +61,17 @@ class MarketplaceRepoFake implements MarketplaceRepository {
       throw UnimplementedError();
 }
 
-/// Monta el marketplace como familiar (dos pestañas, sin trabajos) y deja la
-/// primera visible.
-Future<MarketplaceRepoFake> montarMarketplace(WidgetTester tester) async {
+/// Monta el marketplace como familiar (dos pestañas) o como cuidadora (tres)
+/// y deja la primera visible.
+Future<MarketplaceRepoFake> montarMarketplace(
+  WidgetTester tester, {
+  RoleType rol = RoleType.family,
+}) async {
   final repo = MarketplaceRepoFake();
   await tester.pumpWidget(ProviderScope(
     overrides: [
       currentUserProvider.overrideWith(
-        (ref) => const User(
+        (ref) => User(
           userId: 'u-1',
           fullName: 'Benjamín Camus',
           email: 'familia@agecare.app',
@@ -64,7 +79,7 @@ Future<MarketplaceRepoFake> montarMarketplace(WidgetTester tester) async {
             Membership(
                 patientId: 'p-1',
                 patientName: 'Elena Ramírez',
-                role: RoleType.family),
+                role: rol),
           ],
         ),
       ),

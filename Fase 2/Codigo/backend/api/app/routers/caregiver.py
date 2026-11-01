@@ -619,6 +619,130 @@ async def save_profile(
     return await _perfil(db, user.user_id)
 
 
+class ReportPoint(BaseModel):
+    label: str
+    value: float
+
+
+class ReportOut(BaseModel):
+    period:             str
+    tasks_completed:    int
+    punctuality_pct:    float
+    checkins_on_time:   int
+    observations_logged: int
+    weekly_tasks:       list[ReportPoint]
+
+
+_DIAS = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"]
+
+
+@router.get("/reports", response_model=ReportOut)
+async def reports(
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Desempeno de la cuidadora en los ultimos siete dias.
+
+    Es sobre su propio trabajo, no sobre un paciente: cuenta lo que hizo
+    ella en todos los circulos donde participa.
+    """
+    desde = datetime.now(timezone.utc) - timedelta(days=7)
+
+    tareas = (
+        await db.execute(
+            text(
+                """
+                SELECT count(*) FROM care_tasks
+                WHERE assigned_to_user_id = :uid
+                  AND status = 'completed'
+                  AND completed_at >= :desde
+                  AND deleted_at IS NULL
+                """
+            ),
+            {"uid": user.user_id, "desde": desde},
+        )
+    ).scalar()
+
+    observaciones = (
+        await db.execute(
+            text(
+                """
+                SELECT count(*) FROM care_observations
+                WHERE author_id = :uid
+                  AND observed_at >= :desde
+                  AND deleted_at IS NULL
+                """
+            ),
+            {"uid": user.user_id, "desde": desde},
+        )
+    ).scalar()
+
+    # Puntualidad: turnos que empezaron a la hora. Sin horario pactado en el
+    # esquema, lo unico medible hoy es si el turno se marco o no, asi que se
+    # cuentan los cerrados sobre el total. Un turno que quedo abierto para
+    # siempre es una marca que la cuidadora olvido hacer.
+    turnos = (
+        await db.execute(
+            text(
+                """
+                SELECT count(*) AS total,
+                       count(*) FILTER (WHERE checked_out_at IS NOT NULL) AS cerrados
+                FROM care_shifts
+                WHERE caregiver_id = :uid AND checked_in_at >= :desde
+                """
+            ),
+            {"uid": user.user_id, "desde": desde},
+        )
+    ).mappings().first()
+
+    puntualidad = (
+        round(100.0 * turnos["cerrados"] / turnos["total"], 1)
+        if turnos and turnos["total"] else 0.0
+    )
+
+    # Serie por dia para la grafica. Se arma la semana completa aca y no se
+    # deja que la pantalla rellene los huecos: un dia sin tareas es un cero
+    # que la grafica tiene que dibujar, no un dia que falta.
+    por_dia = {
+        f["dia"]: f["cuantas"]
+        for f in (
+            await db.execute(
+                text(
+                    """
+                    SELECT (completed_at AT TIME ZONE 'UTC')::date AS dia,
+                           count(*) AS cuantas
+                    FROM care_tasks
+                    WHERE assigned_to_user_id = :uid
+                      AND status = 'completed'
+                      AND completed_at >= :desde
+                      AND deleted_at IS NULL
+                    GROUP BY 1
+                    """
+                ),
+                {"uid": user.user_id, "desde": desde},
+            )
+        ).mappings().all()
+    }
+
+    hoy = datetime.now(timezone.utc).date()
+    semana = [
+        ReportPoint(
+            label=_DIAS[(hoy - timedelta(days=i)).weekday()],
+            value=float(por_dia.get(hoy - timedelta(days=i), 0)),
+        )
+        for i in range(6, -1, -1)
+    ]
+
+    return ReportOut(
+        period="Ultimos 7 dias",
+        tasks_completed=tareas or 0,
+        punctuality_pct=puntualidad,
+        checkins_on_time=(turnos["cerrados"] if turnos else 0),
+        observations_logged=observaciones or 0,
+        weekly_tasks=semana,
+    )
+
+
 def _validados(valores: list[str], patron: str, campo: str, ayuda: str,
                transformar=lambda s: s.strip()) -> dict:
     """Recorta, valida contra el patron y quita repetidos conservando el orden."""

@@ -35,9 +35,9 @@ class MainShell extends ConsumerWidget {
     }
 
     final tabs = switch (role) {
-      RoleType.caregiver => _caregiverTabs,
-      RoleType.doctor => _doctorTabs,
-      _ => _familyTabs,
+      RoleType.caregiver => caregiverTabs,
+      RoleType.doctor => doctorTabs,
+      _ => familyTabs,
     };
     final index = ref.watch(shellTabIndexProvider);
     final safeIndex = index.clamp(0, tabs.length - 1);
@@ -84,36 +84,38 @@ class MainShell extends ConsumerWidget {
   // la barra la cortaba con puntos suspensivos. Se muestra un nombre corto y el
   // del wireframe queda en [full], que alimenta el tooltip y al lector de
   // pantalla.
-  static const _familyTabs = <_Tab>[
-    _Tab('Hoy', '🏠', FamilyHomeScreen()),
-    _Tab('Salud', '❤️', HealthScreen()),
-    _Tab('Mensajes', '💬', CommsScreen(), full: 'Comunicación'),
-    _Tab('Tienda', '🛍️', MarketplaceScreen(), full: 'Marketplace'),
-    _Tab('Más', '☰', MoreScreen()),
+  static const familyTabs = <ShellTab>[
+    ShellTab('Hoy', '🏠', FamilyHomeScreen()),
+    ShellTab('Salud', '❤️', HealthScreen()),
+    ShellTab('Mensajes', '💬', CommsScreen(), full: 'Comunicación'),
+    ShellTab('Tienda', '🛍️', MarketplaceScreen(), full: 'Marketplace'),
+    ShellTab('Más', '☰', MoreScreen()),
   ];
 
   // Barra de la cuidadora: solo pestañas con backend real.
   // 🏠 Hoy (resumen + dosis) · ❤️ Salud · 🔔 Alertas · ☰ Más
-  static const _caregiverTabs = <_Tab>[
-    _Tab('Hoy', '🏠', CaregiverHomeScreen()),
-    _Tab('Salud', '❤️', HealthScreen()),
-    _Tab('Alertas', '🔔', AlertsScreen()),
-    _Tab('Más', '☰', MoreScreen()),
+  static const caregiverTabs = <ShellTab>[
+    ShellTab('Hoy', '🏠', CaregiverHomeScreen()),
+    ShellTab('Salud', '❤️', HealthScreen()),
+    ShellTab('Alertas', '🔔', AlertsScreen()),
+    ShellTab('Más', '☰', MoreScreen()),
   ];
 
   // Barra del médico: lectura del historial + recetas desde la ficha del
   // paciente. Todos los GET del backend aceptan cualquier miembro (incluido
   // doctor) y POST /medications acepta el rol doctor.
   // 🏠 Hoy (mis pacientes) · ❤️ Salud · ☰ Más
-  static const _doctorTabs = <_Tab>[
-    _Tab('Hoy', '🏠', DoctorHomeScreen()),
-    _Tab('Salud', '❤️', HealthScreen()),
-    _Tab('Más', '☰', MoreScreen()),
+  static const doctorTabs = <ShellTab>[
+    ShellTab('Hoy', '🏠', DoctorHomeScreen()),
+    ShellTab('Salud', '❤️', HealthScreen()),
+    ShellTab('Más', '☰', MoreScreen()),
   ];
 }
 
-class _Tab {
-  const _Tab(this.label, this.emoji, this.screen, {this.full});
+/// Pestaña de la barra inferior. Las listas de cada rol son públicas para que
+/// los tests midan las etiquetas reales en vez de copiarlas.
+class ShellTab {
+  const ShellTab(this.label, this.emoji, this.screen, {this.full});
 
   final String label;
   final String emoji;

@@ -11,9 +11,13 @@ abstract class MedicationsRepository {
       String patientId, String medicationId, NewMedication data);
   Future<void> deleteMedication(String patientId, String medicationId);
   Future<List<Dose>> listDoses(String patientId, {DateTime? date});
-  Future<Dose> logDose(String doseId, DoseStatus status, {String? note});
-  Future<Adherence> adherence(String patientId,
-      {DateTime? from, DateTime? to});
+
+  /// Registra qué pasó con una dosis. El backend (6.6) responde
+  /// `{dose_id, status, alert_triggered}`: no devuelve la dosis, así que quien
+  /// necesite el estado actual vuelve a listar las dosis del día.
+  Future<void> logDose(String doseId, DoseStatus status,
+      {String? note, DateTime? postponedUntil});
+  Future<Adherence> adherence(String patientId, {DateTime? from, DateTime? to});
   Future<PrescriptionDraft> scanPrescription(String patientId, String fileUrl);
 }
 
@@ -26,8 +30,8 @@ class MedicationsRepositoryHttp implements MedicationsRepository {
 
   @override
   Future<List<Medication>> listMedications(String patientId) async {
-    final data =
-        await _api.get<Map<String, dynamic>>('/patients/$patientId/medications');
+    final data = await _api
+        .get<Map<String, dynamic>>('/patients/$patientId/medications');
     return ((data['items'] ?? []) as List)
         .map((e) => Medication.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -71,20 +75,13 @@ class MedicationsRepositoryHttp implements MedicationsRepository {
   }
 
   @override
-  Future<Dose> logDose(String doseId, DoseStatus status, {String? note}) async {
-    // Backend (6.6): status + (si taken) administered_at + (si missed) reason.
-    // El backend exige 'reason' cuando status='missed'.
-    final res = await _api.post<Map<String, dynamic>>(
-      '/doses/$doseId/log',
-      data: {
-        'status': status.apiValue,
-        if (status == DoseStatus.taken)
-          'administered_at': DateTime.now().toIso8601String(),
-        if (note != null && note.isNotEmpty) 'reason': note,
-      },
-    );
-    return Dose.fromJson(res);
-  }
+  Future<void> logDose(String doseId, DoseStatus status,
+          {String? note, DateTime? postponedUntil}) =>
+      _api.post<void>(
+        '/doses/$doseId/log',
+        data:
+            cuerpoLogDosis(status, note: note, postponedUntil: postponedUntil),
+      );
 
   @override
   Future<Adherence> adherence(String patientId,
@@ -115,6 +112,30 @@ class MedicationsRepositoryHttp implements MedicationsRepository {
       message: 'El escaneo de recetas (OCR) estará disponible próximamente.',
     );
   }
+}
+
+/// Cuerpo que se envía a 6.6 (`POST /doses/{dose_id}/log`).
+///
+/// Las reglas son del backend (medications.py):
+/// - `status` admite únicamente `taken`, `postponed` y `missed`. `skipped` es un
+///   estado que el historial puede devolver pero la petición no; a efectos de
+///   adherencia cuenta igual que no tomada, así que aquí se traduce.
+/// - `missed` sin `reason` se rechaza con 400 MISSING_REASON, por eso la clave
+///   viaja siempre en ese caso aunque el motivo quede vacío.
+/// - `postponed` exige `postponed_until`, dentro de las 4 horas siguientes a la
+///   hora prevista (eso lo calcula la pantalla).
+Map<String, dynamic> cuerpoLogDosis(DoseStatus status,
+    {String? note, DateTime? postponedUntil, DateTime? ahora}) {
+  final enviado = status == DoseStatus.skipped ? DoseStatus.missed : status;
+  final cuando = ahora ?? DateTime.now();
+  return {
+    'status': enviado.apiValue,
+    if (enviado == DoseStatus.taken)
+      'administered_at': cuando.toIso8601String(),
+    if (enviado == DoseStatus.missed) 'reason': (note ?? '').trim(),
+    if (enviado == DoseStatus.postponed)
+      'postponed_until': (postponedUntil ?? cuando).toIso8601String(),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -279,7 +300,8 @@ class MedicationsRepositoryMock implements MedicationsRepository {
   }
 
   @override
-  Future<Dose> logDose(String doseId, DoseStatus status, {String? note}) async {
+  Future<void> logDose(String doseId, DoseStatus status,
+      {String? note, DateTime? postponedUntil}) async {
     await Future.delayed(const Duration(milliseconds: 250));
     final i = _doses.indexWhere((d) => d.id == doseId);
     if (i < 0) {
@@ -289,10 +311,7 @@ class MedicationsRepositoryMock implements MedicationsRepository {
         message: 'La dosis solicitada no existe.',
       );
     }
-    final updated =
-        _doses[i].copyWith(status: status, loggedAt: DateTime.now());
-    _doses[i] = updated;
-    return updated;
+    _doses[i] = _doses[i].copyWith(status: status, loggedAt: DateTime.now());
   }
 
   @override

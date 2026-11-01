@@ -9,6 +9,7 @@ from app.errors import register_error_handlers
 from app.routers import (
     alerts,
     auth,
+    documents,
     files,
     health,
     logbook,
@@ -133,6 +134,7 @@ app.include_router(alerts.router)
 app.include_router(files.router)
 app.include_router(logbook.router)
 app.include_router(tasks.router)
+app.include_router(documents.router)
 
 
 @app.get("/", tags=["root"])

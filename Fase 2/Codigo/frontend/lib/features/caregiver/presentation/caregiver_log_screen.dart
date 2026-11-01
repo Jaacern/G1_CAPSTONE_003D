@@ -123,7 +123,7 @@ class _ObservationCard extends StatelessWidget {
                     color: AppColors.primary.withOpacity(.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(obs.category!,
+                  child: Text(categoryLabel(obs.category),
                       style: const TextStyle(
                           fontSize: 11, color: AppColors.primary)),
                 ),

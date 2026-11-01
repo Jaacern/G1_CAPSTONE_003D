@@ -79,6 +79,95 @@ enum PlanTier {
 }
 
 // ---------------------------------------------------------------------------
+// Categorías del plan de cuidado
+// ---------------------------------------------------------------------------
+
+/// Una categoría: [apiValue] es el código que guarda la API y [label] la
+/// etiqueta que se muestra en pantalla.
+class CareCategory {
+  const CareCategory(this.apiValue, this.label);
+
+  final String apiValue;
+  final String label;
+}
+
+/// Etiquetas en español de los códigos de categoría.
+///
+/// `logbook.py` y `tasks.py` aceptan código o etiqueta al escribir, pero al
+/// leer devuelven siempre el código de base ('hygiene', 'food'...), así que la
+/// traducción vive acá y no en cada tarjeta.
+const _categoryLabels = <String, String>{
+  'hygiene': 'Higiene',
+  'medication': 'Medicación',
+  'food': 'Alimentación',
+  'activity': 'Actividad física',
+  'company': 'Compañía',
+  'sleep': 'Sueño',
+  'mood': 'Ánimo',
+  'mobility': 'Movilidad',
+  'pain': 'Dolor',
+  'visit': 'Visita',
+  'other': 'Otro',
+};
+
+/// Categorías que ofrece el alta de tarea (tasks.py).
+const taskCategories = <String>[
+  'hygiene',
+  'medication',
+  'food',
+  'activity',
+  'company',
+  'other',
+];
+
+/// Categorías que ofrece el alta de observación (logbook.py).
+const observationCategories = <String>[
+  'food',
+  'mood',
+  'sleep',
+  'mobility',
+  'hygiene',
+  'other',
+];
+
+/// Etiqueta de una categoría tal como viene guardada.
+///
+/// Por código ('food' -> 'Alimentación') y también por etiqueta, que es como
+/// la deja el modo demo. Un valor que no está en el catálogo se devuelve tal
+/// cual: mostrar 'otras' escrito por alguien es mejor que mostrar nada.
+String categoryLabel(String? guardada) {
+  if (guardada == null || guardada.isEmpty) return '';
+  final porCodigo = _categoryLabels[guardada];
+  if (porCodigo != null) return porCodigo;
+  // El modo demo guarda la etiqueta ya traducida: coincide y se devuelve tal
+  // cual, sin pasar por el código.
+  for (final etiqueta in _categoryLabels.values) {
+    if (etiqueta == guardada) return etiqueta;
+  }
+  return guardada.replaceAll('_', ' ');
+}
+
+/// Código que hay que enviar o comparar para una categoría ya guardada.
+///
+/// Sirve para precargar un formulario: la API contesta el código y el demo
+/// guarda la etiqueta, y las dos formas tienen que caer en la misma opción del
+/// desplegable. Un valor fuera del catálogo devuelve null en vez de inventar
+/// una categoría.
+String? categoryCode(String? guardada) {
+  if (guardada == null || guardada.isEmpty) return null;
+  if (_categoryLabels.containsKey(guardada)) return guardada;
+  for (final entry in _categoryLabels.entries) {
+    if (entry.value == guardada) return entry.key;
+  }
+  return null;
+}
+
+/// Opciones del desplegable a partir de los códigos que admite el formulario.
+List<CareCategory> categoryOptions(List<String> codigos) => [
+      for (final code in codigos) CareCategory(code, categoryLabel(code)),
+    ];
+
+// ---------------------------------------------------------------------------
 // Tarea de cuidado
 // ---------------------------------------------------------------------------
 

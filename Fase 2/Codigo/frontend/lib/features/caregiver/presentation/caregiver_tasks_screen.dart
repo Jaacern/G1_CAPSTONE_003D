@@ -162,7 +162,7 @@ class _TaskCardState extends ConsumerState<_TaskCard> {
                     color: AppColors.primary.withOpacity(.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(task.category!,
+                  child: Text(categoryLabel(task.category),
                       style: const TextStyle(
                           fontSize: 11, color: AppColors.primary)),
                 ),

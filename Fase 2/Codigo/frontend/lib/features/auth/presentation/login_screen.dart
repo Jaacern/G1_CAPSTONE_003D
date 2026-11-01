@@ -278,8 +278,9 @@ class _FormPanel extends StatelessWidget {
 }
 
 /// Aviso de que la app corre con datos simulados.
-/// Aviso de modo demo con las cuatro personas de prueba. Cada ficha escribe su
-/// correo en el formulario, así que no hay que teclear para cambiar de rol.
+/// Aviso de modo demo con las tres personas que autentican por contraseña. Cada
+/// ficha escribe su correo en el formulario, así que no hay que teclear para
+/// cambiar de rol. El adulto mayor no está: autentica su dispositivo.
 class _DemoBadge extends StatelessWidget {
   const _DemoBadge({required this.onSelect});
 
@@ -289,7 +290,6 @@ class _DemoBadge extends StatelessWidget {
     ('Familiar', AuthRepositoryMock.demoEmail),
     ('Cuidadora', AuthRepositoryMock.demoCaregiverEmail),
     ('Médico', AuthRepositoryMock.demoDoctorEmail),
-    ('Adulto mayor', AuthRepositoryMock.demoElderEmail),
   ];
 
   @override

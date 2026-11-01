@@ -100,7 +100,8 @@ class AuthRepositoryMock implements AuthRepository {
   static const demoEmail = 'demo@agecare.app';
   static const demoDoctorEmail = 'doctor@agecare.app';
   static const demoCaregiverEmail = 'cuidadora@agecare.app';
-  static const demoElderEmail = 'adultomayor@agecare.app';
+  // No hay persona demo de adulto mayor: esa cuenta no admite contraseña
+  // (911_elder_account.sql), autentica el dispositivo vinculado.
   static const demoPassword = 'agecare123';
 
   User? _currentUser;
@@ -141,18 +142,6 @@ class AuthRepositoryMock implements AuthRepository {
     ],
   );
 
-  static const _demoElder = User(
-    userId: 'u-demo-elder',
-    fullName: 'Elena Ramírez',
-    email: demoElderEmail,
-    memberships: [
-      Membership(
-          patientId: 'p-elena',
-          patientName: 'Elena Ramírez',
-          role: RoleType.elder),
-    ],
-  );
-
   @override
   Future<AuthSession> login({required String email, required String password}) async {
     await Future.delayed(const Duration(milliseconds: 400));
@@ -167,7 +156,6 @@ class AuthRepositoryMock implements AuthRepository {
       demoEmail => _demoUser,
       demoDoctorEmail => _demoDoctor,
       demoCaregiverEmail => _demoCaregiver,
-      demoElderEmail => _demoElder,
       _ => null,
     };
     if (user == null) {

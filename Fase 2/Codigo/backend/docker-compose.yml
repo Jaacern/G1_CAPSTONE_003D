@@ -47,6 +47,19 @@ services:
       AZURE_STORAGE_ACCOUNT: ${AZURE_STORAGE_ACCOUNT:-}
       AZURE_STORAGE_KEY: ${AZURE_STORAGE_KEY:-}
       AZURE_STORAGE_CONTAINER: ${AZURE_STORAGE_CONTAINER:-agecare}
+
+      # Asistente de IA. Con 'none' los endpoints responden 503 con un
+      # codigo que la aplicacion distingue, en vez de inventar respuestas
+      # sobre la salud de un paciente.
+      ASSISTANT_PROVIDER: ${ASSISTANT_PROVIDER:-none}
+      ASSISTANT_ENDPOINT: ${ASSISTANT_ENDPOINT:-}
+      ASSISTANT_API_KEY: ${ASSISTANT_API_KEY:-}
+      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-gpt-4o-mini}
+
+      # Voz: transcripcion de notas y lectura en voz alta. Mismo criterio.
+      SPEECH_PROVIDER: ${SPEECH_PROVIDER:-none}
+      SPEECH_REGION: ${SPEECH_REGION:-}
+      SPEECH_API_KEY: ${SPEECH_API_KEY:-}
     ports:
       # 0.0.0.0 = accesible desde otras máquinas de la red local (para que el
       # frontend de un compañero pueda probar). Solo la API se expone; la BD

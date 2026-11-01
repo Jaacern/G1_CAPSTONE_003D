@@ -160,3 +160,100 @@ async def list_messages(
     ).mappings().all()
 
     return MessagesOut(items=[_salida(f, ctx.patient_id) for f in filas])
+
+
+class MessageIn(BaseModel):
+    type:      str = Field(default="text")
+    text:      str | None = Field(default=None, max_length=4000)
+    media_url: str | None = None
+
+
+_TIPOS = {"text", "voice", "photo"}
+
+
+@router.post("/patients/{patient_id}/chat/messages", response_model=MessageOut,
+             status_code=201)
+async def send_message(
+    payload: MessageIn,
+    ctx: PatientContext = Depends(get_patient_member()),
+    db: AsyncSession = Depends(get_db),
+):
+    """Envia un mensaje al chat del circulo.
+
+    chk_messages_content exige que un mensaje de texto traiga texto y que
+    uno de voz o foto traiga archivo. Se valida aca para que el usuario
+    reciba un 422 que explica que falto, en vez del error del motor.
+    """
+    tipo = payload.type.strip().lower()
+    if tipo not in _TIPOS:
+        raise ApiError(
+            status_code=422, code="VALIDATION_ERROR",
+            message="Ese tipo de mensaje no existe.",
+            details=[{"field": "type",
+                      "message": f"Valores aceptados: {', '.join(sorted(_TIPOS))}."}],
+        )
+
+    cuerpo = (payload.text or "").strip() or None
+    file_id = await _archivo_del_paciente(db, payload.media_url, ctx.patient_id)
+
+    if tipo == "text" and cuerpo is None:
+        raise ApiError(
+            status_code=422, code="VALIDATION_ERROR",
+            message="El mensaje no puede ir vacio.",
+            details=[{"field": "text", "message": "Escribe algo antes de enviar."}],
+        )
+    if tipo in ("voice", "photo") and file_id is None:
+        raise ApiError(
+            status_code=422, code="VALIDATION_ERROR",
+            message=f"Un mensaje de tipo '{tipo}' necesita el archivo.",
+            details=[{"field": "media_url", "message": "Falta el archivo."}],
+        )
+
+    conv = await _conversacion(db, ctx.patient_id, crear=True)
+
+    fila = (
+        await db.execute(
+            text(
+                """
+                INSERT INTO messages (conversation_id, sender_id, kind, body, file_id)
+                VALUES (:conv, :uid, :tipo, :cuerpo, :fid)
+                RETURNING id, sender_id, kind, body, file_id, created_at
+                """
+            ),
+            {"conv": conv, "uid": ctx.user.user_id, "tipo": tipo,
+             "cuerpo": cuerpo, "fid": file_id},
+        )
+    ).mappings().first()
+
+    # Un acuse por cada miembro vivo del circulo menos quien escribe, para
+    # que el no leido tenga a quien contarse. Se crean al enviar y no al
+    # abrir la pantalla: si se crearan al leer, un mensaje que nadie abrio
+    # no tendria ninguna fila y no habria forma de distinguir "nadie lo
+    # leyo" de "no se le mostro a nadie".
+    await db.execute(
+        text(
+            """
+            INSERT INTO message_receipts (message_id, recipient_id)
+            SELECT :mid, pm.user_id
+            FROM patient_members pm
+            WHERE pm.patient_id = :pid
+              AND pm.user_id <> :uid
+              AND pm.removed_at IS NULL
+            ON CONFLICT (message_id, recipient_id) DO NOTHING
+            """
+        ),
+        {"mid": str(fila["id"]), "pid": ctx.patient_id, "uid": ctx.user.user_id},
+    )
+
+    await db.execute(
+        text("UPDATE conversations SET last_message_at = now(), updated_at = now() "
+             "WHERE id = :conv"),
+        {"conv": conv},
+    )
+    await db.commit()
+
+    return _salida(
+        {**dict(fila), "full_name": ctx.user.full_name, "role": ctx.role,
+         "leido_por": []},
+        ctx.patient_id,
+    )

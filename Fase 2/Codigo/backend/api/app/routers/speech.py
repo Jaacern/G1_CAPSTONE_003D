@@ -140,3 +140,150 @@ async def transcribe(
         )
 
     return SttOut(text=texto)
+
+
+class TtsIn(BaseModel):
+    text:  str = Field(min_length=1, max_length=3000)
+    voice: str | None = Field(default=None, max_length=60)
+
+    @field_validator("text")
+    @classmethod
+    def _limpiar(cls, v: str) -> str:
+        limpio = v.strip()
+        if not limpio:
+            raise ValueError("No hay texto que leer.")
+        return limpio
+
+
+class TtsOut(BaseModel):
+    audio_url: str
+    cached:    bool
+
+
+# Lista cerrada de voces. Si se aceptara cualquier texto, un nombre
+# inventado llegaria a Azure y volveria un error que no dice nada, y
+# ademas seria un valor del cliente metido tal cual en el SSML.
+_VOCES = {
+    "es-CL-CatalinaNeural", "es-CL-LorenzoNeural",
+    "es-MX-DaliaNeural", "es-MX-JorgeNeural",
+    "es-ES-ElviraNeural", "es-ES-AlvaroNeural",
+}
+
+
+@router.post("/tts", response_model=TtsOut)
+async def speak(
+    payload: TtsIn,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Convierte un texto en audio y devuelve un enlace para reproducirlo.
+
+    El audio se guarda y se reutiliza. La pantalla del adulto mayor lee la
+    misma tarjeta varias veces y volver a sintetizarla seria pagarle a
+    Azure dos veces por el mismo archivo, ademas de hacerlo esperar.
+
+    La copia es por persona, no comun. Asi un texto que incluya algo del
+    expediente de un paciente queda como archivo de quien lo pidio y no
+    como contenido de catalogo que cualquiera podria leer.
+    """
+    import hashlib
+
+    from app.speech_provider import (SpeechNotConfigured, get_speech,
+                                     get_speech_settings)
+
+    proveedor = get_speech()
+    if not proveedor.disponible:
+        raise _NO_DISPONIBLE
+
+    voz = payload.voice or get_speech_settings().speech_default_voice
+    if voz not in _VOCES:
+        raise ApiError(
+            status_code=422, code="VALIDATION_ERROR",
+            message="Esa voz no esta disponible.",
+            details=[{"field": "voice",
+                      "message": f"Voces disponibles: {', '.join(sorted(_VOCES))}."}],
+        )
+
+    firma = hashlib.sha256(
+        f"{user.user_id}|{voz}|{payload.text}".encode("utf-8")
+    ).hexdigest()
+    storage_key = f"user/tts/{firma}.mp3"
+
+    storage = get_storage()
+
+    guardado = (
+        await db.execute(
+            text(
+                """
+                SELECT id, storage_key, mime_type, size_bytes
+                FROM files
+                WHERE storage_key = :key AND status = 'stored'
+                """
+            ),
+            {"key": storage_key},
+        )
+    ).mappings().first()
+
+    if guardado is not None:
+        return TtsOut(
+            audio_url=storage.download_url(
+                file_id=str(guardado["id"]), storage_key=guardado["storage_key"],
+                content_type=guardado["mime_type"], size=guardado["size_bytes"],
+            ),
+            cached=True,
+        )
+
+    try:
+        audio = await proveedor.sintetizar(texto=payload.text, voz=voz)
+    except SpeechNotConfigured:
+        raise _NO_DISPONIBLE
+    except Exception:
+        raise ApiError(
+            status_code=503, code="SPEECH_ERROR",
+            message="No se pudo generar el audio. Intenta de nuevo.",
+        )
+
+    await storage.save(storage_key=storage_key, data=audio)
+
+    # Se guarda el binario antes de la fila, igual que en la subida: si
+    # falla el guardado no queda una fila que dice stored apuntando a un
+    # archivo que no existe.
+    file_id = str(uuid4())
+    nombre = (payload.text[:40] + "...") if len(payload.text) > 40 else payload.text
+    await db.execute(
+        text(
+            """
+            INSERT INTO files (
+                id, patient_id, uploaded_by, storage_key, original_name,
+                mime_type, size_bytes, status, upload_expires_at, stored_at,
+                scope
+            ) VALUES (
+                :id, NULL, :uid, :key, :nombre,
+                'audio/mpeg', :tam, 'stored', now(), now(),
+                'user'
+            )
+            ON CONFLICT (storage_key) DO NOTHING
+            """
+        ),
+        {"id": file_id, "uid": user.user_id, "key": storage_key,
+         "nombre": nombre, "tam": len(audio)},
+    )
+    await db.commit()
+
+    # Dos peticiones iguales a la vez pueden chocar en el UNIQUE. La que
+    # perdio se queda con la fila que gano, que apunta al mismo audio.
+    fila = (
+        await db.execute(
+            text("SELECT id, mime_type, size_bytes FROM files "
+                 "WHERE storage_key = :key"),
+            {"key": storage_key},
+        )
+    ).mappings().first()
+
+    return TtsOut(
+        audio_url=storage.download_url(
+            file_id=str(fila["id"]), storage_key=storage_key,
+            content_type=fila["mime_type"], size=fila["size_bytes"],
+        ),
+        cached=False,
+    )

@@ -4,6 +4,7 @@ Se corren desde afuera, no desde un request:
 
     python -m app.maintenance barrer-subidas
     python -m app.maintenance generar-dosis
+    python -m app.maintenance marcar-vencidas
 
 No se exponen como endpoints a proposito: no son acciones de un usuario,
 no tienen a quien responderle, y un endpoint de mantenimiento abierto es
@@ -205,9 +206,85 @@ async def generar_dosis(*, dias: int = 14, verbose: bool = True) -> dict[str, in
     return {"medicamentos": int(vigentes), "creadas": creadas}
 
 
+async def _parametro(conn, clave: str, por_defecto: int) -> int:
+    """Lee un umbral de negocio de system_parameters.
+
+    Esos valores viven en la tabla justamente para poder cambiarlos sin
+    redespliegue (lo dice el comentario de la tabla). Si falta la fila se
+    usa el valor por defecto en vez de reventar: un proceso de
+    mantenimiento que se cae porque alguien borro una fila de
+    configuracion es peor que uno que sigue con el valor conocido.
+    """
+    v = (
+        await conn.execute(
+            text("SELECT value FROM system_parameters WHERE key = :k"),
+            {"k": clave},
+        )
+    ).scalar()
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return por_defecto
+
+
+async def marcar_dosis_vencidas(*, verbose: bool = True) -> dict[str, int]:
+    """Pasa a 'missed' las dosis cuyo plazo vencio sin que nadie las registre.
+
+    POR QUE HACE FALTA
+        Una dosis se crea 'pending' y ahi se queda para siempre si nadie
+        la toca. La adherencia cuenta 'taken' contra 'missed' y 'skipped',
+        asi que una toma que nunca se dio quedaba como pendiente y no
+        bajaba la adherencia: el indicador mostraba 100% de un paciente al
+        que no le dieron nada en tres dias. El semaforo tampoco se
+        enteraba, porque mira las dosis 'missed' del dia.
+
+    CUANTO SE ESPERA
+        grace_window_min, del propio medicamento (una hora por defecto, y
+        la pantalla deja ponerle entre 5 minutos y 4 horas). No es un
+        numero global a proposito: a una insulina con horario estricto no
+        se le puede dar el mismo margen que a una vitamina.
+
+    LA DIFERENCIA CON MARCARLA A MANO
+        Cuando la cuidadora marca una dosis como no administrada, el
+        endpoint le exige un motivo y guarda quien y cuando. Aca no hay
+        nadie, asi que logged_by y logged_at quedan en NULL, y eso es
+        informacion y no un hueco: una dosis 'missed' con logged_by es
+        "no se la di, por esto"; sin logged_by es "se paso la hora y nadie
+        dijo nada". Son dos hechos distintos y conviene poder separarlos
+        despues. Los CHECK de la tabla lo permiten: solo exigen logged_at
+        para 'taken' y 'skipped'.
+
+    LAS POSPUESTAS
+        Una dosis pospuesta tiene su propio plazo, postponed_until, y se
+        mide contra ese. Hoy la aplicacion no pospone nada, pero el
+        endpoint lo acepta y la tabla lo guarda, asi que si alguna llega
+        por ahi no se queda colgada para siempre.
+    """
+    async with engine.begin() as conn:
+        r = await conn.execute(
+            text(
+                """
+                UPDATE scheduled_doses sd
+                   SET status = 'missed', updated_at = now()
+                  FROM medications m
+                 WHERE m.id = sd.medication_id
+                   AND sd.status IN ('pending', 'postponed')
+                   AND coalesce(sd.postponed_until, sd.scheduled_at)
+                       + make_interval(mins => m.grace_window_min) < now()
+                """
+            )
+        )
+        marcadas = r.rowcount or 0
+
+    if verbose:
+        print(f"dosis vencidas marcadas : {marcadas}")
+    return {"marcadas": marcadas}
+
+
 async def _main(argv: list[str]) -> int:
     tareas = {"barrer-subidas": barrer_subidas_vencidas,
-              "generar-dosis": generar_dosis}
+              "generar-dosis": generar_dosis,
+              "marcar-vencidas": marcar_dosis_vencidas}
     if len(argv) != 1 or argv[0] not in tareas:
         print(f"uso: python -m app.maintenance <{' | '.join(tareas)}>")
         return 2

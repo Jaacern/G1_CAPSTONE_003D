@@ -12,6 +12,7 @@ from app.routers import (
     auth,
     caregiver,
     chat,
+    content,
     documents,
     files,
     gallery,
@@ -145,6 +146,7 @@ app.include_router(marketplace.router)
 app.include_router(gallery.router)
 app.include_router(chat.router)
 app.include_router(assistant.router)
+app.include_router(content.router)
 
 
 @app.get("/", tags=["root"])

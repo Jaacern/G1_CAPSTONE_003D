@@ -24,7 +24,9 @@ class AlertsScreen extends ConsumerWidget {
         child: alertsAsync.when(
           loading: () => const LoadingView(),
           error: (e, _) => ErrorView(
-            message: e is ApiException ? e.message : 'No pudimos cargar las alertas.',
+            message: e is ApiException
+                ? e.message
+                : 'No pudimos cargar las alertas.',
             onRetry: () => ref.invalidate(activeAlertsProvider),
           ),
           data: (alerts) {
@@ -88,7 +90,8 @@ class _SeverityHeader extends StatelessWidget {
         Container(
           width: 10,
           height: 10,
-          decoration: BoxDecoration(color: severity.color, shape: BoxShape.circle),
+          decoration:
+              BoxDecoration(color: severity.color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 8),
         Text(
@@ -101,7 +104,8 @@ class _SeverityHeader extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         Text('($count)',
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            style:
+                const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
       ],
     );
   }
@@ -129,7 +133,8 @@ class _AlertCardState extends ConsumerState<_AlertCard> {
       if (mounted) showAppSnackBar(context, e.message, error: true);
     } catch (_) {
       if (mounted) {
-        showAppSnackBar(context, 'No se pudo completar la acción.', error: true);
+        showAppSnackBar(context, 'No se pudo completar la acción.',
+            error: true);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -184,7 +189,8 @@ class _AlertCardState extends ConsumerState<_AlertCard> {
           Text(a.message,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 13)),
           if (acknowledged) ...[
             const SizedBox(height: 8),
             Row(
@@ -192,7 +198,8 @@ class _AlertCardState extends ConsumerState<_AlertCard> {
                 const Icon(Icons.check_rounded,
                     size: 16, color: AppColors.statusOk),
                 const SizedBox(width: 4),
-                Text('Reconocida${a.acknowledgedBy != null ? ' por ${a.acknowledgedBy}' : ''}',
+                Text(
+                    'Reconocida${a.acknowledgedBy != null ? ' por ${a.acknowledgedBy}' : ''}',
                     style: const TextStyle(
                         color: AppColors.statusOk, fontSize: 12)),
               ],
@@ -206,8 +213,8 @@ class _AlertCardState extends ConsumerState<_AlertCard> {
                   child: OutlinedButton.icon(
                     onPressed: _busy
                         ? null
-                        : () => _run(() => repo.acknowledge(a.id),
-                            'Alerta reconocida'),
+                        : () => _run(
+                            () => repo.acknowledge(a.id), 'Alerta reconocida'),
                     icon: const Icon(Icons.done_rounded, size: 18),
                     label: const Text('Reconocer'),
                   ),
@@ -221,8 +228,7 @@ class _AlertCardState extends ConsumerState<_AlertCard> {
                   ),
                   onPressed: _busy
                       ? null
-                      : () => _run(
-                          () => repo.resolve(a.id), 'Alerta resuelta'),
+                      : () => _run(() => repo.resolve(a.id), 'Alerta resuelta'),
                   icon: _busy
                       ? const SizedBox(
                           width: 16,

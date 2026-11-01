@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../health/domain/models.dart' show VitalType;
 import '../application/alerts_providers.dart';
 import '../data/alerts_repository.dart';
 import '../domain/models.dart';
@@ -45,7 +46,8 @@ class _AlertDetailScreenState extends ConsumerState<AlertDetailScreen> {
       if (mounted) showAppSnackBar(context, e.message, error: true);
     } catch (_) {
       if (mounted) {
-        showAppSnackBar(context, 'No se pudo completar la acción.', error: true);
+        showAppSnackBar(context, 'No se pudo completar la acción.',
+            error: true);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -61,7 +63,8 @@ class _AlertDetailScreenState extends ConsumerState<AlertDetailScreen> {
       body: async.when(
         loading: () => const LoadingView(),
         error: (e, _) => ErrorView(
-          message: e is ApiException ? e.message : 'No pudimos cargar la alerta.',
+          message:
+              e is ApiException ? e.message : 'No pudimos cargar la alerta.',
           onRetry: () => ref.invalidate(_alertByIdProvider(widget.alertId)),
         ),
         data: (alert) {
@@ -138,7 +141,8 @@ class _AlertDetailBody extends StatelessWidget {
                             fontSize: 18,
                             color: color)),
                     const SizedBox(height: 2),
-                    Text('${alert.severity.label} · ${alertTimeAgo(alert.createdAt)}',
+                    Text(
+                        '${alert.severity.label} · ${alertTimeAgo(alert.createdAt)}',
                         style: const TextStyle(
                             color: AppColors.textSecondary, fontSize: 13)),
                   ],
@@ -157,7 +161,8 @@ class _AlertDetailBody extends StatelessWidget {
               children: [
                 Row(
                   children: const [
-                    Icon(Icons.priority_high_rounded, color: AppColors.critical),
+                    Icon(Icons.priority_high_rounded,
+                        color: AppColors.critical),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text('Situación crítica',
@@ -171,7 +176,8 @@ class _AlertDetailBody extends StatelessWidget {
                 const Text(
                   'Contacta al adulto mayor de inmediato para confirmar su estado. '
                   'Si no responde, considera llamar a emergencias.',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  style:
+                      TextStyle(color: AppColors.textSecondary, fontSize: 13),
                 ),
                 const SizedBox(height: 14),
                 FilledButton.icon(
@@ -217,7 +223,8 @@ class _AlertDetailBody extends StatelessWidget {
               if (alert.resolvedAt != null)
                 _DetailRow(
                     'Resuelta',
-                    DateFormat('dd/MM HH:mm').format(alert.resolvedAt!.toLocal())),
+                    DateFormat('dd/MM HH:mm')
+                        .format(alert.resolvedAt!.toLocal())),
               ...?_metaRows(alert.meta),
             ],
           ),
@@ -270,27 +277,99 @@ class _AlertDetailBody extends StatelessWidget {
   }
 
   List<Widget>? _metaRows(Map<String, dynamic>? meta) {
-    if (meta == null || meta.isEmpty) return null;
-    return meta.entries
-        .map((e) => _DetailRow(_prettyKey(e.key), '${e.value}'))
-        .toList();
+    final rows = alertMetaRows(meta);
+    if (rows.isEmpty) return null;
+    return rows.map((r) => _DetailRow(r.label, r.value)).toList();
+  }
+}
+
+/// Una fila del bloque "Detalles" que proviene del payload de la alerta.
+typedef AlertDetailRow = ({String label, String value});
+
+/// Traduce el payload de la alerta a filas que se dejan leer.
+///
+/// El vigilante del backend (maintenance.py) guarda en el payload claves
+/// internas: `reading_id`, `type`, `value`, `min_value`, `max_value` y
+/// `measured_at`. Volcadas tal cual, la ficha de una alerta de ritmo cardíaco
+/// mostraba `type: heart_rate`, `value: 124.0` y un UUID de lectura. Aquí se
+/// convierten a "Signo vital", "Lectura (124 bpm)" y "Rango configurado".
+/// Las alertas del modo demo usan otras claves (`vital`, `unit`), y también se
+/// entienden.
+List<AlertDetailRow> alertMetaRows(Map<String, dynamic>? meta) {
+  if (meta == null || meta.isEmpty) return const [];
+
+  final resto = Map<String, dynamic>.of(meta);
+  final vital = _vitalType(resto.remove('type') ?? resto.remove('vital'));
+  final valor = resto.remove('value');
+  final minimo = resto.remove('min_value');
+  final maximo = resto.remove('max_value');
+  final medida = resto.remove('measured_at');
+  resto.remove('reading_id');
+  final unidad = (resto.remove('unit') ?? vital?.unit ?? '') as String;
+
+  final filas = <AlertDetailRow>[];
+  if (vital != null) filas.add((label: 'Signo vital', value: vital.label));
+  if (valor != null) {
+    filas.add((label: 'Lectura', value: _conUnidad(_numero(valor), unidad)));
+  }
+  if (minimo != null || maximo != null) {
+    final rango = '${minimo != null ? _numero(minimo) : '—'}'
+        '–${maximo != null ? _numero(maximo) : '—'}';
+    filas.add((label: 'Rango configurado', value: _conUnidad(rango, unidad)));
+  }
+  if (medida != null) {
+    final fecha = DateTime.tryParse('$medida');
+    filas.add((
+      label: 'Medida',
+      value: fecha == null
+          ? '$medida'
+          : DateFormat('dd/MM HH:mm').format(fecha.toLocal())
+    ));
   }
 
-  String _prettyKey(String key) {
-    const map = {
-      'location': 'Ubicación',
-      'confidence': 'Confianza',
-      'vital': 'Signo vital',
-      'value': 'Valor',
-      'unit': 'Unidad',
-      'medication': 'Medicamento',
-      'scheduled': 'Programado',
-      'last_sync_hours': 'Última sync (h)',
-      'lat': 'Latitud',
-      'lng': 'Longitud',
-    };
-    return map[key] ?? key;
+  for (final e in resto.entries) {
+    final confianza = e.key == 'confidence' && e.value is num;
+    filas.add((
+      label: _prettyKey(e.key),
+      value: confianza
+          ? '${((e.value as num) * 100).round()} %'
+          : _numero(e.value),
+    ));
   }
+  return filas;
+}
+
+/// 124.0 se lee '124' y 36.7 se queda con su decimal, como en el backend.
+String _numero(Object? v) {
+  if (v is! num) return '$v';
+  return v == v.roundToDouble() ? v.toInt().toString() : '$v';
+}
+
+String _conUnidad(String valor, String unidad) =>
+    unidad.isEmpty ? valor : '$valor $unidad';
+
+VitalType? _vitalType(Object? apiValue) {
+  if (apiValue is! String) return null;
+  for (final t in VitalType.values) {
+    if (t.apiValue == apiValue) return t;
+  }
+  return null;
+}
+
+String _prettyKey(String key) {
+  const map = {
+    'location': 'Ubicación',
+    'confidence': 'Confianza',
+    'vital': 'Signo vital',
+    'value': 'Valor',
+    'unit': 'Unidad',
+    'medication': 'Medicamento',
+    'scheduled': 'Programado',
+    'last_sync_hours': 'Última sync (h)',
+    'lat': 'Latitud',
+    'lng': 'Longitud',
+  };
+  return map[key] ?? key.replaceAll('_', ' ');
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -301,7 +380,9 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) => Text(
         text,
         style: const TextStyle(
-            fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary),
+            fontWeight: FontWeight.w800,
+            fontSize: 15,
+            color: AppColors.textPrimary),
       );
 }
 
@@ -325,8 +406,8 @@ class _DetailRow extends StatelessWidget {
           ),
           Expanded(
             child: Text(value,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w600, fontSize: 14)),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
           ),
         ],
       ),

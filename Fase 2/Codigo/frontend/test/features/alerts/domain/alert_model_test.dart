@@ -30,10 +30,9 @@ void main() {
 
   test('un payload lista no rompe la lectura de la alerta', () {
     // AlertItem declara payload como dict | list.
-    final a = Alert.fromJson(
-        _json(payload: [
-          {'value': 124}
-        ]));
+    final a = Alert.fromJson(_json(payload: [
+      {'value': 124}
+    ]));
 
     expect(a.meta, isNull);
     expect(a.title, 'Ritmo cardíaco elevado');

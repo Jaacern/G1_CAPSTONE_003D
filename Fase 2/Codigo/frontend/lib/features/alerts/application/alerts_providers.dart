@@ -22,7 +22,8 @@ final alertsCountProvider = Provider.autoDispose<int>((ref) {
 void refreshAlerts(Ref ref) => ref.invalidate(activeAlertsProvider);
 
 /// Variante para usar desde widgets con [WidgetRef].
-void refreshAlertsFromWidget(WidgetRef ref) => ref.invalidate(activeAlertsProvider);
+void refreshAlertsFromWidget(WidgetRef ref) =>
+    ref.invalidate(activeAlertsProvider);
 
 /// Hora relativa en español ("hace 5 min", "hace 2 h", "hace 3 días").
 String alertTimeAgo(DateTime when) {

@@ -16,7 +16,8 @@ abstract class AlertsRepository {
   Future<void> resolve(String alertId, {String? note});
 
   /// Envía una alerta SOS para el paciente indicado.
-  Future<void> sendSos(String patientId, {double? lat, double? lng, String? note});
+  Future<void> sendSos(String patientId,
+      {double? lat, double? lng, String? note});
 }
 
 // ---------------------------------------------------------------------------
@@ -110,8 +111,7 @@ class AlertsRepositoryMock implements AlertsRepository {
         type: AlertType.medicationMissed,
         severity: AlertSeverity.warning,
         title: 'Dosis omitida',
-        message:
-            'No se confirmó la toma de Losartán 50 mg de las 08:00. '
+        message: 'No se confirmó la toma de Losartán 50 mg de las 08:00. '
             'Revisa si Elena tomó su medicación.',
         createdAt: now.subtract(const Duration(hours: 2, minutes: 10)),
         status: AlertStatus.acknowledged,

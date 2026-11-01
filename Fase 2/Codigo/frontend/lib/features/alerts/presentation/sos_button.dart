@@ -41,7 +41,8 @@ class _SosButtonState extends ConsumerState<SosButton> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.sos_rounded, color: AppColors.critical, size: 40),
+        icon:
+            const Icon(Icons.sos_rounded, color: AppColors.critical, size: 40),
         title: const Text('¿Enviar alerta SOS?'),
         content: Text(
           'Se notificará de inmediato a la red de cuidado de ${patient.fullName}. '
@@ -117,8 +118,7 @@ class _SosButtonState extends ConsumerState<SosButton> {
   Widget build(BuildContext context) {
     // Solo cuidadora y adulto mayor pueden disparar SOS (roles del backend).
     final role = ref.watch(currentUserProvider)?.primaryRole;
-    final canTriggerSos =
-        role == RoleType.caregiver || role == RoleType.elder;
+    final canTriggerSos = role == RoleType.caregiver || role == RoleType.elder;
     if (!canTriggerSos) return const SizedBox.shrink();
 
     return FloatingActionButton.extended(
@@ -129,7 +129,8 @@ class _SosButtonState extends ConsumerState<SosButton> {
           ? const SizedBox(
               width: 20,
               height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: Colors.white),
             )
           : const Icon(Icons.sos_rounded),
       label: Text(_sending ? 'Enviando...' : 'SOS'),

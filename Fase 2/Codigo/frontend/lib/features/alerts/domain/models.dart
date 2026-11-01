@@ -10,9 +10,11 @@ enum AlertType {
   vitalOutOfRange('vital_out_of_range', 'Signo vital fuera de rango',
       Icons.monitor_heart_rounded),
   medicationMissed('missed_dose', 'Dosis omitida', Icons.medication_rounded),
-  wearableOffline('wearable_offline', 'Wearable sin conexión', Icons.watch_off_rounded),
+  wearableOffline(
+      'wearable_offline', 'Wearable sin conexión', Icons.watch_off_rounded),
   sos('sos', 'Alerta SOS', Icons.sos_rounded),
-  checkinMissed('checkin_missed', 'Check-in sin realizar', Icons.event_busy_rounded),
+  checkinMissed(
+      'checkin_missed', 'Check-in sin realizar', Icons.event_busy_rounded),
   other('other', 'Alerta', Icons.notifications_active_rounded);
 
   const AlertType(this.apiValue, this.label, this.icon);

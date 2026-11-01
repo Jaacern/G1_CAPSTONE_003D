@@ -9,8 +9,14 @@ void main() {
       expect(nombreComuna('08110'), 'Talcahuano');
     });
 
+    test('traduce las comunas de la provincia de Santiago', () {
+      expect(nombreComuna('13101'), 'Santiago');
+      expect(nombreComuna('13123'), 'Providencia');
+      expect(nombreComuna('13132'), 'Vitacura');
+    });
+
     test('un código que no está en la tabla se muestra tal cual', () {
-      expect(nombreComuna('13101'), '13101');
+      expect(nombreComuna('04101'), '04101');
     });
 
     test('no confunde el código con una comuna vacía', () {

@@ -59,7 +59,7 @@ void main() {
             headline: 'Enfermera',
             rating: 4.6,
             reviewsCount: 0,
-            zones: ['13101'],
+            zones: ['04101'],
             bio: '',
             yearsExperience: 5,
           ),
@@ -71,6 +71,6 @@ void main() {
     ));
     await tester.pump();
 
-    expect(find.text('Zonas: 13101'), findsOne);
+    expect(find.text('Zonas: 04101'), findsOne);
   });
 }

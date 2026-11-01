@@ -179,7 +179,7 @@ class MarketplaceRepositoryMock implements MarketplaceRepository {
         name: 'Andadera plegable con ruedas',
         imageUrl: null,
         price: 1450,
-        category: 'movilidad',
+        category: 'mobility',
         description:
             'Andadera de aluminio ligera, plegable, con ruedas delanteras y '
             'asiento de descanso. Soporta hasta 130 kg.',
@@ -189,7 +189,7 @@ class MarketplaceRepositoryMock implements MarketplaceRepository {
         name: 'Dispensador de pastillas semanal',
         imageUrl: null,
         price: 320,
-        category: 'medicacion',
+        category: 'monitoring',
         description:
             'Organizador de medicamentos de 7 días con 4 tomas diarias y '
             'alarma sonora programable.',
@@ -199,7 +199,7 @@ class MarketplaceRepositoryMock implements MarketplaceRepository {
         name: 'Barra de baño de seguridad',
         imageUrl: null,
         price: 480,
-        category: 'seguridad',
+        category: 'bathroom',
         description: 'Barra de sujeción antideslizante para regadera o tina. '
             'Instalación con ventosas de fijación rápida.',
       ),

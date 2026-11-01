@@ -259,33 +259,73 @@ class _CaregiverCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Productos
 // ---------------------------------------------------------------------------
-class _ProductsTab extends ConsumerWidget {
+class _ProductsTab extends ConsumerStatefulWidget {
   const _ProductsTab();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final products = ref.watch(productsProvider(null));
-    return products.when(
-      loading: () => const LoadingView(),
-      error: (e, _) => ErrorView(
-        message: e.toString(),
-        onRetry: () => ref.invalidate(productsProvider(null)),
-      ),
-      data: (list) => list.isEmpty
-          ? const EmptyView(
-              icon: Icons.shopping_bag_outlined,
-              title: 'Sin productos',
-              subtitle: 'Aún no hay ayudas técnicas disponibles.',
-            )
-          : RefreshIndicator(
-              onRefresh: () async => ref.invalidate(productsProvider(null)),
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                itemCount: list.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (_, i) => _ProductCard(product: list[i]),
+  ConsumerState<_ProductsTab> createState() => _ProductsTabState();
+}
+
+class _ProductsTabState extends ConsumerState<_ProductsTab> {
+  /// Clave de la categoría elegida; null es "Todas" y no manda el parámetro.
+  String? _categoria;
+
+  @override
+  Widget build(BuildContext context) {
+    final products = ref.watch(productsProvider(_categoria));
+    return Column(
+      children: [
+        SizedBox(
+          height: 48,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+            children: [
+              ChoiceChip(
+                label: const Text('Todas'),
+                selected: _categoria == null,
+                onSelected: (_) => setState(() => _categoria = null),
               ),
+              for (final (codigo, etiqueta) in categoriasProducto) ...[
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: Text(etiqueta),
+                  selected: _categoria == codigo,
+                  onSelected: (_) => setState(() => _categoria = codigo),
+                ),
+              ],
+            ],
+          ),
+        ),
+        Expanded(
+          child: products.when(
+            loading: () => const LoadingView(),
+            error: (e, _) => ErrorView(
+              message: e.toString(),
+              onRetry: () => ref.invalidate(productsProvider(_categoria)),
             ),
+            data: (list) => list.isEmpty
+                ? EmptyView(
+                    icon: Icons.shopping_bag_outlined,
+                    title: 'Sin productos',
+                    subtitle: _categoria == null
+                        ? 'Aún no hay ayudas técnicas disponibles.'
+                        : 'No hay productos en '
+                            '${categoriaProducto(_categoria)}.',
+                  )
+                : RefreshIndicator(
+                    onRefresh: () async =>
+                        ref.invalidate(productsProvider(_categoria)),
+                    child: ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                      itemCount: list.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (_, i) => _ProductCard(product: list[i]),
+                    ),
+                  ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -334,12 +374,18 @@ class _ProductCard extends StatelessWidget {
                     style: const TextStyle(
                         color: AppColors.textSecondary, fontSize: 13)),
                 const SizedBox(height: 8),
-                Text(
-                  product.precioLabel,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                      color: AppColors.primary),
+                Row(
+                  children: [
+                    _Pill(label: categoriaProducto(product.category)),
+                    const Spacer(),
+                    Text(
+                      product.precioLabel,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: AppColors.primary),
+                    ),
+                  ],
                 ),
               ],
             ),

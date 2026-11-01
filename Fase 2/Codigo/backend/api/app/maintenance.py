@@ -7,6 +7,7 @@ Se corren desde afuera, no desde un request:
     python -m app.maintenance marcar-vencidas
     python -m app.maintenance alertar-dosis
     python -m app.maintenance alertar-vitales
+    python -m app.maintenance semaforo
 
 No se exponen como endpoints a proposito: no son acciones de un usuario,
 no tienen a quien responderle, y un endpoint de mantenimiento abierto es
@@ -585,12 +586,190 @@ async def alertar_vitales_fuera_de_rango(*, verbose: bool = True) -> dict[str, i
     return {"creadas": creadas, "en_espera": omitidas}
 
 
+async def calcular_semaforo(*, verbose: bool = True) -> dict[str, int]:
+    """Calcula el semaforo del dia de cada paciente y lo guarda.
+
+    POR QUE HACE FALTA
+        caregiver.py lee de wellbeing_snapshots el estado del paciente para
+        la pantalla de la cuidadora, y nadie escribia esa tabla. La llenaba
+        el seed de desarrollo, con siete dias y un 'ok' fijo para hoy, y
+        ahi se detenia: al dia siguiente ya no habia fila nueva y la
+        pantalla mostraba el ultimo dia calculado, que es lo que hace el
+        router cuando no encuentra el de hoy. En una instalacion sin seed no
+        habia ninguna, nunca.
+
+        Las dos salidas son malas por el mismo motivo. Un estado de hace
+        tres dias presentado como el de hoy, o un verde que nadie calculo,
+        tranquilizan a la familia sin haber mirado nada, y esto es una
+        aplicacion de cuidado de adultos mayores.
+
+        La tabla guarda tambien los tres conteos que respaldan el estado,
+        "para auditar como se llego al estado", dice su propio comentario.
+        Se llenan: un rojo sin numeros detras no se puede defender frente a
+        una familia que pregunta por que.
+
+    LA MISMA REGLA, A PROPOSITO
+        El calculo es el de _compute_wellbeing en vitals.py, incluido el
+        texto de los motivos:
+
+            attention : una alerta critical activa, o un vital fuera de rango
+            warning   : una alerta warning activa, o dosis omitidas hoy
+            ok        : ninguno de los anteriores
+
+        La duplicacion es deliberada y conviene decir por que. El endpoint
+        del semaforo calcula en vivo cada vez que alguien abre la pantalla;
+        esta tabla es la fotografia del dia, que es lo que permite mirar la
+        semana hacia atras. Son dos cosas distintas, pero la regla tiene
+        que ser una sola: si se separan, la cuidadora ve un estado y la
+        familia ve otro para el mismo dia.
+
+    LA FECHA
+        El dia es el dia chileno, igual que las dosis. OJO: vitals.py cuenta
+        las dosis de hoy con current_date, que es la fecha de la zona de la
+        sesion de Postgres, y el contenedor corre en UTC. Desde las nueve de
+        la noche en Chile, para ese endpoint ya es manana. Aca se usa la
+        hora local a proposito; dejar de lado ese desfase en el endpoint es
+        una decision aparte, no de este proceso.
+
+    No se filtra por antiguedad de la medicion, igual que la pantalla: la
+    ultima medicion conocida es el ultimo estado conocido. La alerta si
+    tiene limite de antiguedad, y la diferencia es sana: una alerta es un
+    aviso, que tiene momento; el semaforo es un estado, que dura hasta que
+    llegue otro dato.
+    """
+    pacientes = 0
+    por_estado: dict[str, int] = {"ok": 0, "warning": 0, "attention": 0}
+
+    async with engine.begin() as conn:
+        ids = (
+            await conn.execute(
+                text("SELECT id FROM patients WHERE deleted_at IS NULL "
+                     "ORDER BY full_name")
+            )
+        ).scalars().all()
+
+        for pid in ids:
+            pid = str(pid)
+            pacientes += 1
+
+            # Alertas activas, lo mas nuevo arriba, igual que _active_alerts.
+            alertas = (
+                await conn.execute(
+                    text(
+                        """
+                        SELECT severity, title
+                        FROM alerts
+                        WHERE patient_id = :pid AND status = 'active'
+                        ORDER BY created_at DESC
+                        """
+                    ),
+                    {"pid": pid},
+                )
+            ).mappings().all()
+
+            # Ultima medicion de cada tipo contra su umbral, igual que
+            # _latest_items: sin limite de antiguedad y comparando solo los
+            # tipos que tienen umbral.
+            fuera = (
+                await conn.execute(
+                    text(
+                        """
+                        WITH ultimas AS (
+                            SELECT DISTINCT ON (type) type, value
+                            FROM vital_readings
+                            WHERE patient_id = :pid
+                            ORDER BY type, measured_at DESC
+                        )
+                        SELECT u.type, u.value, coalesce(vt.unit, '') AS unidad
+                        FROM ultimas u
+                        JOIN vital_thresholds t
+                          ON t.patient_id = :pid AND t.type = u.type
+                         AND t.deleted_at IS NULL
+                        LEFT JOIN vital_types vt ON vt.code = u.type
+                        WHERE (t.min_value IS NOT NULL AND u.value < t.min_value)
+                           OR (t.max_value IS NOT NULL AND u.value > t.max_value)
+                        ORDER BY u.type
+                        """
+                    ),
+                    {"pid": pid},
+                )
+            ).mappings().all()
+
+            omitidas = (
+                await conn.execute(
+                    text(
+                        """
+                        SELECT count(*)
+                        FROM scheduled_doses sd
+                        JOIN medications m ON m.id = sd.medication_id
+                        WHERE m.patient_id = :pid
+                          AND sd.status = 'missed'
+                          AND CAST(sd.scheduled_at AT TIME ZONE CAST(:zona AS text)
+                                   AS date)
+                              = CAST(now() AT TIME ZONE CAST(:zona AS text) AS date)
+                        """
+                    ),
+                    {"pid": pid, "zona": ZONA},
+                )
+            ).scalar() or 0
+
+            criticas = [a for a in alertas if a["severity"] == "critical"]
+            avisos   = [a for a in alertas if a["severity"] == "warning"]
+
+            # El mismo orden y el mismo texto que _compute_wellbeing.
+            motivos = [f"Alerta crítica activa: {a['title']}" for a in criticas]
+            motivos += [
+                f"{v['type']} fuera de rango ({float(v['value'])} {v['unidad']})"
+                for v in fuera
+            ]
+            estado = "attention" if (criticas or fuera) else "ok"
+            motivos += [f"Alerta activa: {a['title']}" for a in avisos]
+            if omitidas > 0:
+                motivos.append(f"{omitidas} dosis omitida(s) hoy")
+            if estado != "attention" and (avisos or omitidas > 0):
+                estado = "warning"
+
+            await conn.execute(
+                text(
+                    """
+                    INSERT INTO wellbeing_snapshots
+                        (patient_id, snapshot_date, status, reasons,
+                         vitals_out_of_range, doses_missed, active_alerts)
+                    VALUES
+                        (:pid,
+                         CAST(now() AT TIME ZONE CAST(:zona AS text) AS date),
+                         :estado, CAST(:motivos AS jsonb),
+                         :fuera, :omitidas, :activas)
+                    ON CONFLICT (patient_id, snapshot_date) DO UPDATE
+                        SET status = EXCLUDED.status,
+                            reasons = EXCLUDED.reasons,
+                            vitals_out_of_range = EXCLUDED.vitals_out_of_range,
+                            doses_missed = EXCLUDED.doses_missed,
+                            active_alerts = EXCLUDED.active_alerts,
+                            computed_at = now()
+                    """
+                ),
+                {"pid": pid, "zona": ZONA, "estado": estado,
+                 "motivos": json.dumps(motivos, ensure_ascii=False),
+                 "fuera": len(fuera), "omitidas": int(omitidas),
+                 "activas": len(alertas)},
+            )
+            por_estado[estado] += 1
+
+    if verbose:
+        print(f"pacientes calculados : {pacientes}")
+        for e in ("ok", "warning", "attention"):
+            print(f"  {e:<10} : {por_estado[e]}")
+    return {"pacientes": pacientes, **por_estado}
+
+
 async def _main(argv: list[str]) -> int:
     tareas = {"barrer-subidas": barrer_subidas_vencidas,
               "generar-dosis": generar_dosis,
               "marcar-vencidas": marcar_dosis_vencidas,
               "alertar-dosis": alertar_dosis_omitidas,
-              "alertar-vitales": alertar_vitales_fuera_de_rango}
+              "alertar-vitales": alertar_vitales_fuera_de_rango,
+              "semaforo": calcular_semaforo}
     if len(argv) != 1 or argv[0] not in tareas:
         print(f"uso: python -m app.maintenance <{' | '.join(tareas)}>")
         return 2

@@ -11,7 +11,7 @@ estan la familia, la cuidadora y el medico. El asistente de IA usa la
 misma tabla con type='assistant' y una conversacion por persona, y va por
 su propio router.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -256,4 +256,54 @@ async def send_message(
         {**dict(fila), "full_name": ctx.user.full_name, "role": ctx.role,
          "leido_por": []},
         ctx.patient_id,
+    )
+
+
+class ReadOut(BaseModel):
+    marked:  int
+    read_at: datetime
+
+
+@router.post("/patients/{patient_id}/chat/read", response_model=ReadOut)
+async def mark_read(
+    ctx: PatientContext = Depends(get_patient_member()),
+    db: AsyncSession = Depends(get_db),
+):
+    """Marca como leido todo el chat del paciente.
+
+    Es lo que la pantalla llama al abrir la conversacion, sin indicar
+    mensajes: se marca lo que esta pendiente para quien pide.
+
+    Solo se tocan los acuses que todavia no tienen fecha. Si se escribiera
+    siempre, abrir la pantalla dos veces movería la hora de lectura de
+    mensajes vistos ayer, y esa hora es justamente lo que le dice a la
+    familia cuando la cuidadora se entero de algo.
+    """
+    conv = await _conversacion(db, ctx.patient_id)
+    if conv is None:
+        return ReadOut(marked=0, read_at=datetime.now(timezone.utc))
+
+    filas = (
+        await db.execute(
+            text(
+                """
+                UPDATE message_receipts mr
+                   SET read_at = now(),
+                       delivered_at = coalesce(mr.delivered_at, now())
+                  FROM messages m
+                 WHERE m.id = mr.message_id
+                   AND m.conversation_id = :conv
+                   AND mr.recipient_id = :uid
+                   AND mr.read_at IS NULL
+                RETURNING mr.read_at
+                """
+            ),
+            {"conv": conv, "uid": ctx.user.user_id},
+        )
+    ).scalars().all()
+    await db.commit()
+
+    return ReadOut(
+        marked=len(filas),
+        read_at=filas[0] if filas else datetime.now(timezone.utc),
     )

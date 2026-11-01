@@ -209,8 +209,8 @@ class MarketplaceRepositoryMock implements MarketplaceRepository {
       const JobOffer(
         id: 'j-1',
         title: 'Cuidadora de día para adulto mayor',
-        zone: 'Roma Norte, CDMX',
-        pay: '\$8,000 - \$10,000 / mes',
+        zone: '08101',
+        pay: '\$550.000 - \$650.000 / mes',
         description:
             'Se busca cuidadora para acompañamiento diurno (L-V, 8:00 a 16:00) '
             'de señora de 78 años con movilidad reducida. Experiencia comprobable.',
@@ -218,11 +218,12 @@ class MarketplaceRepositoryMock implements MarketplaceRepository {
       const JobOffer(
         id: 'j-2',
         title: 'Enfermera para turnos nocturnos',
-        zone: 'Del Valle, CDMX',
-        pay: '\$700 / noche',
+        zone: '13120',
+        pay: '\$80.000 / noche',
         description:
-            'Turnos nocturnos para control de medicación y monitoreo de '
-            'paciente postoperatorio. Se valora cédula profesional.',
+            'Turnos nocturnos para administración de medicamentos y monitoreo '
+            'de paciente postoperatorio. Se valora título con registro en la '
+            'Superintendencia de Salud.',
       ),
     ]);
   }

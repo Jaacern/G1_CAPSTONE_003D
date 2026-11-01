@@ -39,8 +39,12 @@ class ApiException implements Exception {
     );
   }
 
+  /// Las pantallas muestran el error con `toString()` dentro de un aviso. El
+  /// estado y el código quedan disponibles como campos para el registro, pero
+  /// no viajan en la cadena: a la cuidadora le sirve el mensaje del backend,
+  /// que ya viene en español, y no un `409 SHIFT_ALREADY_OPEN`.
   @override
-  String toString() => 'ApiException($statusCode $code): $message';
+  String toString() => message;
 }
 
 /// Cliente HTTP con renovación automática del access token.

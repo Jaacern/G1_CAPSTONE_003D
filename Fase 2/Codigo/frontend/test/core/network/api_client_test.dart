@@ -63,16 +63,19 @@ class _ScriptedAdapter implements HttpClientAdapter {
 
     if (options.path == '/auth/refresh') {
       if (refreshFails) {
-        return _json(401, '{"error":{"code":"INVALID_REFRESH","message":"vencido"}}');
+        return _json(
+            401, '{"error":{"code":"INVALID_REFRESH","message":"vencido"}}');
       }
-      return _json(200, '{"access_token":"new-access","refresh_token":"new-refresh"}');
+      return _json(
+          200, '{"access_token":"new-access","refresh_token":"new-refresh"}');
     }
 
     if (options.path == '/patients/me') {
       if (options.headers['Authorization'] == 'Bearer new-access') {
         return _json(200, '{"id":"p1","name":"Elena"}');
       }
-      return _json(401, '{"error":{"code":"TOKEN_EXPIRED","message":"expirado"}}');
+      return _json(
+          401, '{"error":{"code":"TOKEN_EXPIRED","message":"expirado"}}');
     }
 
     if (options.path == '/auth/login') {
@@ -80,7 +83,8 @@ class _ScriptedAdapter implements HttpClientAdapter {
       return _json(200, '{"ok":true}');
     }
 
-    return _json(404, '{"error":{"code":"NOT_FOUND","message":"no encontrado"}}');
+    return _json(
+        404, '{"error":{"code":"NOT_FOUND","message":"no encontrado"}}');
   }
 
   @override
@@ -92,12 +96,14 @@ Dio _dioWith(_ScriptedAdapter adapter) =>
       ..httpClientAdapter = adapter;
 
 void main() {
-  test('agrega el token guardado en rutas privadas, y lo omite en publicas', () async {
+  test('agrega el token guardado en rutas privadas, y lo omite en publicas',
+      () async {
     final tokens = _FakeTokenStorage()
       ..access = 'new-access'
       ..refresh = 'r1';
     final adapter = _ScriptedAdapter();
-    final client = ApiClient(tokens, dio: _dioWith(adapter), refreshDio: _dioWith(adapter));
+    final client = ApiClient(tokens,
+        dio: _dioWith(adapter), refreshDio: _dioWith(adapter));
 
     await client.get<Map<String, dynamic>>('/patients/me');
     expect(adapter.authHeaders.last, 'Bearer new-access');
@@ -106,12 +112,14 @@ void main() {
     expect(adapter.authHeaders.last, isNull);
   });
 
-  test('ante un 401 pide refresh solo y reintenta la peticion original', () async {
+  test('ante un 401 pide refresh solo y reintenta la peticion original',
+      () async {
     final tokens = _FakeTokenStorage()
       ..access = 'old-access'
       ..refresh = 'valid-refresh';
     final adapter = _ScriptedAdapter();
-    final client = ApiClient(tokens, dio: _dioWith(adapter), refreshDio: _dioWith(adapter));
+    final client = ApiClient(tokens,
+        dio: _dioWith(adapter), refreshDio: _dioWith(adapter));
 
     final result = await client.get<Map<String, dynamic>>('/patients/me');
 
@@ -133,7 +141,8 @@ void main() {
       ..access = 'old-access'
       ..refresh = 'expired-refresh';
     final adapter = _ScriptedAdapter()..refreshFails = true;
-    final client = ApiClient(tokens, dio: _dioWith(adapter), refreshDio: _dioWith(adapter));
+    final client = ApiClient(tokens,
+        dio: _dioWith(adapter), refreshDio: _dioWith(adapter));
 
     var sessionExpiredCalled = false;
     client.onSessionExpired = () => sessionExpiredCalled = true;
@@ -146,5 +155,49 @@ void main() {
     expect(sessionExpiredCalled, isTrue);
     expect(tokens.cleared, isTrue);
     expect(tokens.access, isNull);
+  });
+
+  group('ApiException', () {
+    test('lee el mensaje del sobre de error del backend', () {
+      final error = ApiException.fromDio(DioException(
+        requestOptions: RequestOptions(path: '/x'),
+        response: Response(
+          statusCode: 409,
+          requestOptions: RequestOptions(path: '/x'),
+          data: const {
+            'error': {
+              'code': 'SHIFT_ALREADY_OPEN',
+              'message': 'Ya tienes un turno abierto con otro paciente.',
+              'details': null,
+              'request_id': 'r-1',
+            }
+          },
+        ),
+      ));
+
+      expect(error.statusCode, 409);
+      expect(error.code, 'SHIFT_ALREADY_OPEN');
+      expect(error.message, 'Ya tienes un turno abierto con otro paciente.');
+    });
+
+    // Las pantallas interpolan el error directo en un aviso; si toString
+    // sumara el estado y el código, ese detalle técnico se leería en pantalla.
+    test('se muestra con el mensaje, sin el código de la API', () {
+      final error = ApiException(
+          statusCode: 404, code: 'NOT_FOUND', message: 'La tarea no existe.');
+
+      expect(error.toString(), 'La tarea no existe.');
+    });
+
+    test('un fallo sin sobre de error usa el mensaje genérico', () {
+      final error = ApiException.fromDio(DioException(
+        requestOptions: RequestOptions(path: '/x'),
+        type: DioExceptionType.connectionError,
+      ));
+
+      expect(error.code, 'NETWORK_ERROR');
+      expect(error.toString(), isNot(contains('Instance of')));
+      expect(error.toString(), isNotEmpty);
+    });
   });
 }

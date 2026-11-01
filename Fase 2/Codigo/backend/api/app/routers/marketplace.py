@@ -344,3 +344,114 @@ async def contact_caregiver(
 
     return ContactOut(id=fila["id"], status=fila["status"],
                       created_at=fila["created_at"])
+
+
+class ReviewIn(BaseModel):
+    rating:     int = Field(ge=1, le=5)
+    comment:    str = Field(default="", max_length=1000)
+    patient_id: UUID | None = None
+
+
+@router.post("/caregivers/{profile_id}/reviews", response_model=ReviewOut,
+             status_code=201)
+async def add_review(
+    profile_id: UUID,
+    payload: ReviewIn,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Deja una resena a una cuidadora (RF-78).
+
+    Solo puede resenar quien de verdad compartio el cuidado de un paciente
+    con ella. Las dos claves foraneas compuestas de la tabla lo garantizan
+    en el motor, asi que una resena inventada no entra ni por error de
+    programacion. Aca se resuelve cual es ese paciente y se devuelven
+    errores que se entienden, en vez de dejar que el motor responda con un
+    503.
+    """
+    perfil = await _perfil_publicado(db, profile_id)
+    cuidadora = str(perfil["user_id"])
+
+    if cuidadora == user.user_id:
+        raise ApiError(
+            status_code=422, code="VALIDATION_ERROR",
+            message="No puedes resenarte a ti misma.",
+        )
+
+    # Pacientes donde los dos son miembros vivos. Es exactamente lo que las
+    # dos FK compuestas van a exigir despues.
+    compartidos = (
+        await db.execute(
+            text(
+                """
+                SELECT a.patient_id
+                FROM patient_members a
+                JOIN patient_members b ON b.patient_id = a.patient_id
+                JOIN patients p ON p.id = a.patient_id
+                WHERE a.user_id = :autor
+                  AND b.user_id = :cuidadora
+                  AND a.removed_at IS NULL
+                  AND b.removed_at IS NULL
+                  AND p.deleted_at IS NULL
+                ORDER BY a.created_at
+                """
+            ),
+            {"autor": user.user_id, "cuidadora": cuidadora},
+        )
+    ).scalars().all()
+
+    if not compartidos:
+        raise ApiError(
+            status_code=403, code="FORBIDDEN",
+            message="Solo puedes resenar a una cuidadora con la que compartiste "
+                    "el cuidado de un paciente.",
+        )
+
+    if payload.patient_id is not None:
+        if payload.patient_id not in compartidos:
+            raise ApiError(
+                status_code=403, code="FORBIDDEN",
+                message="No compartiste el cuidado de ese paciente con esta cuidadora.",
+            )
+        paciente = str(payload.patient_id)
+    else:
+        paciente = str(compartidos[0])
+
+    # uq_caregiver_reviews_autor deja una resena por persona. Cambiar de
+    # opinion es legitimo, asi que la segunda reemplaza a la primera en vez
+    # de rechazarse. El trigger recalcula el promedio del perfil solo.
+    fila = (
+        await db.execute(
+            text(
+                """
+                INSERT INTO caregiver_reviews (
+                    profile_id, reviewed_user_id, author_id, patient_id,
+                    rating, comment
+                ) VALUES (
+                    :perfil, :cuidadora, :autor, :paciente, :nota, :comentario
+                )
+                ON CONFLICT (profile_id, author_id) DO UPDATE
+                   SET rating = EXCLUDED.rating,
+                       comment = EXCLUDED.comment,
+                       patient_id = EXCLUDED.patient_id,
+                       deleted_at = NULL,
+                       updated_at = now()
+                RETURNING rating, comment, created_at
+                """
+            ),
+            {
+                "perfil": str(perfil["id"]), "cuidadora": cuidadora,
+                "autor": user.user_id, "paciente": paciente,
+                "nota": payload.rating,
+                "comentario": payload.comment.strip() or None,
+            },
+        )
+    ).mappings().first()
+    await db.commit()
+
+    return ReviewOut(
+        author_name=user.full_name,
+        rating=fila["rating"],
+        comment=fila["comment"] or "",
+        created_at=fila["created_at"],
+    )

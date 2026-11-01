@@ -11,8 +11,8 @@ import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/models.dart';
 import '../../patients/application/patients_providers.dart';
 import '../application/medications_providers.dart';
-import '../data/medications_repository.dart';
 import '../domain/models.dart';
+import 'dose_actions.dart';
 
 /// Roles que el backend autoriza a crear/editar medicamentos y registrar
 /// dosis (la familia es solo-lectura: el backend responde 403).
@@ -20,6 +20,13 @@ bool _canManageMeds(WidgetRef ref) {
   final role = ref.watch(currentUserProvider)?.primaryRole;
   return role == RoleType.caregiver || role == RoleType.doctor;
 }
+
+/// Quién puede marcar una dosis como tomada. No es lo mismo que gestionar el
+/// plan: 6.6 (POST /doses/{id}/log) comprueba a mano que el llamador sea
+/// miembro 'caregiver' del paciente, así que al médico lo devuelve con 404
+/// aunque sí pueda crear, editar o discontinuar medicamentos.
+bool _puedeRegistrarToma(WidgetRef ref) =>
+    ref.watch(currentUserProvider)?.primaryRole == RoleType.caregiver;
 
 /// Pestaña principal de Medicamentos: adherencia, plan y dosis de hoy
 /// (tickets AGE-401/402/403/404).
@@ -173,8 +180,8 @@ class _AdherenceSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final adherence = ref.watch(adherenceProvider);
     return adherence.when(
-      loading: () => const AppCard(
-          child: SizedBox(height: 160, child: LoadingView())),
+      loading: () =>
+          const AppCard(child: SizedBox(height: 160, child: LoadingView())),
       error: (e, _) => AppCard(
         child: ErrorView(
             message: e.toString(),
@@ -184,8 +191,7 @@ class _AdherenceSection extends ConsumerWidget {
         if (data == null || data.byDay.isEmpty) {
           return const AppCard(
             child: EmptyView(
-                icon: Icons.insights_rounded,
-                title: 'Sin datos de adherencia'),
+                icon: Icons.insights_rounded, title: 'Sin datos de adherencia'),
           );
         }
         return AppCard(
@@ -259,8 +265,8 @@ class _AdherenceChart extends StatelessWidget {
           rightTitles:
               const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           leftTitles: const AxisTitles(
-            sideTitles: SideTitles(
-                showTitles: true, reservedSize: 32, interval: 25),
+            sideTitles:
+                SideTitles(showTitles: true, reservedSize: 32, interval: 25),
           ),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
@@ -287,8 +293,8 @@ class _AdherenceChart extends StatelessWidget {
               BarChartRodData(
                 toY: points[i].pct,
                 width: 14,
-                borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(4)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(4)),
                 color: _pctColor(points[i].pct),
               ),
             ]),
@@ -351,21 +357,9 @@ class _DoseTileState extends ConsumerState<_DoseTile> {
 
   Future<void> _log(DoseStatus status) async {
     setState(() => _busy = true);
-    try {
-      await ref
-          .read(medicationsRepositoryProvider)
-          .logDose(widget.dose.id, status);
-      ref.invalidate(todayDosesProvider);
-      ref.invalidate(adherenceProvider);
-      if (mounted) {
-        showAppSnackBar(context,
-            status == DoseStatus.taken ? 'Toma registrada' : 'Dosis omitida');
-      }
-    } catch (e) {
-      if (mounted) showAppSnackBar(context, e.toString(), error: true);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    await registrarDosis(
+        context: context, ref: ref, dose: widget.dose, status: status);
+    if (mounted) setState(() => _busy = false);
   }
 
   @override
@@ -407,28 +401,36 @@ class _DoseTileState extends ConsumerState<_DoseTile> {
               _StatusChip(status: d.status),
             ],
           ),
-          // Registrar la toma solo lo puede hacer la cuidadora/médico.
-          if (!done && _canManageMeds(ref)) ...[
+          // Registrar la toma le corresponde a la cuidadora: el endpoint 6.6
+          // solo autoriza a ese rol (ver [_puedeRegistrarToma]).
+          if (!done && _puedeRegistrarToma(ref)) ...[
             const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _busy ? null : () => _log(DoseStatus.taken),
+                icon: const Icon(Icons.check_rounded),
+                label: const Text('Tomada'),
+                style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44)),
+              ),
+            ),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
-                  child: FilledButton.icon(
-                    onPressed: _busy ? null : () => _log(DoseStatus.taken),
-                    icon: const Icon(Icons.check_rounded),
-                    label: const Text('Tomada'),
-                    style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(44)),
+                  child: OutlinedButton.icon(
+                    onPressed: _busy ? null : () => _log(DoseStatus.postponed),
+                    icon: const Icon(Icons.schedule_rounded, size: 18),
+                    label: const Text('Posponer'),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: _busy ? null : () => _log(DoseStatus.skipped),
-                    icon: const Icon(Icons.close_rounded),
-                    label: const Text('Omitir'),
-                    style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(44)),
+                    onPressed: _busy ? null : () => _log(DoseStatus.missed),
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    label: const Text('No la tomé'),
                   ),
                 ),
               ],
@@ -454,9 +456,7 @@ class _StatusChip extends StatelessWidget {
       ),
       child: Text(status.label,
           style: TextStyle(
-              color: status.color,
-              fontWeight: FontWeight.w700,
-              fontSize: 12)),
+              color: status.color, fontWeight: FontWeight.w700, fontSize: 12)),
     );
   }
 }
@@ -476,13 +476,12 @@ class _MedicationCard extends ConsumerWidget {
     return AppCard(
       // El familiar ve el plan en solo lectura; no navega a edición.
       onTap: canManage
-          ? () => context.push(
-              '/meds/plan?patient=$patientId&medication=${medication.id}')
+          ? () => context
+              .push('/meds/plan?patient=$patientId&medication=${medication.id}')
           : null,
       child: Row(
         children: [
-          const Icon(Icons.medication_liquid_rounded,
-              color: AppColors.primary),
+          const Icon(Icons.medication_liquid_rounded, color: AppColors.primary),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

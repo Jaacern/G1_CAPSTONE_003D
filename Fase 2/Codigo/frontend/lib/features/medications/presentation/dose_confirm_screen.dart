@@ -5,9 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../../patients/application/patients_providers.dart';
-import '../application/medications_providers.dart';
 import '../data/medications_repository.dart';
 import '../domain/models.dart';
+import 'dose_actions.dart';
 
 /// Carga la dosis (de las de hoy del paciente seleccionado) por su id.
 final _doseByIdProvider =
@@ -24,7 +24,8 @@ final _doseByIdProvider =
 });
 
 /// Pantalla a la que se llega desde la alarma de medicación (ticket AGE-403).
-/// Diseño accesible: botones grandes de "Confirmar toma" / "Omitir".
+/// Diseño accesible: botones grandes de "Confirmar toma" / "Posponer" /
+/// "No la tomé".
 class DoseConfirmScreen extends ConsumerWidget {
   const DoseConfirmScreen({super.key, required this.doseId});
 
@@ -68,22 +69,11 @@ class _DoseConfirmBodyState extends ConsumerState<_DoseConfirmBody> {
 
   Future<void> _log(DoseStatus status) async {
     setState(() => _busy = true);
-    try {
-      await ref
-          .read(medicationsRepositoryProvider)
-          .logDose(widget.dose.id, status);
-      ref.invalidate(todayDosesProvider);
-      ref.invalidate(adherenceProvider);
-      if (mounted) {
-        showAppSnackBar(context,
-            status == DoseStatus.taken ? 'Toma confirmada' : 'Dosis omitida');
-        context.pop();
-      }
-    } catch (e) {
-      if (mounted) showAppSnackBar(context, e.toString(), error: true);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    final registrado = await registrarDosis(
+        context: context, ref: ref, dose: widget.dose, status: status);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (registrado) context.pop();
   }
 
   @override
@@ -117,13 +107,14 @@ class _DoseConfirmBodyState extends ConsumerState<_DoseConfirmBody> {
           const SizedBox(height: 8),
           Text(d.medicationName,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 30, fontWeight: FontWeight.w800)),
+              style:
+                  const TextStyle(fontSize: 30, fontWeight: FontWeight.w800)),
           const SizedBox(height: 4),
           Text(
             '${d.dose != null ? '${d.dose} ${d.unit ?? ''} · '.trim() : ''}${d.timeLabel}',
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 20, color: AppColors.textSecondary),
+            style:
+                const TextStyle(fontSize: 20, color: AppColors.textSecondary),
           ),
           const Spacer(),
           FilledButton.icon(
@@ -137,16 +128,40 @@ class _DoseConfirmBodyState extends ConsumerState<_DoseConfirmBody> {
             ),
           ),
           const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: _busy ? null : () => _log(DoseStatus.skipped),
-            icon: const Icon(Icons.close_rounded, size: 28),
-            label: const Text('Omitir',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(72),
-              foregroundColor: AppColors.textPrimary,
-              side: const BorderSide(color: AppColors.divider, width: 1.5),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _busy ? null : () => _log(DoseStatus.postponed),
+                  icon: const Icon(Icons.schedule_rounded, size: 26),
+                  label: const Text('Posponer',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(64),
+                    foregroundColor: AppColors.textPrimary,
+                    side:
+                        const BorderSide(color: AppColors.divider, width: 1.5),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _busy ? null : () => _log(DoseStatus.missed),
+                  icon: const Icon(Icons.close_rounded, size: 26),
+                  label: const Text('No la tomé',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(64),
+                    foregroundColor: AppColors.statusAttention,
+                    side: const BorderSide(
+                        color: AppColors.statusAttention, width: 1.5),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
         ],

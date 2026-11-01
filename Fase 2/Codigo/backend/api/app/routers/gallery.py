@@ -292,3 +292,44 @@ async def react_photo(
         reactions={c["reaction_type"]: c["cuantas"] for c in conteos},
         mine=mia,
     )
+
+
+@router.delete("/photos/{photo_id}", status_code=204)
+async def delete_photo(
+    photo_id: UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Quita una foto de la galeria.
+
+    Es borrado logico y las reacciones no se tocan: photo_reactions apunta
+    a la foto con RESTRICT, y de todos modos que alguien haya reaccionado
+    es un hecho que paso.
+
+    Quita la foto quien la compartio. El familiar administrador tambien,
+    porque es quien responde por lo que ve el adulto mayor.
+    """
+    fila, rol = await _foto_del_usuario(db, photo_id, user.user_id)
+
+    es_duena = str(fila["published_by_user_id"]) == user.user_id
+    if not es_duena:
+        propietario = (
+            await db.execute(
+                text("SELECT is_owner FROM patient_members "
+                     "WHERE patient_id = :pid AND user_id = :uid "
+                     "AND removed_at IS NULL"),
+                {"pid": str(fila["patient_id"]), "uid": user.user_id},
+            )
+        ).scalar()
+        if not propietario:
+            raise ApiError(
+                status_code=403, code="FORBIDDEN",
+                message="Solo quien compartio la foto puede quitarla.",
+            )
+
+    await db.execute(
+        text("UPDATE gallery_photos SET deleted_at = now(), updated_at = now() "
+             "WHERE id = :fid AND deleted_at IS NULL"),
+        {"fid": str(photo_id)},
+    )
+    await db.commit()

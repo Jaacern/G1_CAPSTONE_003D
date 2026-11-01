@@ -583,3 +583,90 @@ def _unicas(fuentes: list) -> list:
     for f in fuentes:
         vistas.setdefault(f.label, f)
     return list(vistas.values())
+
+
+class MessagesOut(BaseModel):
+    items: list[AssistantMessageOut]
+
+
+# Nombre legible de cada tabla del expediente, para mostrar la fuente.
+_ETIQUETA = {
+    "patients":           "Datos del paciente",
+    "patient_conditions": "Condiciones",
+    "medications":        "Medicamentos",
+    "scheduled_doses":    "Dosis",
+    "vital_readings":     "Mediciones",
+    "care_observations":  "Bitacora",
+    "alerts":             "Alertas",
+    "medical_documents":  "Documentos",
+}
+
+
+@router.get("/assistant/conversations/{conversation_id}/messages",
+            response_model=MessagesOut)
+async def conversation_messages(
+    conversation_id: UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Historial de una conversacion con el asistente.
+
+    Cada fila de assistant_queries es una pregunta y su respuesta, porque
+    asi quedo la tabla: una consulta es un hecho con las dos partes. La
+    pantalla en cambio dibuja mensajes sueltos, asi que cada fila se abre
+    en dos, el de la persona y el del asistente.
+
+    La ruta no lleva el paciente. Se comprueba que la conversacion sea de
+    quien pide, que en el asistente es mas estricto que la membresia: no
+    basta con ser del circulo, tiene que ser su propia conversacion.
+    """
+    conv = (
+        await db.execute(
+            text(
+                """
+                SELECT id, user_id FROM conversations
+                WHERE id = :cid AND type = 'assistant'
+                """
+            ),
+            {"cid": str(conversation_id)},
+        )
+    ).mappings().first()
+
+    if conv is None or str(conv["user_id"]) != user.user_id:
+        raise _NO_EXISTE
+
+    filas = (
+        await db.execute(
+            text(
+                """
+                SELECT q.id, q.query_text, q.response_text, q.created_at,
+                       coalesce(c.tablas, ARRAY[]::text[]) AS tablas
+                FROM assistant_queries q
+                LEFT JOIN LATERAL (
+                    SELECT array_agg(DISTINCT ac.source_table_name) AS tablas
+                    FROM assistant_citations ac
+                    WHERE ac.query_id = q.id
+                ) c ON true
+                WHERE q.conversation_id = :cid
+                ORDER BY q.created_at
+                LIMIT 200
+                """
+            ),
+            {"cid": str(conversation_id)},
+        )
+    ).mappings().all()
+
+    mensajes: list[AssistantMessageOut] = []
+    for f in filas:
+        mensajes.append(AssistantMessageOut(
+            id=f["id"], role="user", text=f["query_text"],
+            created_at=f["created_at"], citations=[],
+        ))
+        mensajes.append(AssistantMessageOut(
+            id=f["id"], role="assistant", text=f["response_text"],
+            created_at=f["created_at"],
+            citations=[CitationOut(label=_ETIQUETA.get(t, t), reference=t)
+                       for t in sorted(f["tablas"])],
+        ))
+
+    return MessagesOut(items=mensajes)

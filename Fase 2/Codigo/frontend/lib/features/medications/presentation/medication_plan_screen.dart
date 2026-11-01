@@ -13,7 +13,8 @@ import '../domain/models.dart';
 /// Formulario para crear o editar un medicamento del plan (ticket AGE-402).
 /// Al guardar, programa recordatorios locales para las próximas dosis.
 class MedicationPlanScreen extends ConsumerStatefulWidget {
-  const MedicationPlanScreen({super.key, required this.patientId, this.medicationId});
+  const MedicationPlanScreen(
+      {super.key, required this.patientId, this.medicationId});
 
   final String patientId;
   final String? medicationId;
@@ -224,8 +225,7 @@ class _MedicationPlanScreenState extends ConsumerState<MedicationPlanScreen> {
                           controller: _dose,
                           keyboardType: const TextInputType.numberWithOptions(
                               decimal: true),
-                          decoration:
-                              const InputDecoration(labelText: 'Dosis'),
+                          decoration: const InputDecoration(labelText: 'Dosis'),
                           validator: (v) => (v == null || v.trim().isEmpty)
                               ? 'Requerido'
                               : null,
@@ -291,8 +291,9 @@ class _MedicationPlanScreenState extends ConsumerState<MedicationPlanScreen> {
                         ? 'Sin fecha de fin'
                         : DateFormat('d MMM yyyy', 'es').format(_endDate!),
                     onTap: () => _pickDate(isStart: false),
-                    onClear:
-                        _endDate == null ? null : () => setState(() => _endDate = null),
+                    onClear: _endDate == null
+                        ? null
+                        : () => setState(() => _endDate = null),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(

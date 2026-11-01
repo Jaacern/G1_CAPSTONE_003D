@@ -9,7 +9,9 @@ final medicationsProvider =
     FutureProvider.autoDispose<List<Medication>>((ref) async {
   final patient = ref.watch(selectedPatientProvider);
   if (patient == null) return const [];
-  return ref.watch(medicationsRepositoryProvider).listMedications(patient.patientId);
+  return ref
+      .watch(medicationsRepositoryProvider)
+      .listMedications(patient.patientId);
 });
 
 /// Dosis de hoy del paciente seleccionado.

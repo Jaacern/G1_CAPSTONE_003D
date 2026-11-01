@@ -58,9 +58,8 @@ class _PrescriptionScanScreenState
       _error = null;
     });
     try {
-      final uploaded = await ref
-          .read(uploadServiceProvider)
-          .uploadFile(_image!, kind: 'prescription', patientId: widget.patientId);
+      final uploaded = await ref.read(uploadServiceProvider).uploadFile(_image!,
+          kind: 'prescription', patientId: widget.patientId);
       final draft = await ref
           .read(medicationsRepositoryProvider)
           .scanPrescription(widget.patientId, uploaded.fileUrl);
@@ -89,8 +88,8 @@ class _PrescriptionScanScreenState
       ref.invalidate(medicationsProvider);
       ref.invalidate(todayDosesProvider);
       if (mounted) {
-        showAppSnackBar(context,
-            'Se guardó ${drafts.length} medicamento(s) de la receta.');
+        showAppSnackBar(
+            context, 'Se guardó ${drafts.length} medicamento(s) de la receta.');
         context.pop();
       }
     } catch (e) {
@@ -116,7 +115,8 @@ class _PrescriptionScanScreenState
         body: const ComingSoonView(
           icon: Icons.document_scanner_rounded,
           title: 'Escaneo de recetas',
-          subtitle: 'El reconocimiento de recetas (OCR) estará disponible pronto.',
+          subtitle:
+              'El reconocimiento de recetas (OCR) estará disponible pronto.',
         ),
       );
     }
@@ -132,8 +132,7 @@ class _PrescriptionScanScreenState
                 if (_image != null)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.file(_image!,
-                        height: 180, fit: BoxFit.cover),
+                    child: Image.file(_image!, height: 180, fit: BoxFit.cover),
                   )
                 else
                   Container(
@@ -355,8 +354,7 @@ class _DraftCard extends StatelessWidget {
           TextField(
             controller: entry.instructions,
             maxLines: 2,
-            decoration:
-                const InputDecoration(labelText: 'Instrucciones'),
+            decoration: const InputDecoration(labelText: 'Instrucciones'),
           ),
         ],
       ),

@@ -9,6 +9,11 @@ Se corren desde afuera, no desde un request:
     python -m app.maintenance alertar-vitales
     python -m app.maintenance semaforo
 
+Y las del dia juntas, en el orden correcto, que es lo que va en la tarea
+programada:
+
+    python -m app.maintenance diario
+
 No se exponen como endpoints a proposito: no son acciones de un usuario,
 no tienen a quien responderle, y un endpoint de mantenimiento abierto es
 justo la clase de puerta que uno no quiere tener en una aplicacion con
@@ -763,21 +768,90 @@ async def calcular_semaforo(*, verbose: bool = True) -> dict[str, int]:
     return {"pacientes": pacientes, **por_estado}
 
 
+# El orden no es casual y es la razon de que esto exista como una sola
+# tarea en vez de cinco lineas en el crontab.
+#
+#   1. generar-dosis    crea los slots. Si corriera despues, el paso 2 no
+#                       tendria nada que vencer y la dosis de las 08:00 de
+#                       hoy no existiria hasta manana.
+#   2. marcar-vencidas  pasa a 'missed' lo que ya vencio, incluidos los
+#                       slots de hoy que el paso 1 acaba de crear.
+#   3. alertar-dosis    avisa de esas, que recien ahora existen como
+#                       omitidas.
+#   4. alertar-vitales  independiente de los tres anteriores, pero va antes
+#                       del semaforo porque el semaforo cuenta alertas
+#                       activas.
+#   5. semaforo         al final, para que vea las dosis y las alertas de
+#                       esta misma corrida. Al revés mostraria el estado de
+#                       antes de los cuatro pasos anteriores.
+#   6. barrer-subidas   no depende de nada ni nada depende de ella; va al
+#                       final porque es la unica que toca archivos y no
+#                       datos clinicos, y si se cae no arrastra al resto.
+DIARIO = (
+    ("generar-dosis",   generar_dosis),
+    ("marcar-vencidas", marcar_dosis_vencidas),
+    ("alertar-dosis",   alertar_dosis_omitidas),
+    ("alertar-vitales", alertar_vitales_fuera_de_rango),
+    ("semaforo",        calcular_semaforo),
+    ("barrer-subidas",  barrer_subidas_vencidas),
+)
+
+
+async def correr_todo(*, verbose: bool = True) -> dict[str, int]:
+    """Corre las tareas del dia en orden, en una sola invocacion.
+
+    Es lo que se pone en la tarea programada. Una linea en el crontab y no
+    seis, porque el orden importa (esta explicado arriba) y seis entradas
+    separadas con sus horarios se desincronizan el dia que alguien edite
+    una sola.
+
+    Cada tarea se encierra en su propio try. Si una falla, se informa y se
+    sigue con las demas: que no se puedan generar las dosis no es razon
+    para dejar sin calcular el semaforo de todos los pacientes. Al final
+    devuelve cuantas fallaron, y el codigo de salida lo refleja, para que
+    quien mire el cron se entere en vez de ver un exito falso.
+
+    Que cada una sea idempotente es lo que hace esto seguro: si la corrida
+    se cae a la mitad, volver a lanzarla completa no duplica nada.
+    """
+    fallos = []
+    for nombre, tarea in DIARIO:
+        if verbose:
+            print(f"--- {nombre}")
+        try:
+            # verbose se pasa hacia abajo: quien pide silencio lo quiere
+            # entero, no el encabezado callado y las seis tareas hablando.
+            await tarea(verbose=verbose)
+        except Exception as e:  # noqa: BLE001
+            fallos.append(nombre)
+            print(f"    FALLO {nombre}: {str(e).splitlines()[0]}")
+
+    if verbose:
+        if fallos:
+            print(f"\nTerminado con {len(fallos)} fallas: {', '.join(fallos)}")
+        else:
+            print(f"\nTerminado. {len(DIARIO)} tareas sin fallas.")
+    return {"tareas": len(DIARIO), "fallas": len(fallos)}
+
+
 async def _main(argv: list[str]) -> int:
     tareas = {"barrer-subidas": barrer_subidas_vencidas,
               "generar-dosis": generar_dosis,
               "marcar-vencidas": marcar_dosis_vencidas,
               "alertar-dosis": alertar_dosis_omitidas,
               "alertar-vitales": alertar_vitales_fuera_de_rango,
-              "semaforo": calcular_semaforo}
+              "semaforo": calcular_semaforo,
+              "diario": correr_todo}
     if len(argv) != 1 or argv[0] not in tareas:
         print(f"uso: python -m app.maintenance <{' | '.join(tareas)}>")
         return 2
     try:
-        await tareas[argv[0]]()
+        resultado = await tareas[argv[0]]()
     finally:
         await engine.dispose()
-    return 0
+    # Una falla dentro de 'diario' tiene que salir por el codigo de retorno:
+    # el cron no lee la salida, lee el codigo.
+    return 1 if (resultado or {}).get("fallas") else 0
 
 
 if __name__ == "__main__":

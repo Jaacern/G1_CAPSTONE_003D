@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 
 /// Estado de una dosis (alineado con la API).
+///
+/// [skipped] es solo de lectura: el backend la usa en su historial pero
+/// 6.6 no admite recibirla, así que al registrar se traduce a [missed].
 enum DoseStatus {
   pending('pending', 'Pendiente', AppColors.textSecondary),
   taken('taken', 'Tomada', AppColors.statusOk),
+  postponed('postponed', 'Pospuesta', AppColors.statusWarning),
   skipped('skipped', 'Omitida', AppColors.statusWarning),
   missed('missed', 'No tomada', AppColors.statusAttention);
 

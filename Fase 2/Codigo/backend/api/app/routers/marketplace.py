@@ -237,3 +237,110 @@ async def get_caregiver(
             for r in resenas
         ],
     )
+
+
+async def _perfil_publicado(db: AsyncSession, profile_id: UUID):
+    fila = (
+        await db.execute(
+            text(
+                """
+                SELECT cp.id, cp.user_id
+                FROM caregiver_profiles cp
+                JOIN users u ON u.id = cp.user_id
+                WHERE cp.id = :pid
+                  AND cp.status = 'published'
+                  AND cp.suspended_at IS NULL
+                  AND cp.deleted_at IS NULL
+                  AND u.is_active AND u.deleted_at IS NULL
+                """
+            ),
+            {"pid": str(profile_id)},
+        )
+    ).mappings().first()
+    if fila is None:
+        raise _NO_EXISTE
+    return fila
+
+
+class ContactIn(BaseModel):
+    message:    str = Field(min_length=1, max_length=1000)
+    patient_id: UUID | None = None
+
+    @field_validator("message")
+    @classmethod
+    def _limpiar(cls, v: str) -> str:
+        limpio = v.strip()
+        if not limpio:
+            raise ValueError("El mensaje no puede quedar vacio.")
+        return limpio
+
+
+class ContactOut(BaseModel):
+    id:         UUID
+    status:     str
+    created_at: datetime
+
+
+@router.post("/caregivers/{profile_id}/contact", response_model=ContactOut,
+             status_code=201)
+async def contact_caregiver(
+    profile_id: UUID,
+    payload: ContactIn,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Envia una solicitud de contacto a la cuidadora."""
+    perfil = await _perfil_publicado(db, profile_id)
+
+    if str(perfil["user_id"]) == user.user_id:
+        raise ApiError(
+            status_code=422, code="VALIDATION_ERROR",
+            message="No puedes enviarte una solicitud de contacto a ti misma.",
+        )
+
+    if payload.patient_id is not None:
+        miembro = (
+            await db.execute(
+                text(
+                    """
+                    SELECT 1 FROM patient_members
+                    WHERE patient_id = :pid AND user_id = :uid
+                      AND removed_at IS NULL
+                    """
+                ),
+                {"pid": str(payload.patient_id), "uid": user.user_id},
+            )
+        ).first()
+        if miembro is None:
+            raise _NO_EXISTE
+
+    # ux_contact_requests_pendiente deja una sola solicitud pendiente entre
+    # las mismas dos personas. Reenviar no es un error del usuario: es que
+    # no le han respondido y vuelve a escribir. Se actualiza el mensaje de
+    # la que ya existe en vez de fallar.
+    fila = (
+        await db.execute(
+            text(
+                """
+                INSERT INTO contact_requests (
+                    profile_id, requester_id, patient_id, message
+                ) VALUES (:perfil, :uid, :paciente, :mensaje)
+                ON CONFLICT (profile_id, requester_id)
+                    WHERE status = 'pending'
+                DO UPDATE SET message = EXCLUDED.message,
+                              patient_id = EXCLUDED.patient_id,
+                              updated_at = now()
+                RETURNING id, status, created_at
+                """
+            ),
+            {
+                "perfil": str(perfil["id"]), "uid": user.user_id,
+                "paciente": str(payload.patient_id) if payload.patient_id else None,
+                "mensaje": payload.message,
+            },
+        )
+    ).mappings().first()
+    await db.commit()
+
+    return ContactOut(id=fila["id"], status=fila["status"],
+                      created_at=fila["created_at"])

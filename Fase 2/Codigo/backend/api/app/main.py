@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from app.errors import register_error_handlers
 from app.routers import (
     alerts,
+    assistant,
     auth,
     caregiver,
     chat,
@@ -143,6 +144,7 @@ app.include_router(caregiver.router)
 app.include_router(marketplace.router)
 app.include_router(gallery.router)
 app.include_router(chat.router)
+app.include_router(assistant.router)
 
 
 @app.get("/", tags=["root"])

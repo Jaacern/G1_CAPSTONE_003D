@@ -393,3 +393,103 @@ async def upgrade_plan(
 
     await db.commit()
     return await _plan_del_usuario(db, user.user_id)
+
+
+# ---------------------------------------------------------------------------
+# Perfil profesional del marketplace
+# ---------------------------------------------------------------------------
+class ProfileOut(BaseModel):
+    headline:         str
+    bio:              str
+    years_experience: int
+    specialties:      list[str]
+    languages:        list[str]
+    zones:            list[str]
+    certifications:   list[str]
+
+
+async def _perfil(db: AsyncSession, user_id: str) -> ProfileOut:
+    """Arma el perfil, o uno vacio si la cuidadora todavia no lo creo.
+
+    La pantalla de perfil se abre igual aunque no haya nada escrito, asi
+    que devolver 404 la dejaria sin poder empezar. Un perfil vacio es la
+    respuesta util.
+    """
+    perfil = (
+        await db.execute(
+            text(
+                """
+                SELECT id, headline, bio, years_experience
+                FROM caregiver_profiles
+                WHERE user_id = :uid AND deleted_at IS NULL
+                """
+            ),
+            {"uid": user_id},
+        )
+    ).mappings().first()
+
+    if perfil is None:
+        return ProfileOut(headline="", bio="", years_experience=0,
+                          specialties=[], languages=[], zones=[],
+                          certifications=[])
+
+    pid = str(perfil["id"])
+
+    especialidades = (
+        await db.execute(
+            text(
+                """
+                SELECT s.label
+                FROM caregiver_specialties cs
+                JOIN specialties s ON s.code = cs.specialty_code
+                WHERE cs.profile_id = :pid
+                ORDER BY s.label
+                """
+            ),
+            {"pid": pid},
+        )
+    ).scalars().all()
+
+    idiomas = (
+        await db.execute(
+            text("SELECT language_code FROM caregiver_languages "
+                 "WHERE profile_id = :pid ORDER BY language_code"),
+            {"pid": pid},
+        )
+    ).scalars().all()
+
+    zonas = (
+        await db.execute(
+            text("SELECT commune_code FROM caregiver_zones "
+                 "WHERE profile_id = :pid ORDER BY commune_code"),
+            {"pid": pid},
+        )
+    ).scalars().all()
+
+    certificaciones = (
+        await db.execute(
+            text("SELECT name FROM caregiver_certifications "
+                 "WHERE profile_id = :pid AND deleted_at IS NULL "
+                 "ORDER BY issued_at DESC NULLS LAST, name"),
+            {"pid": pid},
+        )
+    ).scalars().all()
+
+    return ProfileOut(
+        headline=perfil["headline"],
+        bio=perfil["bio"] or "",
+        years_experience=perfil["years_experience"],
+        specialties=list(especialidades),
+        languages=list(idiomas),
+        zones=list(zonas),
+        certifications=list(certificaciones),
+    )
+
+
+@router.get("/profile", response_model=ProfileOut)
+async def get_profile(
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Perfil profesional de la cuidadora."""
+    return await _perfil(db, user.user_id)

@@ -68,11 +68,10 @@ class CaregiverProfileScreen extends ConsumerWidget {
                   icon: Icons.translate_rounded,
                   label: 'Idiomas: ${c.languages.map(nombreIdioma).join(', ')}',
                 ),
-              if (c.pricePerHour != null)
+              if (c.tarifaLabel != null)
                 _InfoRow(
                   icon: Icons.payments_outlined,
-                  label:
-                      'Tarifa: \$${c.pricePerHour!.toStringAsFixed(0)} por hora',
+                  label: 'Tarifa: ${c.tarifaLabel} por hora',
                 ),
               const SizedBox(height: 16),
               if (c.specialties.isNotEmpty) ...[

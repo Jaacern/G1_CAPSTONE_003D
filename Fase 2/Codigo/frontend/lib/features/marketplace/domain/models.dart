@@ -1,5 +1,24 @@
 /// Modelos del Marketplace: cuidadoras, productos/ayudas técnicas, ofertas de
 /// trabajo y reseñas. JSON en snake_case, fechas ISO8601.
+library;
+
+import 'package:intl/intl.dart';
+
+/// Plata con el separador de miles chileno y sin decimales.
+///
+/// La API manda el monto como número y la moneda como código de tres letras;
+/// un `toStringAsFixed(0)` dejaba la tarifa de una hora en "$12000", que en
+/// pesos se lee mal. La que no es CLP conserva el código delante, porque un
+/// símbolo de peso suelto no alcanza para saber en qué moneda es el precio.
+String _plata(num monto, String moneda) {
+  final numero = NumberFormat('#,##0', 'es').format(monto);
+  return moneda == 'CLP' ? '\$$numero' : '$moneda $numero';
+}
+
+/// CLP es el supuesto de la tabla (`currency` tiene ese valor por defecto) y
+/// el único que la API puede significar hoy: el listado de cuidadoras no
+/// devuelve el código de moneda, solo el monto.
+const String _monedaPadron = 'CLP';
 
 /// Resumen de perfil de cuidadora para el listado.
 class CaregiverProfileSummary {
@@ -24,6 +43,10 @@ class CaregiverProfileSummary {
   final List<String> zones;
   final List<String> specialties;
   final double? pricePerHour;
+
+  /// 'Tarifa por hora' ya formateada, o null si la cuidadora no la publica.
+  String? get tarifaLabel =>
+      pricePerHour == null ? null : _plata(pricePerHour!, _monedaPadron);
 
   factory CaregiverProfileSummary.fromJson(Map<String, dynamic> json) =>
       CaregiverProfileSummary(
@@ -75,6 +98,10 @@ class CaregiverProfileDetail {
   final List<String> languages;
   final List<String> certifications;
   final List<Review> reviews;
+
+  /// 'Tarifa por hora' ya formateada, o null si la cuidadora no la publica.
+  String? get tarifaLabel =>
+      pricePerHour == null ? null : _plata(pricePerHour!, _monedaPadron);
 
   factory CaregiverProfileDetail.fromJson(Map<String, dynamic> json) =>
       CaregiverProfileDetail(
@@ -138,6 +165,7 @@ class MarketProduct {
     required this.name,
     this.imageUrl,
     required this.price,
+    this.currency = _monedaPadron,
     required this.category,
     required this.description,
   });
@@ -146,14 +174,21 @@ class MarketProduct {
   final String name;
   final String? imageUrl;
   final double price;
+
+  /// Código ISO de tres letras, como lo guarda `market_products.currency`.
+  final String currency;
   final String category;
   final String description;
+
+  /// Precio listo para imprimir, con el separador de miles y la moneda.
+  String get precioLabel => _plata(price, currency);
 
   factory MarketProduct.fromJson(Map<String, dynamic> json) => MarketProduct(
         id: json['id'] as String,
         name: json['name'] as String,
         imageUrl: json['image_url'] as String?,
         price: (json['price'] as num?)?.toDouble() ?? 0,
+        currency: ((json['currency'] ?? _monedaPadron) as String).toUpperCase(),
         category: (json['category'] ?? 'general') as String,
         description: (json['description'] ?? '') as String,
       );

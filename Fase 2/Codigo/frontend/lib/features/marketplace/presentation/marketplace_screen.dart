@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/config/comunas.dart';
@@ -233,9 +232,9 @@ class _CaregiverCard extends StatelessWidget {
                     fontSize: 13, color: AppColors.textSecondary),
               ),
               const Spacer(),
-              if (caregiver.pricePerHour != null)
+              if (caregiver.tarifaLabel != null)
                 Text(
-                  '\$${caregiver.pricePerHour!.toStringAsFixed(0)}/h',
+                  '${caregiver.tarifaLabel!}/h',
                   style: const TextStyle(
                       fontWeight: FontWeight.w800, color: AppColors.primary),
                 ),
@@ -336,7 +335,7 @@ class _ProductCard extends StatelessWidget {
                         color: AppColors.textSecondary, fontSize: 13)),
                 const SizedBox(height: 8),
                 Text(
-                  '\$${NumberFormat('#,##0', 'es').format(product.price)}',
+                  product.precioLabel,
                   style: const TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 16,

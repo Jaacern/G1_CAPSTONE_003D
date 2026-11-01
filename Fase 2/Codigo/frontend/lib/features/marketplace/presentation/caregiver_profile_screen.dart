@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/config/comunas.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../application/marketplace_providers.dart';
@@ -59,7 +60,7 @@ class CaregiverProfileScreen extends ConsumerWidget {
               if (c.zones.isNotEmpty)
                 _InfoRow(
                   icon: Icons.location_on_outlined,
-                  label: 'Zonas: ${c.zones.join(', ')}',
+                  label: 'Zonas: ${c.zones.map(nombreComuna).join(', ')}',
                 ),
               if (c.languages.isNotEmpty)
                 _InfoRow(
@@ -148,7 +149,8 @@ class CaregiverProfileScreen extends ConsumerWidget {
         text: 'Hola ${c.name}, me gustaría saber tu disponibilidad.');
     await showDialog<void>(
       context: context,
-      builder: (ctx) => _ContactDialog(profileId: c.profileId, controller: controller),
+      builder: (ctx) =>
+          _ContactDialog(profileId: c.profileId, controller: controller),
     );
     controller.dispose();
   }

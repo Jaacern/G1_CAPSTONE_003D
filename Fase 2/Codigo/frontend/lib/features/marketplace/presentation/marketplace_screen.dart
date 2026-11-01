@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/config/comunas.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../../../core/widgets/remote_file_image.dart';
@@ -27,8 +28,7 @@ class MarketplaceScreen extends ConsumerWidget {
         body: const ComingSoonView(
           icon: Icons.storefront_rounded,
           title: 'Marketplace de cuidado',
-          subtitle:
-              'Aquí podrás encontrar cuidadoras y productos de apoyo. '
+          subtitle: 'Aquí podrás encontrar cuidadoras y productos de apoyo. '
               'Esta función estará disponible en una próxima versión.',
         ),
       );
@@ -160,8 +160,7 @@ class _CaregiversTabState extends ConsumerState<_CaregiversTab> {
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                       itemCount: list.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (_, i) =>
-                          _CaregiverCard(caregiver: list[i]),
+                      itemBuilder: (_, i) => _CaregiverCard(caregiver: list[i]),
                     ),
                   ),
           ),
@@ -235,8 +234,7 @@ class _CaregiverCard extends StatelessWidget {
               spacing: 6,
               runSpacing: 6,
               children: [
-                for (final s in caregiver.specialties.take(3))
-                  _Pill(label: s),
+                for (final s in caregiver.specialties.take(3)) _Pill(label: s),
               ],
             ),
           ],
@@ -386,8 +384,8 @@ class _JobCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(job.title,
-              style: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w700)),
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 6),
           Row(
             children: [
@@ -395,7 +393,7 @@ class _JobCard extends StatelessWidget {
                   size: 15, color: AppColors.textSecondary),
               const SizedBox(width: 4),
               Expanded(
-                child: Text(job.zone,
+                child: Text(nombreComuna(job.zone),
                     style: const TextStyle(
                         fontSize: 13, color: AppColors.textSecondary)),
               ),

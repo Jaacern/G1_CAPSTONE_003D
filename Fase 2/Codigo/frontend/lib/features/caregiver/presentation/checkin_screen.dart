@@ -68,6 +68,18 @@ class _CheckinScreenState extends ConsumerState<CheckinScreen> {
         data: (today) {
           final current = today.shiftStatus;
           final entering = !current.isCheckedIn;
+          // /caregiver/today elige el paciente él mismo (primero el turno
+          // abierto), así que su estado puede pertenecer a otro paciente. El
+          // alta de un segundo turno la responde el backend con 409.
+          final abiertoConOtro =
+              current.isCheckedIn && today.patientId != widget.patientId;
+          if (abiertoConOtro) {
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: _OtroTurnoAbierto(
+                  patientId: today.patientId, patientName: today.patientName),
+            );
+          }
           return Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -121,7 +133,7 @@ class _CheckinScreenState extends ConsumerState<CheckinScreen> {
                         : Icon(entering
                             ? Icons.login_rounded
                             : Icons.logout_rounded),
-                    label: Text(entering ? 'Check-in' : 'Check-out'),
+                    label: Text(entering ? 'Iniciar turno' : 'Finalizar turno'),
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -130,6 +142,53 @@ class _CheckinScreenState extends ConsumerState<CheckinScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+/// El cuidador solo puede tener un turno abierto a la vez, así que antes de
+/// dejar que el botón devuelva un 409 se le muestra con quién está abierto.
+class _OtroTurnoAbierto extends StatelessWidget {
+  const _OtroTurnoAbierto({required this.patientId, required this.patientName});
+
+  final String patientId;
+  final String patientName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppCard(
+          child: Column(
+            children: [
+              const Icon(Icons.how_to_reg_rounded,
+                  size: 48, color: AppColors.statusWarning),
+              const SizedBox(height: 12),
+              Text('Ya tienes un turno abierto con $patientName.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              const Text(
+                'Cierra ese turno antes de empezar uno con otro paciente.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+        const Spacer(),
+        OutlinedButton.icon(
+          onPressed: () =>
+              context.pushReplacement('/cg/checkin?patient=$patientId'),
+          icon: const Icon(Icons.swap_horiz_rounded),
+          label: const Text('Ir a cerrar ese turno'),
+          style:
+              OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(64)),
+        ),
+        const SizedBox(height: 32),
+      ],
     );
   }
 }

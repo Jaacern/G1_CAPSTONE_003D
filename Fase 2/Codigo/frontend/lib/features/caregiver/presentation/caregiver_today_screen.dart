@@ -302,6 +302,8 @@ class _TaskTileState extends ConsumerState<_TaskTile> {
       TaskStatus.pending => TaskStatus.inProgress,
       TaskStatus.inProgress => TaskStatus.done,
       TaskStatus.done => TaskStatus.pending,
+      // Cancelada: tocarla la devuelve a la cola.
+      TaskStatus.cancelled => TaskStatus.pending,
     };
     setState(() => _busy = true);
     try {

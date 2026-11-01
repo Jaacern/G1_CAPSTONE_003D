@@ -199,7 +199,7 @@ class _StatusMenu extends StatelessWidget {
             value: s,
             child: Row(
               children: [
-                Icon(Icons.circle, size: 12, color: s.color),
+                Icon(s.icon, size: 12, color: s.color),
                 const SizedBox(width: 8),
                 Text(s.label),
               ],

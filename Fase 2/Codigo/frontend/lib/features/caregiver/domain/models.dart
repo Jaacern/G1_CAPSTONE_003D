@@ -7,16 +7,26 @@ import '../../../core/theme/app_theme.dart';
 // ---------------------------------------------------------------------------
 
 /// Estado de una tarea de cuidado (alineado con la API).
+///
+/// `tasks.py` acepta `done` o `completed` al escribir, pero al leer devuelve
+/// siempre `done`; [cancelled] existe en la tabla y en el estado que se puede
+/// enviar, así que la pantalla también tiene que saber mostrarlo.
 enum TaskStatus {
   pending('pending', 'Pendiente', AppColors.textSecondary),
   inProgress('in_progress', 'En curso', AppColors.statusWarning),
-  done('done', 'Completada', AppColors.statusOk);
+  done('done', 'Completada', AppColors.statusOk),
+  cancelled('cancelled', 'Cancelada', AppColors.textFaint,
+      Icons.cancel_outlined);
 
-  const TaskStatus(this.apiValue, this.label, this.color);
+  const TaskStatus(this.apiValue, this.label, this.color,
+      [this.icon = Icons.circle]);
 
   final String apiValue;
   final String label;
   final Color color;
+
+  /// Icono del menú de estados; los tres primeros comparten círculo.
+  final IconData icon;
 
   static TaskStatus fromApi(String value) => TaskStatus.values.firstWhere(
         (s) => s.apiValue == value,

@@ -165,3 +165,130 @@ async def add_photo(
 
     return _salida({**dict(fila), "full_name": ctx.user.full_name,
                     "reacciones": {}})
+
+
+# ---------------------------------------------------------------------------
+# Una foto suelta: la ruta no lleva el paciente
+# ---------------------------------------------------------------------------
+async def _foto_del_usuario(db: AsyncSession, photo_id: UUID, user_id: str):
+    """Carga la foto comprobando que quien pide sea del circulo."""
+    fila = (
+        await db.execute(
+            text(
+                """
+                SELECT g.id, g.patient_id, g.published_by_user_id
+                FROM gallery_photos g
+                JOIN patients p ON p.id = g.patient_id
+                WHERE g.id = :fid
+                  AND g.deleted_at IS NULL
+                  AND p.deleted_at IS NULL
+                """
+            ),
+            {"fid": str(photo_id)},
+        )
+    ).mappings().first()
+    if fila is None:
+        raise _NO_EXISTE
+
+    rol = (
+        await db.execute(
+            text(
+                """
+                SELECT role FROM patient_members
+                WHERE patient_id = :pid AND user_id = :uid
+                  AND removed_at IS NULL
+                """
+            ),
+            {"pid": str(fila["patient_id"]), "uid": user_id},
+        )
+    ).scalar()
+    if rol is None:
+        raise _NO_EXISTE
+
+    return fila, rol
+
+
+_REACCIONES = {"like", "love", "smile", "heart"}
+
+
+class ReactionIn(BaseModel):
+    reaction: str
+
+
+class ReactionsOut(BaseModel):
+    photo_id:  UUID
+    reactions: dict[str, int]
+    mine:      str | None
+
+
+@router.post("/photos/{photo_id}/reactions", response_model=ReactionsOut)
+async def react_photo(
+    photo_id: UUID,
+    payload: ReactionIn,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reacciona a una foto, o cambia la reaccion que ya habia dejado.
+
+    uq_photo_reactions_photo_user deja una reaccion por persona y foto.
+    Tocar otro boton es cambiar de reaccion, no sumar una segunda, y tocar
+    el mismo boton otra vez es quitarla: es lo que hace cualquier aplicacion
+    y lo que la persona espera, sobre todo un adulto mayor que toca el
+    corazon dos veces sin querer.
+    """
+    reaccion = payload.reaction.strip().lower()
+    if reaccion not in _REACCIONES:
+        raise ApiError(
+            status_code=422, code="VALIDATION_ERROR",
+            message="Esa reaccion no existe.",
+            details=[{"field": "reaction",
+                      "message": f"Valores aceptados: {', '.join(sorted(_REACCIONES))}."}],
+        )
+
+    await _foto_del_usuario(db, photo_id, user.user_id)
+
+    actual = (
+        await db.execute(
+            text("SELECT reaction_type FROM photo_reactions "
+                 "WHERE photo_id = :fid AND user_id = :uid"),
+            {"fid": str(photo_id), "uid": user.user_id},
+        )
+    ).scalar()
+
+    if actual == reaccion:
+        await db.execute(
+            text("DELETE FROM photo_reactions "
+                 "WHERE photo_id = :fid AND user_id = :uid"),
+            {"fid": str(photo_id), "uid": user.user_id},
+        )
+        mia = None
+    else:
+        await db.execute(
+            text(
+                """
+                INSERT INTO photo_reactions (photo_id, user_id, reaction_type)
+                VALUES (:fid, :uid, :tipo)
+                ON CONFLICT (photo_id, user_id)
+                DO UPDATE SET reaction_type = EXCLUDED.reaction_type
+                """
+            ),
+            {"fid": str(photo_id), "uid": user.user_id, "tipo": reaccion},
+        )
+        mia = reaccion
+
+    await db.commit()
+
+    conteos = (
+        await db.execute(
+            text("SELECT reaction_type, count(*) AS cuantas "
+                 "FROM photo_reactions WHERE photo_id = :fid "
+                 "GROUP BY reaction_type"),
+            {"fid": str(photo_id)},
+        )
+    ).mappings().all()
+
+    return ReactionsOut(
+        photo_id=photo_id,
+        reactions={c["reaction_type"]: c["cuantas"] for c in conteos},
+        mine=mia,
+    )

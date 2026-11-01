@@ -79,8 +79,12 @@ class DoctorPatientScreen extends ConsumerWidget {
             loading: () => const AppCard(
               child: SizedBox(height: 70, child: LoadingView()),
             ),
-            error: (e, _) =>
-                AppCard(child: Text('No se pudieron cargar: $e')),
+            error: (_, __) => AppCard(
+              child: ErrorView(
+                message: 'No se pudieron cargar las constantes.',
+                onRetry: () => ref.invalidate(latestVitalsProvider),
+              ),
+            ),
             data: (vitals) {
               final withData = vitals.where((v) => v.hasData).toList();
               if (withData.isEmpty) {
@@ -109,8 +113,12 @@ class DoctorPatientScreen extends ConsumerWidget {
             loading: () => const AppCard(
               child: SizedBox(height: 70, child: LoadingView()),
             ),
-            error: (e, _) =>
-                AppCard(child: Text('No se pudo cargar: $e')),
+            error: (_, __) => AppCard(
+              child: ErrorView(
+                message: 'No se pudo cargar la medicación.',
+                onRetry: () => ref.invalidate(medicationsProvider),
+              ),
+            ),
             data: (meds) {
               final active = meds.where((m) => m.active).toList();
               if (active.isEmpty) {
@@ -150,8 +158,12 @@ class DoctorPatientScreen extends ConsumerWidget {
             loading: () => const AppCard(
               child: SizedBox(height: 70, child: LoadingView()),
             ),
-            error: (e, _) =>
-                AppCard(child: Text('No se pudo cargar: $e')),
+            error: (_, __) => AppCard(
+              child: ErrorView(
+                message: 'No se pudo calcular la adherencia.',
+                onRetry: () => ref.invalidate(adherenceProvider),
+              ),
+            ),
             data: (adh) {
               if (adh == null) return const SizedBox.shrink();
               return AppCard(
@@ -181,8 +193,12 @@ class DoctorPatientScreen extends ConsumerWidget {
             loading: () => const AppCard(
               child: SizedBox(height: 70, child: LoadingView()),
             ),
-            error: (e, _) =>
-                AppCard(child: Text('No se pudieron cargar: $e')),
+            error: (_, __) => AppCard(
+              child: ErrorView(
+                message: 'No se pudieron cargar las observaciones.',
+                onRetry: () => ref.invalidate(observationsProvider),
+              ),
+            ),
             data: (notes) {
               if (notes.isEmpty) {
                 return const AppCard(

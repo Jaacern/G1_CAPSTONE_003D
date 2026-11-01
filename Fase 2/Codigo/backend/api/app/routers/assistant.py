@@ -144,7 +144,12 @@ async def _cobrar_consulta(db: AsyncSession, user_id: str) -> None:
                     last_used_at
                 ) VALUES (
                     :sid, 'ai_queries_month',
-                    CAST(date_trunc('month', now() AT TIME ZONE 'UTC') AS date),
+                    -- El mes sale de la zona de la conexion (db.py). Antes
+                    -- se forzaba UTC aqui, y las tres primeras horas del dia
+                    -- 1 en Chile todavia son del mes anterior alla: las
+                    -- consultas de esa madrugada se cobraban al cupo de un
+                    -- mes que ya habia cerrado.
+                    CAST(date_trunc('month', now()) AS date),
                     1, now()
                 )
                 ON CONFLICT (subscription_id, limit_key, period_start)
@@ -169,7 +174,7 @@ async def _cobrar_consulta(db: AsyncSession, user_id: str) -> None:
                    SET used_value = used_value - 1
                  WHERE subscription_id = :sid
                    AND limit_key = 'ai_queries_month'
-                   AND period_start = CAST(date_trunc('month', now() AT TIME ZONE 'UTC') AS date)
+                   AND period_start = CAST(date_trunc('month', now()) AS date)
                 """
             ),
             {"sid": str(suscripcion["id"])},

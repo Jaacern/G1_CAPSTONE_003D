@@ -493,3 +493,173 @@ async def get_profile(
 ):
     """Perfil profesional de la cuidadora."""
     return await _perfil(db, user.user_id)
+
+
+class ProfileIn(BaseModel):
+    headline:         str = Field(default="", max_length=120)
+    bio:              str = Field(default="", max_length=2000)
+    years_experience: int = Field(default=0, ge=0, le=70)
+    specialties:      list[str] = Field(default_factory=list)
+    languages:        list[str] = Field(default_factory=list)
+    zones:            list[str] = Field(default_factory=list)
+    certifications:   list[str] = Field(default_factory=list)
+
+
+@router.put("/profile", response_model=ProfileOut)
+async def save_profile(
+    payload: ProfileIn,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Guarda el perfil profesional.
+
+    La pantalla manda el perfil completo, no un parche, asi que las listas
+    se reemplazan enteras: lo que no viene es lo que la cuidadora quito.
+
+    Las certificaciones NO se tocan aca. Cada una puede estar verificada
+    por Alloxentric y llevar un archivo adjunto, asi que borrarlas y
+    reescribirlas desde una pantalla de texto perderia la verificacion y
+    dejaria el archivo huerfano. Se devuelven para mostrar, y se
+    administran por su propio camino.
+    """
+    headline = payload.headline.strip()
+    if not headline:
+        # headline es NOT NULL y la pantalla permite dejarlo vacio al
+        # empezar. Un texto neutro es mejor que un error que no deja
+        # guardar el resto de lo que si escribio.
+        headline = f"Cuidadora, {payload.years_experience} anios de experiencia"
+
+    perfil_id = (
+        await db.execute(
+            text("SELECT id FROM caregiver_profiles "
+                 "WHERE user_id = :uid AND deleted_at IS NULL"),
+            {"uid": user.user_id},
+        )
+    ).scalar()
+
+    if perfil_id is None:
+        perfil_id = (
+            await db.execute(
+                text(
+                    """
+                    INSERT INTO caregiver_profiles (
+                        user_id, headline, bio, years_experience
+                    ) VALUES (:uid, :tit, :bio, :anios)
+                    RETURNING id
+                    """
+                ),
+                {"uid": user.user_id, "tit": headline,
+                 "bio": payload.bio.strip() or None,
+                 "anios": payload.years_experience},
+            )
+        ).scalar()
+    else:
+        await db.execute(
+            text(
+                """
+                UPDATE caregiver_profiles
+                   SET headline = :tit, bio = :bio,
+                       years_experience = :anios, updated_at = now()
+                 WHERE id = :pid
+                """
+            ),
+            {"pid": str(perfil_id), "tit": headline,
+             "bio": payload.bio.strip() or None,
+             "anios": payload.years_experience},
+        )
+
+    pid = str(perfil_id)
+
+    # Especialidades: la pantalla manda etiquetas y la tabla guarda codigos.
+    # Una etiqueta que no existe en el catalogo se rechaza en vez de
+    # inventar un codigo, porque specialties es la lista que alimenta el
+    # buscador del marketplace.
+    codigos: list[str] = []
+    if payload.specialties:
+        catalogo = {
+            _normaliza(fila["label"]): fila["code"]
+            for fila in (
+                await db.execute(text("SELECT code, label FROM specialties"))
+            ).mappings().all()
+        }
+        validos = set(catalogo.values())
+        for s in payload.specialties:
+            limpio = s.strip()
+            if not limpio:
+                continue
+            codigo = limpio if limpio in validos else catalogo.get(_normaliza(limpio))
+            if codigo is None:
+                raise ApiError(
+                    status_code=422, code="VALIDATION_ERROR",
+                    message="Esa especialidad no esta en el catalogo.",
+                    details=[{"field": "specialties",
+                              "message": f"Valor recibido: {s}."}],
+                )
+            codigos.append(codigo)
+
+    # El motor exige el formato exacto: dos letras para el idioma y cinco
+    # digitos para la comuna. Si no se valida aca, un dato mal escrito llega
+    # al CHECK y el usuario recibe un 500 en vez de saber que corregir.
+    idiomas = _validados(
+        payload.languages, r"^[a-z]{2}$", "languages",
+        "Usa el codigo de dos letras del idioma, como 'es' o 'en'.",
+        transformar=lambda s: s.strip().lower(),
+    )
+    zonas = _validados(
+        payload.zones, r"^[0-9]{5}$", "zones",
+        "Usa el codigo de cinco digitos de la comuna, como '08101'.",
+    )
+
+    await _reemplazar(db, "caregiver_specialties", "specialty_code", pid,
+                      dict.fromkeys(codigos))
+    await _reemplazar(db, "caregiver_languages", "language_code", pid, idiomas)
+    await _reemplazar(db, "caregiver_zones", "commune_code", pid, zonas)
+
+    await db.commit()
+    return await _perfil(db, user.user_id)
+
+
+def _validados(valores: list[str], patron: str, campo: str, ayuda: str,
+               transformar=lambda s: s.strip()) -> dict:
+    """Recorta, valida contra el patron y quita repetidos conservando el orden."""
+    import re as _re
+    limpios = {}
+    for v in valores:
+        x = transformar(v)
+        if not x:
+            continue
+        if not _re.match(patron, x):
+            raise ApiError(
+                status_code=422, code="VALIDATION_ERROR",
+                message=ayuda,
+                details=[{"field": campo, "message": f"Valor recibido: {v}."}],
+            )
+        limpios[x] = True
+    return limpios
+
+
+def _normaliza(s: str) -> str:
+    tabla = str.maketrans("áàäâãéèëêíìïîóòöôõúùüûñç",
+                          "aaaaaeeeeiiiiooooouuuunc")
+    return s.strip().lower().translate(tabla)
+
+
+async def _reemplazar(db: AsyncSession, tabla: str, columna: str,
+                      perfil_id: str, valores) -> None:
+    """Deja la lista exactamente como la mando la pantalla.
+
+    Se borra y se vuelve a insertar porque son tablas de union sin nada
+    propio que perder: no tienen id, ni historial, ni nada que apunte a
+    ellas. Para las certificaciones esto no valdria, y por eso no se hacen
+    aca.
+    """
+    await db.execute(
+        text(f"DELETE FROM {tabla} WHERE profile_id = :pid"),  # noqa: S608
+        {"pid": perfil_id},
+    )
+    for v in valores:
+        await db.execute(
+            text(f"INSERT INTO {tabla} (profile_id, {columna}) "  # noqa: S608
+                 f"VALUES (:pid, :valor)"),
+            {"pid": perfil_id, "valor": v},
+        )

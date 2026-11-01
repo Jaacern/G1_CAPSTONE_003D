@@ -44,6 +44,15 @@ class MedicationsRepositoryHttp implements MedicationsRepository {
       '/patients/$patientId/medications',
       data: data.toJson(),
     );
+    // 6.1 (MedicationCreateOut) responde solo {medication_id, name,
+    // prescribed_by, created_at}: sin dosis ni horarios. Se recupera del plan
+    // para devolver el medicamento completo, que es lo que usa quien acaba de
+    // crearlo para programar los recordatorios.
+    final id = (res['medication_id'] ?? '').toString();
+    final plan = await listMedications(patientId);
+    for (final m in plan) {
+      if (m.id == id) return m;
+    }
     return Medication.fromJson(res);
   }
 

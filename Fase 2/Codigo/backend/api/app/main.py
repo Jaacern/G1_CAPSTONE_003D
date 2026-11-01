@@ -21,6 +21,7 @@ from app.routers import (
     marketplace,
     medications,
     patients,
+    speech,
     tasks,
     vitals,
 )
@@ -147,6 +148,7 @@ app.include_router(gallery.router)
 app.include_router(chat.router)
 app.include_router(assistant.router)
 app.include_router(content.router)
+app.include_router(speech.router)
 
 
 @app.get("/", tags=["root"])

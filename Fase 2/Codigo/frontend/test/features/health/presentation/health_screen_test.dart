@@ -26,6 +26,11 @@ void main() {
   testWidgets(
       'agrupa las tarjetas en "Vitales" (FC/SpO2/Temperatura) y "Actividad", como pide el wireframe',
       (tester) async {
+    // La sub-pestaña es un ListView perezoso: en los 600 dp del viewport de
+    // test el grupo "Actividad" nunca llega a construirse y find.text no lo ve.
+    // Se agranda la superficie para medir las dos secciones sin desplazar.
+    await tester.binding.setSurfaceSize(const Size(800, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(ProviderScope(
       overrides: overrides(),
       child: MaterialApp(

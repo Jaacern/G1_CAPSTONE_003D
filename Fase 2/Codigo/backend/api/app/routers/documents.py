@@ -14,7 +14,7 @@ switch sobre sus propias claves. Si la API devolviera los codigos de la
 base, todos los documentos caerian en el grupo 'Otros' y la pantalla
 perderia lo unico que hace.
 """
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
@@ -31,7 +31,7 @@ from app.routers.logbook import (
     _sin_tildes,
     _texto_con_contenido,
 )
-from app.storage import get_storage
+from app.storage import DOWNLOAD_TTL_MINUTES, get_storage
 
 router = APIRouter(prefix="/api/v1", tags=["documents"])
 
@@ -289,3 +289,54 @@ async def delete_document(
         {"did": str(document_id), "uid": user.user_id},
     )
     await db.commit()
+
+
+class DownloadOut(BaseModel):
+    url:        str
+    name:       str
+    mime_type:  str
+    expires_at: datetime
+
+
+@router.get("/documents/{document_id}/download", response_model=DownloadOut)
+async def download_document(
+    document_id: UUID,
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Entrega el enlace corto para abrir el documento (RF-42, RNF-13)."""
+    fila, rol = await _documento_del_usuario(db, document_id, user.user_id)
+
+    if fila["file_status"] != "stored":
+        raise _NO_EXISTE
+
+    # Abrir un documento del expediente es acceder al expediente.
+    await db.execute(
+        text(
+            """
+            INSERT INTO record_access_log (
+                patient_id, user_id, role, section, entity_id,
+                ip_address, user_agent
+            ) VALUES (:pid, :uid, :rol, 'documents', :eid, :ip, :ua)
+            """
+        ),
+        {
+            "pid": str(fila["patient_id"]), "uid": user.user_id, "rol": rol,
+            "eid": str(fila["id"]),
+            "ip": request.client.host if request.client else None,
+            "ua": (request.headers.get("user-agent") or "")[:300] or None,
+        },
+    )
+    await db.commit()
+
+    storage = get_storage()
+    return DownloadOut(
+        url=storage.download_url(
+            file_id=str(fila["file_id"]), storage_key=fila["storage_key"],
+            content_type=fila["mime_type"], size=fila["size_bytes"],
+        ),
+        name=fila["title"],
+        mime_type=fila["mime_type"],
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=DOWNLOAD_TTL_MINUTES),
+    )

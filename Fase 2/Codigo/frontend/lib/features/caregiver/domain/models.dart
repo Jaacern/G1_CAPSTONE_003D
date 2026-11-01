@@ -328,11 +328,18 @@ class Observation {
         category: json['category'] as String?,
         mediaUrl: json['media_url'] as String?,
         createdAt: json['created_at'] != null
-            ? DateTime.parse(json['created_at'] as String)
+            ? _enZonaLocal(json['created_at'] as String)
             : DateTime.now(),
         authorName: (json['author_name'] ?? '') as String,
       );
 }
+
+/// Instante de la API traído a la zona del teléfono.
+///
+/// Los routers de bitácora devuelven la columna con su zona ('...+00:00') y
+/// DateTime.parse la deja en UTC; DateFormat formatea los campos tal como
+/// están, así que una observación de las 15:10 aparecía firmada a las 18:10.
+DateTime _enZonaLocal(String crudo) => DateTime.parse(crudo).toLocal();
 
 // ---------------------------------------------------------------------------
 // Nota de relevo
@@ -357,7 +364,7 @@ class HandoverNote {
         text: (json['text'] ?? '') as String,
         authorName: (json['author_name'] ?? '') as String,
         createdAt: json['created_at'] != null
-            ? DateTime.parse(json['created_at'] as String)
+            ? _enZonaLocal(json['created_at'] as String)
             : DateTime.now(),
       );
 }

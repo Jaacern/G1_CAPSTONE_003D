@@ -268,6 +268,28 @@ class _VitalTile extends StatelessWidget {
 /// la receta con discontinued_at, conservando las dosis ya registradas.
 Future<void> _discontinuarReceta(BuildContext context, WidgetRef ref,
     String patientId, Medication medication) async {
+  final confirmar = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text('¿Discontinuar ${medication.name}?'),
+      content: const Text(
+        'Deja de estar activa en el plan del paciente. '
+        'Las dosis ya registradas se conservan.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.critical),
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('Discontinuar'),
+        ),
+      ],
+    ),
+  );
+  if (confirmar != true) return;
   try {
     await ref
         .read(medicationsRepositoryProvider)

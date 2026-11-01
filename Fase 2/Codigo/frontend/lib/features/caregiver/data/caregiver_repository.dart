@@ -215,13 +215,20 @@ class CaregiverRepositoryHttp implements CaregiverRepository {
 // ---------------------------------------------------------------------------
 // Mock
 // ---------------------------------------------------------------------------
+/// Datos de demostración de la cuidadora. Lo que se escribe durante la sesión
+/// queda firmado por Rosa Millán, la persona demo de cuidadora@agecare.app; la
+/// nota de relevo semilla se deja a nombre de otra colega porque así se lee:
+/// entra un turno y encuentra la nota de quien se va.
 class CaregiverRepositoryMock implements CaregiverRepository {
   CaregiverRepositoryMock() {
     _seed();
   }
 
-  static const _patientId = 'p-demo';
-  static const _patientName = 'Doña Rosa Martínez';
+  // Tiene que ser el mismo id que usa PatientsRepositoryMock: el resumen del
+  // día y la lista de pacientes se comparan entre sí, y con un id suelto el
+  // check-in cree que el turno abierto es de otra persona.
+  static const _patientId = 'p-elena';
+  static const _patientName = 'Elena Ramírez';
 
   final List<CareTask> _tasks = [];
   final List<Observation> _observations = [];
@@ -286,14 +293,14 @@ class CaregiverRepositoryMock implements CaregiverRepository {
         text: 'Desayunó bien y de buen ánimo. Presión estable.',
         category: 'Alimentación',
         createdAt: _at(9, 30),
-        authorName: 'Elena Fuentes',
+        authorName: 'Rosa Millán',
       ),
       Observation(
         id: 'o-2',
         text: 'Se notó algo cansada después de la siesta, sin molestias.',
         category: 'Ánimo',
         createdAt: _at(15, 10),
-        authorName: 'Elena Fuentes',
+        authorName: 'Rosa Millán',
       ),
     ]);
 
@@ -445,7 +452,7 @@ class CaregiverRepositoryMock implements CaregiverRepository {
       category: category,
       mediaUrl: mediaUrl,
       createdAt: DateTime.now(),
-      authorName: 'Elena Fuentes',
+      authorName: 'Rosa Millán',
     );
     _observations.add(obs);
     return obs;
@@ -467,7 +474,7 @@ class CaregiverRepositoryMock implements CaregiverRepository {
       category: 'Incidente · $type',
       mediaUrl: mediaUrl,
       createdAt: DateTime.now(),
-      authorName: 'Elena Fuentes',
+      authorName: 'Rosa Millán',
     ));
   }
 
@@ -489,7 +496,7 @@ class CaregiverRepositoryMock implements CaregiverRepository {
     final note = HandoverNote(
       id: 'h-${DateTime.now().millisecondsSinceEpoch}',
       text: text,
-      authorName: 'Elena Fuentes',
+      authorName: 'Rosa Millán',
       createdAt: DateTime.now(),
     );
     _handovers.add(note);

@@ -212,3 +212,118 @@ async def today(
         alerts_count=alertas or 0,
         adherence_pct=float(adherencia) if adherencia is not None else None,
     )
+
+
+# ---------------------------------------------------------------------------
+# Plan
+# ---------------------------------------------------------------------------
+class PlanOut(BaseModel):
+    tier:        str
+    features:    list[str]
+    limits_text: str
+
+
+async def _plan_del_usuario(db: AsyncSession, user_id: str) -> PlanOut:
+    """Arma el plan vigente del usuario.
+
+    Sin suscripcion es plan gratis. No se crea una fila al vuelo para
+    representarlo: la ausencia de suscripcion ya significa gratis, y
+    escribir en una consulta de lectura es una sorpresa que nadie espera.
+    """
+    plan = (
+        await db.execute(
+            text(
+                """
+                SELECT p.id, p.code
+                FROM subscriptions s
+                JOIN plans p ON p.id = s.plan_id
+                WHERE s.user_id = :uid
+                  AND s.status = 'active'
+                  AND (s.current_period_end IS NULL
+                       OR s.current_period_end > now())
+                ORDER BY p.tier DESC
+                LIMIT 1
+                """
+            ),
+            {"uid": user_id},
+        )
+    ).mappings().first()
+
+    if plan is None:
+        plan = (
+            await db.execute(
+                text("SELECT id, code FROM plans WHERE code = 'free'")
+            )
+        ).mappings().first()
+        if plan is None:
+            raise ApiError(
+                status_code=500, code="PLAN_NOT_CONFIGURED",
+                message="No hay planes configurados en el sistema.",
+            )
+
+    caracteristicas = (
+        await db.execute(
+            text(
+                """
+                SELECT f.label
+                FROM plan_features pf
+                JOIN features f ON f.code = pf.feature_code
+                WHERE pf.plan_id = :pid AND pf.is_included
+                ORDER BY f.module, f.label
+                """
+            ),
+            {"pid": str(plan["id"])},
+        )
+    ).scalars().all()
+
+    # El texto de limites se arma aca y no en la pantalla: la unidad vive en
+    # limit_keys, que es donde quedo al normalizar, y la pantalla no deberia
+    # tener que saber que 'megabytes' se escribe 'MB' ni que un limite nulo
+    # significa sin tope.
+    limites = (
+        await db.execute(
+            text(
+                """
+                SELECT k.label, pl.limit_value, k.unit
+                FROM plan_limits pl
+                JOIN limit_keys k ON k.key = pl.limit_key
+                WHERE pl.plan_id = :pid
+                ORDER BY k.label
+                """
+            ),
+            {"pid": str(plan["id"])},
+        )
+    ).mappings().all()
+
+    return PlanOut(
+        tier=plan["code"],
+        features=list(caracteristicas),
+        limits_text=" · ".join(_texto_limite(l) for l in limites),
+    )
+
+
+_UNIDAD = {
+    "count":     "",
+    "days":      " dias",
+    "months":    " meses",
+    "megabytes": " MB",
+    "per_month": " al mes",
+    "per_day":   " al dia",
+}
+
+
+def _texto_limite(l) -> str:
+    if l["limit_value"] is None:
+        return f"{l['label']}: sin tope"
+    if l["limit_value"] == 0:
+        return f"{l['label']}: no incluido"
+    return f"{l['label']}: {l['limit_value']}{_UNIDAD.get(l['unit'], '')}"
+
+
+@router.get("/plan", response_model=PlanOut)
+async def get_plan(
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Plan vigente del usuario, con lo que incluye y sus topes."""
+    return await _plan_del_usuario(db, user.user_id)

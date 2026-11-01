@@ -10,6 +10,7 @@ import '../../../core/network/upload_service.dart';
 import '../../../core/widgets/common.dart';
 import '../application/caregiver_providers.dart';
 import '../data/caregiver_repository.dart';
+import '../domain/models.dart';
 
 /// Formulario para registrar una observación (con foto opcional).
 class ObservationScreen extends ConsumerStatefulWidget {
@@ -26,22 +27,17 @@ class _ObservationScreenState extends ConsumerState<ObservationScreen> {
   final _text = TextEditingController();
   final _picker = ImagePicker();
 
-  final _categories = const [
-    'Alimentación',
-    'Ánimo',
-    'Sueño',
-    'Movilidad',
-    'Higiene',
-    'General',
-  ];
+  /// Se envía el código de base y se muestra la etiqueta: el backend traduce
+  /// la etiqueta al guardar, pero devuelve el código al leer.
+  final _options = categoryOptions(observationCategories);
   String? _category;
   File? _image;
   bool _saving = false;
 
   Future<void> _pick(ImageSource source) async {
     try {
-      final picked =
-          await _picker.pickImage(source: source, imageQuality: 85, maxWidth: 2000);
+      final picked = await _picker.pickImage(
+          source: source, imageQuality: 85, maxWidth: 2000);
       if (picked == null) return;
       setState(() => _image = File(picked.path));
     } catch (_) {
@@ -110,8 +106,8 @@ class _ObservationScreenState extends ConsumerState<ObservationScreen> {
               value: _category,
               decoration: const InputDecoration(labelText: 'Categoría'),
               items: [
-                for (final c in _categories)
-                  DropdownMenuItem(value: c, child: Text(c)),
+                for (final c in _options)
+                  DropdownMenuItem(value: c.apiValue, child: Text(c.label)),
               ],
               onChanged: (v) => setState(() => _category = v),
             ),
@@ -123,8 +119,9 @@ class _ObservationScreenState extends ConsumerState<ObservationScreen> {
                 labelText: '¿Qué observaste?',
                 alignLabelWithHint: true,
               ),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Escribe una observación' : null,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Escribe una observación'
+                  : null,
             ),
             const SizedBox(height: 16),
             if (_image != null)
@@ -133,9 +130,7 @@ class _ObservationScreenState extends ConsumerState<ObservationScreen> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Image.file(_image!,
-                        height: 180,
-                        width: double.infinity,
-                        fit: BoxFit.cover),
+                        height: 180, width: double.infinity, fit: BoxFit.cover),
                   ),
                   Positioned(
                     top: 8,

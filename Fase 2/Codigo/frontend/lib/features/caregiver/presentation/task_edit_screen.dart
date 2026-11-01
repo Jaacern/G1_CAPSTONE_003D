@@ -25,14 +25,10 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
   final _title = TextEditingController();
   final _description = TextEditingController();
 
-  final _categories = const [
-    'Higiene',
-    'Medicación',
-    'Alimentación',
-    'Actividad física',
-    'Compañía',
-    'Otros',
-  ];
+  /// Opciones del desplegable: se manda el código que guarda la API y se
+  /// muestra la etiqueta, para que lo enviado y lo recibido sean la misma
+  /// forma incluso si backend cambia el texto de una categoría.
+  final _options = categoryOptions(taskCategories);
   String? _category;
   TimeOfDay? _time;
   TaskStatus _status = TaskStatus.pending;
@@ -54,12 +50,16 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
     }
     setState(() => _loading = true);
     try {
-      final tasks =
-          await ref.read(caregiverRepositoryProvider).listTasks(widget.patientId);
+      final tasks = await ref
+          .read(caregiverRepositoryProvider)
+          .listTasks(widget.patientId);
       final task = tasks.firstWhere((t) => t.id == widget.taskId);
       _title.text = task.title;
       _description.text = task.description ?? '';
-      _category = task.category;
+      // El desplegable exige que el valor esté entre sus opciones: la categoría
+      // llega en el código de la API y una fuera del catálogo se deja vacía en
+      // vez de dejar el valor crudo, que corta la pantalla con un assert.
+      _category = categoryCode(task.category);
       _status = task.status;
       if (task.due != null) {
         _time = TimeOfDay(hour: task.due!.hour, minute: task.due!.minute);
@@ -130,8 +130,7 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
       );
     }
     return Scaffold(
-      appBar:
-          AppBar(title: Text(_isEdit ? 'Editar tarea' : 'Nueva tarea')),
+      appBar: AppBar(title: Text(_isEdit ? 'Editar tarea' : 'Nueva tarea')),
       body: _loading
           ? const LoadingView()
           : Form(
@@ -151,16 +150,17 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
                     controller: _description,
                     enabled: !_isEdit,
                     maxLines: 3,
-                    decoration:
-                        const InputDecoration(labelText: 'Descripción (opcional)'),
+                    decoration: const InputDecoration(
+                        labelText: 'Descripción (opcional)'),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     value: _category,
                     decoration: const InputDecoration(labelText: 'Categoría'),
                     items: [
-                      for (final c in _categories)
-                        DropdownMenuItem(value: c, child: Text(c)),
+                      for (final c in _options)
+                        DropdownMenuItem(
+                            value: c.apiValue, child: Text(c.label)),
                     ],
                     onChanged:
                         _isEdit ? null : (v) => setState(() => _category = v),
@@ -234,9 +234,7 @@ class _TimeField extends StatelessWidget {
                 size: 20, color: AppColors.textSecondary),
             const SizedBox(width: 8),
             Text(
-              time == null
-                  ? 'Sin hora'
-                  : time!.format(context),
+              time == null ? 'Sin hora' : time!.format(context),
               style: TextStyle(
                   color: time == null
                       ? AppColors.textSecondary

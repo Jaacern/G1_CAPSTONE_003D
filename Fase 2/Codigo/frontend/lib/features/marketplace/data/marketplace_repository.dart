@@ -173,35 +173,70 @@ class MarketplaceRepositoryMock implements MarketplaceRepository {
       ),
     ];
 
+    // Mismo catálogo que siembra el backend (sql/925_market_products.sql), con
+    // sus precios en pesos, para que la demo se vea como la API real.
     _products.addAll([
       const MarketProduct(
-        id: 'p-andadera',
-        name: 'Andadera plegable con ruedas',
+        id: 'p-andador',
+        name: 'Andador plegable con ruedas',
         imageUrl: null,
-        price: 1450,
+        price: 45990,
         category: 'mobility',
         description:
-            'Andadera de aluminio ligera, plegable, con ruedas delanteras y '
-            'asiento de descanso. Soporta hasta 130 kg.',
+            'Andador de aluminio con dos ruedas delanteras y regulación de '
+            'altura. Soporta hasta 100 kg y se pliega para guardarlo o '
+            'llevarlo en auto.',
       ),
       const MarketProduct(
-        id: 'p-dispensador',
-        name: 'Dispensador de pastillas semanal',
+        id: 'p-silla-ruedas',
+        name: 'Silla de ruedas estándar',
         imageUrl: null,
-        price: 320,
+        price: 139990,
+        category: 'mobility',
+        description:
+            'Silla plegable de acero con apoyapiés desmontables y frenos en '
+            'ambas ruedas. Para uso domiciliario y traslados cortos.',
+      ),
+      const MarketProduct(
+        id: 'p-barra-ducha',
+        name: 'Barra de apoyo para ducha',
+        imageUrl: null,
+        price: 18990,
+        category: 'bathroom',
+        description:
+            'Barra de sujeción de 60 cm con ventosas de presión, para instalar '
+            'sin perforar. Reduce el riesgo de caída en el baño, que es donde '
+            'más ocurren.',
+      ),
+      const MarketProduct(
+        id: 'p-silla-ducha',
+        name: 'Silla de ducha con respaldo',
+        imageUrl: null,
+        price: 32990,
+        category: 'bathroom',
+        description:
+            'Asiento plástico con patas antideslizantes y altura regulable, '
+            'para quienes no pueden mantenerse de pie durante el baño.',
+      ),
+      const MarketProduct(
+        id: 'p-panales',
+        name: 'Pañales para adulto, talla M',
+        imageUrl: null,
+        price: 12990,
+        category: 'hygiene',
+        description:
+            'Paquete de 20 unidades con alta absorción y banda elástica. '
+            'Talla M, contorno de cadera 80 a 120 cm.',
+      ),
+      const MarketProduct(
+        id: 'p-pastillero',
+        name: 'Pastillero semanal con alarma',
+        imageUrl: null,
+        price: 24990,
         category: 'monitoring',
         description:
-            'Organizador de medicamentos de 7 días con 4 tomas diarias y '
-            'alarma sonora programable.',
-      ),
-      const MarketProduct(
-        id: 'p-barra-bano',
-        name: 'Barra de baño de seguridad',
-        imageUrl: null,
-        price: 480,
-        category: 'bathroom',
-        description: 'Barra de sujeción antideslizante para regadera o tina. '
-            'Instalación con ventosas de fijación rápida.',
+            'Organizador de 7 días con 4 tomas diarias y alarma sonora '
+            'programable, para no saltarse ni repetir una dosis.',
       ),
     ]);
 

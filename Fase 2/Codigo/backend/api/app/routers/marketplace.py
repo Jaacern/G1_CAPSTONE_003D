@@ -537,3 +537,31 @@ async def list_products(
     ).mappings().all()
 
     return ProductsOut(items=[_producto(f) for f in filas])
+
+
+@router.get("/products/{product_id}", response_model=ProductOut)
+async def get_product(
+    product_id: UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Detalle de un producto del catalogo."""
+    f = (
+        await db.execute(
+            text(
+                f"""
+                SELECT {_COLUMNAS}
+                FROM market_products
+                WHERE id = :pid
+                  AND status = 'published'
+                  AND deleted_at IS NULL
+                """  # noqa: S608
+            ),
+            {"pid": str(product_id)},
+        )
+    ).mappings().first()
+
+    if f is None:
+        raise _NO_EXISTE
+
+    return _producto(f)

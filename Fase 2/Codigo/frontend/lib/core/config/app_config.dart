@@ -32,33 +32,27 @@ class AppConfig {
   // --------------------------------------------------------------------------
   // Capacidades del backend (feature flags)
   // --------------------------------------------------------------------------
-  // El backend actual implementa los módulos 3 (auth), 4 (pacientes),
-  // 5 (vitals/semáforo), 6 (medicamentos/adherencia) y 9 (alertas/SOS).
-  //
-  // Los siguientes módulos NO tienen endpoints en el backend todavía. Mientras
-  // tanto, en modo backend real (useMocks=false) se muestran como
-  // "Próximamente"; en modo demo (useMocks=true) siguen disponibles con datos
-  // simulados en memoria para poder enseñar el flujo completo.
-  //
-  // La regla es simple: un módulo sin backend solo está habilitado si estamos
-  // en modo mocks. Así la app nunca llama a endpoints inexistentes.
+  // Un módulo queda en false solo si el backend todavía no lo tiene. En ese
+  // caso, con useMocks=false la pantalla muestra "Próximamente" en vez de
+  // llamar a un endpoint inexistente, y con useMocks=true sigue disponible
+  // con datos simulados para poder enseñar el flujo completo.
 
-  /// Comunicación: chat de familia + asistente IA. Sin backend aún.
-  static bool get hasComms => useMocks;
+  /// Comunicación: chat del círculo + asistente IA.
+  static bool get hasComms => true;
 
-  /// Marketplace de cuidadoras y artículos. Sin backend aún.
-  static bool get hasMarketplace => useMocks;
+  /// Marketplace: cuidadoras, ayudas técnicas y ofertas de trabajo.
+  static bool get hasMarketplace => true;
 
-  /// Documentos clínicos del paciente (recetas, estudios). Sin backend aún.
-  static bool get hasDocuments => useMocks;
+  /// Documentos clínicos del paciente (recetas, estudios).
+  static bool get hasDocuments => true;
 
   /// OCR / escaneo de recetas para crear medicamentos. Sin backend aún.
   static bool get hasPrescriptionScan => useMocks;
 
-  /// Fotos de familia y feed de contenido del adulto mayor. Sin backend aún.
-  static bool get hasElderContent => useMocks;
+  /// Fotos de familia y feed de contenido del adulto mayor.
+  static bool get hasElderContent => true;
 
   /// Bitácora de la cuidadora: tareas, observaciones, incidentes, entrega de
-  /// turno, check-in y reportes (/caregiver/*). Sin backend aún.
-  static bool get hasCaregiverLog => useMocks;
+  /// turno, check-in y reportes.
+  static bool get hasCaregiverLog => true;
 }

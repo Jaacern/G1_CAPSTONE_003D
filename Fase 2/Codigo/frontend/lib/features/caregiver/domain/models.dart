@@ -185,6 +185,9 @@ class CareTask {
   final String id;
   final String title;
   final String? description;
+
+  /// Momento de la tarea ya traído a la zona de la cuidadora. Vale null
+  /// cuando la tarea es "de todo el día".
   final DateTime? due;
   final TaskStatus status;
   final String? category;
@@ -206,19 +209,26 @@ class CareTask {
         id: (json['id'] ?? json['task_id']).toString(),
         title: (json['title'] ?? '') as String,
         description: json['description'] as String?,
-        due: json['due'] != null ? DateTime.parse(json['due'] as String) : null,
+        due: _debido(json['due']),
         status: TaskStatus.fromApi((json['status'] ?? 'pending') as String),
         category: json['category'] as String?,
       );
+}
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        if (description != null) 'description': description,
-        if (due != null) 'due': due!.toIso8601String(),
-        'status': status.apiValue,
-        if (category != null) 'category': category,
-      };
+/// Hora prevista de una tarea, o null si es de todo el día.
+///
+/// `tasks.py` no manda la hora aparte: arma un instante UTC con `due_date` y
+/// `due_time` y, cuando la tarea no tiene hora, pone la medianoche UTC. Por eso
+/// el centinela se lee antes de convertir: a las 21:00 de Chile la medianoche
+/// UTC del día siguiente se vería como una tarea con fecha corrida.
+///
+/// El mismo centinela tiene un costo real: una tarea pedida para las 21:00
+/// locales viaja como 00:00 UTC y el backend la guarda como "sin hora".
+DateTime? _debido(Object? crudo) {
+  if (crudo == null) return null;
+  final utc = DateTime.parse(crudo as String).toUtc();
+  if (utc.hour == 0 && utc.minute == 0) return null;
+  return utc.toLocal();
 }
 
 /// Solicitud de creación de una tarea.
@@ -239,7 +249,10 @@ class NewCareTask {
         'title': title,
         if (description != null && description!.isNotEmpty)
           'description': description,
-        if (due != null) 'due': due!.toIso8601String(),
+        // tasks.py le asigna UTC a cualquier instante escrito sin zona, así que
+        // la hora local de la cuidadora tiene que viajar convertida y con su
+        // designación de zona; si no, una tarea de las 08:00 queda a las 05:00.
+        if (due != null) 'due': due!.toUtc().toIso8601String(),
         if (category != null && category!.isNotEmpty) 'category': category,
       };
 }

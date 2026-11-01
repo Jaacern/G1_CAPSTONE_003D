@@ -17,7 +17,8 @@ import 'shell_providers.dart';
 
 /// Contenedor principal con navegación inferior según el rol del usuario.
 /// Las pestañas se limitan a lo que el backend soporta hoy:
-/// - familiar:        Hoy · Salud · Comunicación · Marketplace · Más
+/// - familiar:        Hoy · Salud · Mensajes · Tienda · Más
+///                    (Mensajes = Comunicación, Tienda = Marketplace)
 /// - cuidadora:       Hoy · Salud · Alertas · Más
 /// - adulto mayor:    experiencia de mosaico a pantalla completa
 /// - médico:          Hoy (mis pacientes) · Salud · Más
@@ -65,7 +66,10 @@ class MainShell extends ConsumerWidget {
             NavigationDestination(
               // Emojis fieles al wireframe (🏠 ❤️ 💬 🛍️ ☰). Semantics mantiene
               // la accesibilidad con el nombre de la pestaña.
-              icon: _EmojiTab(emoji: tabs[i].emoji, active: i == safeIndex),
+              icon: _EmojiTab(
+                  emoji: tabs[i].emoji,
+                  active: i == safeIndex,
+                  nombre: tabs[i].full ?? tabs[i].label),
               label: tabs[i].label,
             ),
         ],
@@ -75,11 +79,16 @@ class MainShell extends ConsumerWidget {
 
   // Orden, emojis y etiquetas fieles al wireframe Suite/Familiar v1:
   // 🏠 Hoy · ❤️ Salud · 💬 Comunicación · 🛍️ Marketplace · ☰ Más
+  //
+  // Cinco destinos en 360 dp dan ~72 dp por etiqueta y "Comunicación" no cabe:
+  // la barra la cortaba con puntos suspensivos. Se muestra un nombre corto y el
+  // del wireframe queda en [full], que alimenta el tooltip y al lector de
+  // pantalla.
   static const _familyTabs = <_Tab>[
     _Tab('Hoy', '🏠', FamilyHomeScreen()),
     _Tab('Salud', '❤️', HealthScreen()),
-    _Tab('Comunicación', '💬', CommsScreen()),
-    _Tab('Marketplace', '🛍️', MarketplaceScreen()),
+    _Tab('Mensajes', '💬', CommsScreen(), full: 'Comunicación'),
+    _Tab('Tienda', '🛍️', MarketplaceScreen(), full: 'Marketplace'),
     _Tab('Más', '☰', MoreScreen()),
   ];
 
@@ -104,24 +113,40 @@ class MainShell extends ConsumerWidget {
 }
 
 class _Tab {
-  const _Tab(this.label, this.emoji, this.screen);
+  const _Tab(this.label, this.emoji, this.screen, {this.full});
+
   final String label;
   final String emoji;
   final Widget screen;
+
+  /// Nombre completo, para el tooltip y el lector de pantalla cuando [label]
+  /// se acorta porque no entra en la barra.
+  final String? full;
 }
 
 /// Emoji de pestaña. Se atenúa levemente cuando no está activa para que la
-/// seleccionada destaque, imitando el wireframe.
+/// seleccionada destaque, imitando el wireframe. El lector de pantalla recibe
+/// el nombre en vez del emoji, que de otra forma se announce como "casa".
 class _EmojiTab extends StatelessWidget {
-  const _EmojiTab({required this.emoji, required this.active});
+  const _EmojiTab(
+      {required this.emoji, required this.active, required this.nombre});
+
   final String emoji;
   final bool active;
+  final String nombre;
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
-      opacity: active ? 1 : 0.55,
-      child: Text(emoji, style: const TextStyle(fontSize: 22)),
+    return Tooltip(
+      message: nombre,
+      child: Semantics(
+        label: nombre,
+        excludeSemantics: true,
+        child: Opacity(
+          opacity: active ? 1 : 0.55,
+          child: Text(emoji, style: const TextStyle(fontSize: 22)),
+        ),
+      ),
     );
   }
 }

@@ -32,8 +32,8 @@ final jobsProvider = FutureProvider.autoDispose<List<JobOffer>>(
 );
 
 /// Detalle de un perfil de cuidadora.
-final caregiverDetailProvider = FutureProvider.autoDispose
-    .family<CaregiverProfileDetail, String>(
+final caregiverDetailProvider =
+    FutureProvider.autoDispose.family<CaregiverProfileDetail, String>(
   (ref, profileId) =>
       ref.watch(marketplaceRepositoryProvider).getCaregiver(profileId),
 );

@@ -17,7 +17,8 @@ class AppConfig {
   );
 
   /// Application ID de Spike API (https://docs.spikeapi.com).
-  static const int spikeAppId = int.fromEnvironment('SPIKE_APP_ID', defaultValue: 0);
+  static const int spikeAppId =
+      int.fromEnvironment('SPIKE_APP_ID', defaultValue: 0);
 
   /// true = usa el simulador de wearable en lugar del SDK de Spike.
   /// El simulador es la fuente por defecto mientras no haya SPIKE_APP_ID.

@@ -28,27 +28,36 @@ void main() {
     expect(AppConfig.useMocks, isTrue);
   });
 
-  test('cada repositorio resuelve a su implementacion Mock cuando useMocks es true', () {
+  test(
+      'cada repositorio resuelve a su implementacion Mock cuando useMocks es true',
+      () {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
     final casos = <String, Object>{
       'alertsRepositoryProvider': container.read(alertsRepositoryProvider),
       'authRepositoryProvider': container.read(authRepositoryProvider),
-      'caregiverRepositoryProvider': container.read(caregiverRepositoryProvider),
-      'assistantRepositoryProvider': container.read(assistantRepositoryProvider),
+      'caregiverRepositoryProvider':
+          container.read(caregiverRepositoryProvider),
+      'assistantRepositoryProvider':
+          container.read(assistantRepositoryProvider),
       'chatRepositoryProvider': container.read(chatRepositoryProvider),
-      'documentsRepositoryProvider': container.read(documentsRepositoryProvider),
+      'documentsRepositoryProvider':
+          container.read(documentsRepositoryProvider),
       'elderRepositoryProvider': container.read(elderRepositoryProvider),
       'vitalsRepositoryProvider': container.read(vitalsRepositoryProvider),
-      'dashboardRepositoryProvider': container.read(dashboardRepositoryProvider),
-      'marketplaceRepositoryProvider': container.read(marketplaceRepositoryProvider),
-      'medicationsRepositoryProvider': container.read(medicationsRepositoryProvider),
+      'dashboardRepositoryProvider':
+          container.read(dashboardRepositoryProvider),
+      'marketplaceRepositoryProvider':
+          container.read(marketplaceRepositoryProvider),
+      'medicationsRepositoryProvider':
+          container.read(medicationsRepositoryProvider),
       'patientsRepositoryProvider': container.read(patientsRepositoryProvider),
       'profileRepositoryProvider': container.read(profileRepositoryProvider),
     };
 
-    expect(casos.length, 13, reason: 'deberian ser los 13 repositorios de la app');
+    expect(casos.length, 13,
+        reason: 'deberian ser los 13 repositorios de la app');
 
     for (final entry in casos.entries) {
       expect(

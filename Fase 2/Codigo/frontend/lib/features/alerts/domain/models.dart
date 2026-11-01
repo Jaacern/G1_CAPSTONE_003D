@@ -114,22 +114,29 @@ class Alert {
         meta: meta,
       );
 
-  factory Alert.fromJson(Map<String, dynamic> json) => Alert(
-        id: (json['id'] ?? json['alert_id']).toString(),
-        patientId: json['patient_id'] as String,
-        patientName: (json['patient_name'] ?? '') as String,
-        type: AlertType.fromApi((json['type'] ?? 'other') as String),
-        severity: AlertSeverity.fromApi((json['severity'] ?? 'info') as String),
-        title: (json['title'] ?? '') as String,
-        // El backend usa 'detail'; conservamos 'message' como alias de compat.
-        message: (json['detail'] ?? json['message'] ?? '') as String,
-        createdAt: DateTime.parse(json['created_at'] as String),
-        status: AlertStatus.fromApi((json['status'] ?? 'active') as String),
-        acknowledgedBy: json['acknowledged_by'] as String?,
-        resolvedAt: json['resolved_at'] != null
-            ? DateTime.parse(json['resolved_at'] as String)
-            : null,
-        // El backend usa 'payload' (jsonb); 'meta' es el alias de compat del mock.
-        meta: (json['payload'] ?? json['meta']) as Map<String, dynamic>?,
-      );
+  factory Alert.fromJson(Map<String, dynamic> json) {
+    // 'payload' es jsonb libre: la spec lo declara dict | list y el backend
+    // devuelve el string crudo si el JSON no se puede parsear. Un map vacío es
+    // lo único que consume la ficha, así que el resto se descarta en vez de
+    // reventar el cast y dejar el centro de alertas sin ninguna.
+    final payload = json['payload'] ?? json['meta'];
+    return Alert(
+      id: (json['id'] ?? json['alert_id']).toString(),
+      patientId: json['patient_id'] as String,
+      patientName: (json['patient_name'] ?? '') as String,
+      type: AlertType.fromApi((json['type'] ?? 'other') as String),
+      severity: AlertSeverity.fromApi((json['severity'] ?? 'info') as String),
+      title: (json['title'] ?? '') as String,
+      // El backend usa 'detail'; conservamos 'message' como alias de compat.
+      message: (json['detail'] ?? json['message'] ?? '') as String,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      status: AlertStatus.fromApi((json['status'] ?? 'active') as String),
+      // 'acknowledged_by' es el id del usuario, no su nombre: este endpoint no
+      // resuelve nombres, así que se omite en lugar de imprimir un UUID.
+      resolvedAt: json['resolved_at'] != null
+          ? DateTime.parse(json['resolved_at'] as String)
+          : null,
+      meta: payload is Map ? Map<String, dynamic>.from(payload) : null,
+    );
+  }
 }

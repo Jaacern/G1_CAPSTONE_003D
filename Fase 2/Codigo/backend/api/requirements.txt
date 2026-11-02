@@ -24,7 +24,7 @@ pydantic[email]==2.10.3
 pydantic-settings==2.6.1
 # SEC: vulnerable. CVE-2024-33663 (critica), CVE-2024-33664 (media) -> fix 3.4.0.
 # SEC: CVE-2026-85394 (critica) sin fix upstream (<= 3.5.0); evaluar migrar a PyJWT.
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 # SEC: vulnerable. 8 CVE (CVE-2024-53981, CVE-2026-24486/40347/42561/53537/53538/

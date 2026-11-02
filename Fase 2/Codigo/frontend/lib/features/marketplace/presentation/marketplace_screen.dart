@@ -222,16 +222,27 @@ class _CaregiverCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          Row(
+          // Valoración a la izquierda y tarifa a la derecha; si el teléfono es
+          // chico o el texto está grande, la tarifa baja de línea en vez de
+          // desbordar la tarjeta.
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              _RatingStars(rating: caregiver.rating),
-              const SizedBox(width: 6),
-              Text(
-                '${caregiver.rating.toStringAsFixed(1)} (${caregiver.reviewsCount})',
-                style: const TextStyle(
-                    fontSize: 13, color: AppColors.textSecondary),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _RatingStars(rating: caregiver.rating),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${caregiver.rating.toStringAsFixed(1)} (${caregiver.reviewsCount})',
+                    style: const TextStyle(
+                        fontSize: 13, color: AppColors.textSecondary),
+                  ),
+                ],
               ),
-              const Spacer(),
               if (caregiver.tarifaLabel != null)
                 Text(
                   '${caregiver.tarifaLabel!}/h',

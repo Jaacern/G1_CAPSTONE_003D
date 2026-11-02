@@ -7,6 +7,10 @@ import 'package:agecare_app/features/alerts/presentation/sos_button.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../../core/widgets/remote_file_image.dart';
+import '../../alerts/application/alerts_providers.dart';
+import '../../caregiver/application/caregiver_providers.dart';
+import '../../caregiver/domain/models.dart';
 import '../../patients/application/patients_providers.dart';
 import '../../patients/domain/models.dart';
 import '../../shell/shell_providers.dart';
@@ -240,7 +244,9 @@ class _PatientSemCard extends ConsumerWidget {
                               fontWeight: FontWeight.w700, fontSize: 15)),
                       Text(
                         patient.topReason ??
-                            (isSelected ? 'Paciente seleccionado' : patient.role.label),
+                            (isSelected
+                                ? 'Paciente seleccionado'
+                                : patient.role.label),
                         style: const TextStyle(
                             fontSize: 11, color: AppColors.textSecondary),
                       ),
@@ -373,7 +379,8 @@ class _MedsTodayCard extends ConsumerWidget {
                   ),
                   if (m.pending > 0)
                     _Pill(
-                      text: '${m.pending} pendiente${m.pending == 1 ? '' : 's'}',
+                      text:
+                          '${m.pending} pendiente${m.pending == 1 ? '' : 's'}',
                       color: AppColors.statusWarning,
                     )
                   else if (m.missed > 0)
@@ -402,7 +409,8 @@ class _MedsTodayCard extends ConsumerWidget {
                     fontSize: 12, color: AppColors.textSecondary),
               ),
               const SizedBox(height: 6),
-              const Text('El plan lo gestiona la cuidadora / médico · tú observas',
+              const Text(
+                  'El plan lo gestiona la cuidadora / médico · tú observas',
                   style:
                       TextStyle(fontSize: 11, color: AppColors.textSecondary)),
             ],
@@ -434,54 +442,126 @@ class _Pill extends StatelessWidget {
   }
 }
 
-/// Tarjeta "Última observación" del wireframe. La bitácora/observaciones de la
-/// cuidadora AÚN NO tiene backend (summary.last_observation llega siempre null).
-/// Se muestra el diseño con estado "Próximamente" para el equipo.
+/// Tarjeta "Última observación" del wireframe.
 ///
-/// PENDIENTE BACKEND: crear tabla `observations` (patient_id, author_id, text,
-/// photo_url?, created_at) y exponerla en GET /patients/{id}/summary/today
-/// (campo last_observation) y en un listado GET /patients/{id}/observations.
-class _LastObservationCard extends StatelessWidget {
+/// Lee `GET /patients/{id}/observations` (logbook.py), que devuelve la bitácora
+/// de la cuidadora del más nuevo al más viejo. El endpoint solo pide
+/// pertenencia al paciente, sin lista de roles, así que la familia y el médico
+/// pueden leerla; lo que no pueden es escribir.
+class _LastObservationCard extends ConsumerWidget {
   const _LastObservationCard();
 
   @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text('👩‍⚕️ ', style: TextStyle(fontSize: 16)),
-              const Expanded(
-                child: Text('Última observación',
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final obsAsync = ref.watch(observationsProvider);
+    return obsAsync.when(
+      // Mientras llega, nada: la pantalla ya se está llenando sola y un
+      // spinner en cada tarjeta hace que el listado parpadee.
+      loading: () => const SizedBox.shrink(),
+      error: (e, _) => AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _ObservationHeader(),
+            const SizedBox(height: 8),
+            Text(
+              'No pudimos cargar la bitácora. ${e.toString()}',
+              style: const TextStyle(
+                  fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => ref.invalidate(observationsProvider),
+                child: const Text('Reintentar'),
               ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withOpacity(.18),
-                  borderRadius: BorderRadius.circular(999),
+            ),
+          ],
+        ),
+      ),
+      data: (items) {
+        if (items.isEmpty) {
+          return const AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ObservationHeader(),
+                SizedBox(height: 8),
+                Text(
+                  'La cuidadora todavía no ha registrado una observación para '
+                  'este paciente.',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      height: 1.4),
                 ),
-                child: const Text('Próximamente',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF8A6300))),
+              ],
+            ),
+          );
+        }
+        final obs = items.first;
+        final etiqueta = categoryLabel(obs.category);
+        return AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(child: _ObservationHeader()),
+                  Text(alertTimeAgo(obs.createdAt),
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary)),
+                ],
               ),
+              const SizedBox(height: 8),
+              Text(obs.authorName.isEmpty ? 'Cuidadora' : obs.authorName,
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary)),
+              const SizedBox(height: 4),
+              Text(obs.text, style: const TextStyle(fontSize: 14, height: 1.4)),
+              if (etiqueta.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Flexible(
+                        child: _Pill(text: etiqueta, color: AppColors.primary)),
+                  ],
+                ),
+              ],
+              if (obs.mediaUrl != null && obs.mediaUrl!.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                RemoteFileImage(
+                  obs.mediaUrl!,
+                  height: 150,
+                  width: double.infinity,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'La bitácora de la cuidadora (ánimo, apetito, sueño, notas y fotos) '
-            'aparecerá aquí cuando el backend la incorpore.',
-            style: TextStyle(
-                fontSize: 13, color: AppColors.textSecondary, height: 1.4),
-          ),
-        ],
-      ),
+        );
+      },
+    );
+  }
+}
+
+/// Encabezado de la tarjeta, igual con o sin datos.
+class _ObservationHeader extends StatelessWidget {
+  const _ObservationHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      children: [
+        Text('👩‍⚕️ ', style: TextStyle(fontSize: 16)),
+        Expanded(
+          child: Text('Última observación',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+        ),
+      ],
     );
   }
 }

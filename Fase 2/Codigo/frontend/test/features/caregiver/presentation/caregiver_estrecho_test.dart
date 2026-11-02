@@ -1,7 +1,10 @@
 import 'package:agecare_app/core/theme/app_theme.dart';
+import 'package:agecare_app/features/auth/application/auth_controller.dart';
+import 'package:agecare_app/features/auth/domain/models.dart';
 import 'package:agecare_app/features/caregiver/data/caregiver_repository.dart';
 import 'package:agecare_app/features/caregiver/presentation/caregiver_log_screen.dart';
 import 'package:agecare_app/features/caregiver/presentation/caregiver_tasks_screen.dart';
+import 'package:agecare_app/features/caregiver/presentation/caregiver_today_screen.dart';
 import 'package:agecare_app/features/patients/data/patients_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -20,6 +23,13 @@ void main() {
         patientsRepositoryProvider
             .overrideWithValue(PatientsRepositoryMock()),
         caregiverRepositoryProvider.overrideWithValue(CaregiverRepositoryMock()),
+        // La pantalla del turno lee la sesión para el saludo; sin este
+        // override queda un timer de restauración pendiente al terminar.
+        currentUserProvider.overrideWith((ref) => const User(
+              userId: 'u-cg',
+              fullName: 'Rosa Millán',
+              email: 'cuidadora@agecare.app',
+            )),
       ];
 
   Future<void> montar(WidgetTester tester, Widget screen) async {
@@ -56,5 +66,13 @@ void main() {
     await montar(tester, const CaregiverLogScreen());
 
     expect(find.textContaining('Desayunó bien'), findsOneWidget);
+  });
+
+  testWidgets('la tarjeta del turno de hoy cabe en 320 dp', (tester) async {
+    await montar(tester, const CaregiverTodayScreen());
+
+    // La fila del estado del turno ("Check-in abierto" + fecha larga) es la
+    // más ancha de la pantalla.
+    expect(find.textContaining('Elena Ramírez'), findsWidgets);
   });
 }

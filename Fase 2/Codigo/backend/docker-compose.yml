@@ -60,6 +60,9 @@ services:
       ASSISTANT_ENDPOINT: ${ASSISTANT_ENDPOINT:-}
       ASSISTANT_API_KEY: ${ASSISTANT_API_KEY:-}
       ASSISTANT_MODEL: ${ASSISTANT_MODEL:-gpt-4o-mini}
+      # Solo para 'openai_compatible' (Claude, NVIDIA, Groq...).
+      ASSISTANT_BASE_URL: ${ASSISTANT_BASE_URL:-}
+      ASSISTANT_SEND_SAMPLING: ${ASSISTANT_SEND_SAMPLING:-true}
 
       # Voz: transcripcion de notas y lectura en voz alta. Mismo criterio.
       SPEECH_PROVIDER: ${SPEECH_PROVIDER:-none}

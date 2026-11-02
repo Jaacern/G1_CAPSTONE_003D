@@ -329,33 +329,66 @@ async def _contexto(db: AsyncSession, patient_id: str) -> tuple[str, list]:
             f"de {adherencia['total']} programadas."
         )
 
+    # El reloj inserta signos vitales cada pocos segundos. Pasarle al modelo
+    # la ultima lectura suelta hace que parezca que el valor "cambia" entre
+    # una respuesta y otra (72, luego 65, luego 70...). Por eso se le entrega
+    # un resumen por tipo: la ultima lectura con su hora, y ademas el
+    # promedio/minimo/maximo de las ultimas 24h. Asi el modelo tiene el dato
+    # actual y el rango del dia, y no confunde lecturas distintas con
+    # contradicciones. El agregado se calcula en SQL, que es donde escala.
     vitales = (
         await db.execute(
             text(
                 """
-                SELECT DISTINCT ON (v.type)
-                       v.id, v.type, v.value, v.value_secondary,
-                       v.measured_at, t.label, t.unit
-                FROM vital_readings v
-                JOIN vital_types t ON t.code = v.type
-                WHERE v.patient_id = :pid
-                  AND v.measured_at >= now() - interval '14 days'
-                ORDER BY v.type, v.measured_at DESC
+                WITH ult AS (
+                    SELECT DISTINCT ON (v.type)
+                           v.id, v.type, v.value, v.value_secondary,
+                           -- La conexion ya esta en la zona de la operacion
+                           -- (db.py), asi que to_char da la hora de Chile.
+                           to_char(v.measured_at, 'DD-MM HH24:MI') AS cuando
+                    FROM vital_readings v
+                    WHERE v.patient_id = :pid
+                      AND v.measured_at >= now() - interval '14 days'
+                    ORDER BY v.type, v.measured_at DESC
+                ),
+                agg AS (
+                    SELECT type,
+                           round(avg(value))::int AS prom,
+                           round(min(value))::int AS minimo,
+                           round(max(value))::int AS maximo,
+                           count(*) AS n
+                    FROM vital_readings
+                    WHERE patient_id = :pid
+                      AND measured_at >= now() - interval '24 hours'
+                    GROUP BY type
+                )
+                SELECT ult.id, ult.type, ult.value, ult.value_secondary,
+                       ult.cuando, t.label, t.unit,
+                       agg.prom, agg.minimo, agg.maximo, agg.n
+                FROM ult
+                JOIN vital_types t ON t.code = ult.type
+                LEFT JOIN agg ON agg.type = ult.type
                 """
             ),
             {"pid": patient_id},
         )
     ).mappings().all()
     if vitales:
-        partes.append(
-            "Ultimas mediciones: "
-            + "; ".join(
-                f"{v['label']} {v['value']}"
-                + (f"/{v['value_secondary']}" if v["value_secondary"] is not None else "")
-                + f" {v['unit']} ({v['measured_at']:%d-%m %H:%M})"
-                for v in vitales
-            ) + "."
-        )
+        lineas = []
+        for v in vitales:
+            valor = f"{v['value']}"
+            if v["value_secondary"] is not None:
+                valor += f"/{v['value_secondary']}"
+            txt_v = f"{v['label']} {valor} {v['unit']} (ultima: {v['cuando']}"
+            # Solo tiene sentido mostrar rango cuando hay varias lecturas en
+            # el dia (tipico del wearable). Una medicion manual unica no.
+            if v["n"] and v["n"] > 1:
+                txt_v += (f"; en 24h promedio {v['prom']}, "
+                          f"rango {v['minimo']}-{v['maximo']} {v['unit']}, "
+                          f"{v['n']} lecturas")
+            txt_v += ")"
+            lineas.append(txt_v)
+        partes.append("Ultimas mediciones: " + "; ".join(lineas) + ".")
         for v in vitales[:5]:
             fuentes.append(Fuente(tabla="vital_readings", id=str(v["id"]),
                                   label="Mediciones"))
@@ -364,7 +397,9 @@ async def _contexto(db: AsyncSession, patient_id: str) -> tuple[str, list]:
         await db.execute(
             text(
                 """
-                SELECT id, category, note, observed_at
+                SELECT id, category, note,
+                       -- Zona puesta en la conexion (db.py); da hora Chile.
+                       to_char(observed_at, 'DD-MM') AS cuando
                 FROM care_observations
                 WHERE patient_id = :pid AND deleted_at IS NULL
                 ORDER BY observed_at DESC LIMIT 10
@@ -376,7 +411,7 @@ async def _contexto(db: AsyncSession, patient_id: str) -> tuple[str, list]:
     if observaciones:
         partes.append(
             "Bitacora reciente: "
-            + " | ".join(f"{o['observed_at']:%d-%m} [{o['category']}] {o['note']}"
+            + " | ".join(f"{o['cuando']} [{o['category']}] {o['note']}"
                          for o in observaciones) + "."
         )
         for o in observaciones[:5]:

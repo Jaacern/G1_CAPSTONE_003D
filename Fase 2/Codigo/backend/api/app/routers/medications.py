@@ -417,7 +417,8 @@ async def log_dose(
         await db.execute(
             text(
                 """
-                SELECT sd.id, m.patient_id, sd.scheduled_at, sd.status
+                SELECT sd.id, m.patient_id, sd.scheduled_at, sd.status,
+                       sd.logged_by
                 FROM scheduled_doses sd
                 JOIN medications m ON m.id = sd.medication_id
                 WHERE sd.id = :did
@@ -446,7 +447,27 @@ async def log_dose(
         raise ApiError(status_code=404, code="NOT_FOUND",
                        message="El recurso solicitado no existe o no está disponible.")
 
-    if dose["status"] != "pending":
+    # Se puede registrar una dosis que todavia no resolvio una PERSONA.
+    #
+    #   pending            : nadie la ha tocado.
+    #   postponed          : esta esperando su nueva hora. Antes caia aqui y
+    #                        devolvia 409, asi que una dosis pospuesta no se
+    #                        podia marcar nunca mas: quedaba trabada para
+    #                        siempre y no contaba ni a favor ni en contra.
+    #   missed sin logged_by: la marco el proceso de mantenimiento porque se
+    #                        paso la hora, no una persona. Si la cuidadora
+    #                        llega con hora y media de retraso y se la da,
+    #                        tiene que poder registrarlo; negarselo es
+    #                        guardar que no se administro una dosis que si
+    #                        se administro.
+    #
+    # Lo que no se puede es pisar lo que alguien ya declaro: taken, skipped,
+    # o missed con el motivo que escribio la cuidadora.
+    resuelta_por_alguien = (
+        dose["status"] in ("taken", "skipped")
+        or (dose["status"] == "missed" and dose["logged_by"] is not None)
+    )
+    if resuelta_por_alguien:
         raise ApiError(status_code=409, code="DOSE_ALREADY_LOGGED",
                        message="Esta dosis ya fue registrada.")
 

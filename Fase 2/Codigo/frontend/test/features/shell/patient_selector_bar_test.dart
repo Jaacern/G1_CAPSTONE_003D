@@ -127,6 +127,11 @@ void main() {
     expect(find.byKey(const Key('patientSelectorBar_option_p-jose')),
         findsOneWidget);
 
+    // Cada opción dice qué rol se tiene con ese paciente, porque el trato
+    // cambia: Elena es de la familia y José también, con una alerta abierta.
+    expect(find.text('Familiar'), findsOneWidget);
+    expect(find.text('Familiar · 1 alerta(s) activa(s)'), findsOneWidget);
+
     // 1 toque sobre José cambia el contexto activo.
     await tester.tap(find.byKey(const Key('patientSelectorBar_option_p-jose')));
     await tester.pumpAndSettle(const Duration(milliseconds: 1000));

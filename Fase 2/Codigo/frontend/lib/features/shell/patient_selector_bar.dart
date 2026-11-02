@@ -110,9 +110,14 @@ class PatientSelectorBar extends ConsumerWidget {
                 leading: Icon(p.wellbeingStatus.icon,
                     color: p.wellbeingStatus.color),
                 title: Text(p.fullName),
-                subtitle: p.activeAlertsCount > 0
-                    ? Text('${p.activeAlertsCount} alerta(s) activa(s)')
-                    : null,
+                subtitle: Text(
+                  // Con dos pacientes o más, el rol es lo que cambia el trato:
+                  // no es lo mismo entrar como familiar de uno que como
+                  // cuidadora del otro.
+                  p.activeAlertsCount > 0
+                      ? '${p.role.label} · ${p.activeAlertsCount} alerta(s) activa(s)'
+                      : p.role.label,
+                ),
                 trailing: p.patientId == current.patientId
                     ? const Icon(Icons.check_rounded, color: AppColors.primary)
                     : null,

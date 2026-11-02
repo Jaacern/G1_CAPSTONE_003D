@@ -89,12 +89,14 @@ class _ShiftCard extends StatelessWidget {
             children: [
               Icon(status.icon, color: status.color),
               const SizedBox(width: 8),
-              Text(status.label,
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      color: status.color)),
-              const Spacer(),
+              Expanded(
+                child: Text(status.label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: status.color)),
+              ),
               Text(DateFormat('EEEE d MMM', 'es').format(DateTime.now()),
                   style: const TextStyle(color: AppColors.textSecondary)),
             ],

@@ -105,9 +105,13 @@ class MedicationsBody extends ConsumerWidget {
           const SizedBox(height: 20),
           Row(
             children: [
-              Text('Plan de medicación',
-                  style: Theme.of(context).textTheme.titleMedium),
-              const Spacer(),
+              // Como en "Hoy": el título cede su ancho antes que el Spacer le
+              // robe los últimos px al chip de solo lectura.
+              Expanded(
+                child: Text('Plan de medicación',
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium),
+              ),
               // El familiar ve el plan en solo lectura (lo gestiona la
               // cuidadora o el médico).
               if (!canManage)

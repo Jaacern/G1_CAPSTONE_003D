@@ -57,13 +57,22 @@ class ApiClient {
     @visibleForTesting Dio? dio,
     @visibleForTesting Dio? refreshDio,
   }) : _refreshDio = refreshDio ??
-            Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl + AppConfig.apiVersion)) {
+            Dio(BaseOptions(
+              baseUrl: AppConfig.apiBaseUrl + AppConfig.apiVersion,
+              // Cabeceras del service token de Cloudflare Access (vacías si no
+              // está configurado). Sin ellas, Access responde 403 antes de
+              // llegar al backend.
+              headers: {...AppConfig.cfAccessHeaders},
+            )) {
     _dio = dio ??
         Dio(BaseOptions(
           baseUrl: AppConfig.apiBaseUrl + AppConfig.apiVersion,
           connectTimeout: const Duration(seconds: 10),
           receiveTimeout: const Duration(seconds: 20),
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            ...AppConfig.cfAccessHeaders,
+          },
         ));
 
     _dio.interceptors.add(InterceptorsWrapper(

@@ -384,24 +384,30 @@ class _TrendChart extends StatelessWidget {
         ],
         lineTouchData: LineTouchData(
           touchTooltipData: LineTouchTooltipData(
-            getTooltipItems: (touched) => touched
-                .where((s) => s.barIndex == touched.length - 1)
-                .map((s) {
-              final p = points[s.spotIndex];
-              final mn = p.min != null ? ' · mín ${p.min!.toStringAsFixed(0)}' : '';
-              final mx = p.max != null ? ' · máx ${p.max!.toStringAsFixed(0)}' : '';
-              final when = switch (grain) {
-                _Grain.hour => DateFormat("d MMM HH:mm", 'es').format(p.ts),
-                _Grain.day => DateFormat('d MMM', 'es').format(p.ts),
-                _Grain.week =>
-                  'Semana del ${DateFormat('d MMM', 'es').format(p.ts)}',
-              };
-              return LineTooltipItem(
-                '${p.value.toStringAsFixed(0)} ${series.type.unit} (promedio)$mn$mx\n'
-                '$when',
-                const TextStyle(color: Colors.white, fontSize: 12),
-              );
-            }).toList(),
+            // La línea del promedio es la ÚLTIMA de lineBarsData. Su índice es
+            // 2 cuando hay banda mín–máx (2 líneas transparentes antes) o 0 si
+            // no la hay. Solo esa línea muestra tooltip; las transparentes de la
+            // banda devuelven null para que NO salga el recuadro blanco vacío.
+            getTooltipItems: (touched) {
+              final avgBarIndex = hasMinMax ? 2 : 0;
+              return touched.map((s) {
+                if (s.barIndex != avgBarIndex) return null;
+                final p = points[s.spotIndex];
+                final mn = p.min != null ? ' · mín ${p.min!.toStringAsFixed(0)}' : '';
+                final mx = p.max != null ? ' · máx ${p.max!.toStringAsFixed(0)}' : '';
+                final when = switch (grain) {
+                  _Grain.hour => DateFormat("d MMM HH:mm", 'es').format(p.ts),
+                  _Grain.day => DateFormat('d MMM', 'es').format(p.ts),
+                  _Grain.week =>
+                    'Semana del ${DateFormat('d MMM', 'es').format(p.ts)}',
+                };
+                return LineTooltipItem(
+                  '${p.value.toStringAsFixed(0)} ${series.type.unit} (promedio)$mn$mx\n'
+                  '$when',
+                  const TextStyle(color: Colors.white, fontSize: 12),
+                );
+              }).toList();
+            },
           ),
         ),
       ),

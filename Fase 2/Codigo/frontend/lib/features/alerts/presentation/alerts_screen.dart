@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -10,11 +12,36 @@ import '../data/alerts_repository.dart';
 import '../domain/models.dart';
 
 /// Centro de alertas: lista agrupada por severidad con acciones rápidas.
-class AlertsScreen extends ConsumerWidget {
+/// Se auto-refresca cada pocos segundos (sin parpadeo) para que las alertas
+/// nuevas —en especial las caídas— aparezcan solas sin arrastrar a refrescar.
+class AlertsScreen extends ConsumerStatefulWidget {
   const AlertsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AlertsScreen> createState() => _AlertsScreenState();
+}
+
+class _AlertsScreenState extends ConsumerState<AlertsScreen> {
+  Timer? _auto;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-refresco cada 5s: recargar() es silencioso (mantiene los datos en
+    // pantalla), así no hay parpadeo. Las caídas aparecen solas.
+    _auto = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) ref.read(alertsControllerProvider.notifier).recargar();
+    });
+  }
+
+  @override
+  void dispose() {
+    _auto?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final alertsAsync = ref.watch(alertsControllerProvider);
 
     return Scaffold(

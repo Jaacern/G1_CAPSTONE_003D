@@ -34,6 +34,7 @@ import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/shell/main_shell.dart';
 import '../../features/shell/splash_screen.dart';
 import '../../features/wearable/presentation/wearable_link_screen.dart';
+import '../../features/wearable/presentation/watch_pairing_screen.dart';
 import '../../features/dev/presentation/theme_gallery_screen.dart';
 
 /// Rutas públicas (accesibles sin sesión).
@@ -85,6 +86,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/wearable/link/:patientId',
         builder: (_, st) =>
             WearableLinkScreen(patientId: st.pathParameters['patientId']!),
+      ),
+      // Vinculación del Reloj AgeCare por código de un solo uso (RF-68).
+      GoRoute(
+        path: '/wearable/watch/:patientId',
+        builder: (_, st) => WatchPairingScreen(
+          patientId: st.pathParameters['patientId']!,
+          patientName: st.uri.queryParameters['name'],
+        ),
       ),
 
       // --- Pacientes ---

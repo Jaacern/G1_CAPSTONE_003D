@@ -73,7 +73,11 @@ class VitalsRepositoryHttp implements VitalsRepository {
     final srcRaw = (res['sources'] ?? const {}) as Map<String, dynamic>;
     final sources = <VitalSource, int>{};
     srcRaw.forEach((k, v) {
-      sources[VitalSource.resolve(k, k)] = (v as num).toInt();
+      // ACUMULA (+=) en vez de asignar: varias claves crudas pueden resolver a
+      // la misma fuente (p. ej. 'wearable' y 'watch' → VitalSource.watch) y hay
+      // que sumar sus conteos, no sobrescribir.
+      final src = VitalSource.resolve(k, k);
+      sources[src] = (sources[src] ?? 0) + (v as num).toInt();
     });
     return VitalSeries(
       type: type,

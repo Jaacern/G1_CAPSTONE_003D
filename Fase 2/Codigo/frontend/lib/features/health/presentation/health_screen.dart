@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../../medications/presentation/medications_screen.dart';
 import '../../patients/application/patients_providers.dart';
+import '../../wearable/application/watch_link_service.dart';
 import '../application/health_providers.dart';
 import '../domain/models.dart';
 
@@ -110,35 +111,59 @@ class _DocsTab extends ConsumerWidget {
 
 /// Contenido de la sub-pestaña "Vitales": estado del wearable + tarjetas de
 /// signos vitales con acceso al detalle de tendencias.
-class _VitalsTab extends ConsumerWidget {
+class _VitalsTab extends ConsumerStatefulWidget {
   const _VitalsTab();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_VitalsTab> createState() => _VitalsTabState();
+}
+
+class _VitalsTabState extends ConsumerState<_VitalsTab> {
+  @override
+  void initState() {
+    super.initState();
+    // Auto-refresco "En vivo" activado al entrar a Salud: las lecturas que
+    // sube el reloj aparecen solas, sin que el usuario arrastre para refrescar.
+    // Se enciende tras el primer frame para no modificar providers en build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final live = ref.read(liveControllerProvider);
+      if (!live.enabled) ref.read(liveControllerProvider.notifier).start();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final latest = ref.watch(latestVitalsProvider);
-    final detail = ref.watch(selectedPatientDetailProvider);
+
+    // UX de "actualización suave": mientras recarga (auto-refresco o pull),
+    // NO tapamos la pantalla con un spinner. Si ya hay datos previos, los
+    // seguimos mostrando y se reemplazan solos cuando llegan los nuevos
+    // (efecto server-side events). El spinner a pantalla completa solo aparece
+    // en la PRIMERA carga, cuando aún no hay nada que mostrar.
+    final vitals = latest.valueOrNull;
+    if (vitals == null) {
+      if (latest.hasError) {
+        return ErrorView(
+          message: latest.error.toString(),
+          onRetry: () => ref.invalidate(latestVitalsProvider),
+        );
+      }
+      return const LoadingView();
+    }
 
     return RefreshIndicator(
       onRefresh: () async => refreshVitalsViews(ref.invalidate),
-      child: latest.when(
-        loading: () => const LoadingView(),
-        error: (e, _) => ErrorView(
-            message: e.toString(),
-            onRetry: () => ref.invalidate(latestVitalsProvider)),
-        data: (vitals) => ListView(
+      child: Builder(
+        builder: (context) {
+          return ListView(
           padding: const EdgeInsets.all(16),
           children: [
             // Estado del wearable (ticket AGE-306, criterio de visibilidad de sync)
-            detail.maybeWhen(
-              data: (p) => p?.wearable != null
-                  ? _WearableStatusCard(
-                      lastSync: p!.wearable!.lastSyncAt,
-                      battery: p.wearable!.batteryPct,
-                      isStale: p.wearable!.isStale,
-                    )
-                  : const _WearableLinkCard(),
-              orElse: () => const SizedBox.shrink(),
-            ),
+            // Estado del Reloj AgeCare en Salud: conectado / desconectado /
+            // sin vincular + aviso de batería baja. Usa watchStatusProvider,
+            // la misma fuente de verdad que el panel de Dispositivos.
+            const _WatchStatusBanner(),
             // Fila: interruptor "En vivo" (auto-refresco) + sincronizar reloj.
             // En un teléfono de 320 dp no cabe todo en una línea, así que los
             // botones bajan solos en vez de desbordar la pantalla.
@@ -192,8 +217,9 @@ class _VitalsTab extends ConsumerWidget {
                 ),
               ];
             }(),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -202,44 +228,77 @@ class _VitalsTab extends ConsumerWidget {
 /// Interruptor "En vivo": activa el auto-refresco que sondea el backend cada
 /// pocos segundos, para que las lecturas que sube el reloj aparezcan solas sin
 /// arrastrar para refrescar. Muestra cuándo fue la última actualización.
-class _LiveToggle extends ConsumerWidget {
+/// Indicador "En vivo": un punto verde que late para comunicar que los datos
+/// se actualizan solos. NO es un interruptor (el auto-refresco está siempre
+/// activo al entrar a Salud); es solo una señal visual del estado. Muestra la
+/// hora de la última actualización.
+class _LiveToggle extends ConsumerStatefulWidget {
   const _LiveToggle();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_LiveToggle> createState() => _LiveToggleState();
+}
+
+class _LiveToggleState extends ConsumerState<_LiveToggle>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final live = ref.watch(liveControllerProvider);
-    final color = live.enabled ? AppColors.statusOk : AppColors.textSecondary;
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: () => ref.read(liveControllerProvider.notifier).toggle(),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              live.enabled
-                  ? Icons.sensors_rounded
-                  : Icons.sensors_off_rounded,
-              size: 18,
-              color: color,
+    final on = live.enabled;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Punto que late cuando está en vivo (fijo y gris si no).
+          FadeTransition(
+            opacity: on
+                ? Tween(begin: 0.3, end: 1.0).animate(_pulse)
+                : const AlwaysStoppedAnimation(1.0),
+            child: Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                color: on ? AppColors.statusOk : AppColors.textSecondary,
+                shape: BoxShape.circle,
+              ),
             ),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            'En vivo',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: on ? AppColors.statusOk : AppColors.textSecondary,
+            ),
+          ),
+          if (on && live.lastRefresh != null) ...[
             const SizedBox(width: 6),
             Text(
-              live.enabled ? 'En vivo' : 'En vivo (off)',
-              style: TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w700, color: color),
+              '· ${DateFormat('HH:mm:ss').format(live.lastRefresh!)}',
+              style: const TextStyle(
+                  fontSize: 11, color: AppColors.textSecondary),
             ),
-            if (live.enabled && live.lastRefresh != null) ...[
-              const SizedBox(width: 6),
-              Text(
-                '· ${DateFormat('HH:mm:ss').format(live.lastRefresh!)}',
-                style: const TextStyle(
-                    fontSize: 11, color: AppColors.textSecondary),
-              ),
-            ],
           ],
-        ),
+        ],
       ),
     );
   }
@@ -509,79 +568,130 @@ class _Sparkline extends StatelessWidget {
   }
 }
 
-class _WearableStatusCard extends StatelessWidget {
-  const _WearableStatusCard({this.lastSync, this.battery, required this.isStale});
-
-  final DateTime? lastSync;
-  final int? battery;
-  final bool isStale;
+/// Banner de estado del Reloj AgeCare en la pantalla de Salud.
+/// Muestra, con la misma fuente de verdad del panel de Dispositivos
+/// (watchStatusProvider): Sin vincular / Desconectado / Conectado, el nivel de
+/// batería y un aviso cuando está baja. Es donde el familiar ve de un vistazo
+/// si el monitoreo está activo.
+class _WatchStatusBanner extends ConsumerWidget {
+  const _WatchStatusBanner();
 
   @override
-  Widget build(BuildContext context) {
-    final color = isStale ? AppColors.statusWarning : AppColors.statusOk;
-    final syncText = lastSync == null
-        ? 'sin datos'
-        : 'hace ${_ago(DateTime.now().difference(lastSync!.toLocal()))}';
-    return AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Icon(Icons.watch_rounded, color: color),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              isStale
-                  ? 'Wearable sin datos recientes (última sync $syncText)'
-                  : 'Wearable sincronizado $syncText',
-              style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final patient = ref.watch(selectedPatientProvider);
+    if (patient == null) return const SizedBox.shrink();
+    final statusAsync = ref.watch(watchStatusProvider(patient.patientId));
+    final s = statusAsync.valueOrNull;
+
+    // Mientras carga la primera vez, no mostramos nada (evita parpadeo).
+    if (s == null) return const SizedBox.shrink();
+
+    // Caso 1: sin vincular → tarjeta con acción de vincular.
+    if (!s.linked) {
+      return AppCard(
+        child: Row(
+          children: [
+            const Icon(Icons.watch_off_outlined, color: AppColors.textSecondary),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text('Sin reloj vinculado',
+                  style: TextStyle(color: AppColors.textSecondary)),
             ),
-          ),
-          if (battery != null) ...[
-            Icon(
-                battery! > 20
-                    ? Icons.battery_std_rounded
-                    : Icons.battery_alert_rounded,
-                size: 18,
-                color: battery! > 20 ? AppColors.textSecondary : AppColors.critical),
-            Text('$battery%',
-                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-          ],
-        ],
-      ),
-    );
-  }
-
-  String _ago(Duration d) {
-    if (d.inMinutes < 60) return '${d.inMinutes} min';
-    if (d.inHours < 24) return '${d.inHours} h';
-    return '${d.inDays} días';
-  }
-}
-
-class _WearableLinkCard extends StatelessWidget {
-  const _WearableLinkCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Row(
-        children: [
-          const Icon(Icons.watch_off_outlined, color: AppColors.textSecondary),
-          const SizedBox(width: 10),
-          const Expanded(
-              child: Text('Sin wearable vinculado',
-                  style: TextStyle(color: AppColors.textSecondary))),
-          Consumer(
-            builder: (context, ref, _) => TextButton(
-              onPressed: () {
-                final p = ref.read(selectedPatientProvider);
-                if (p != null) context.push('/wearable/link/${p.patientId}');
-              },
+            TextButton(
+              onPressed: () =>
+                  context.push('/wearable/watch/${patient.patientId}'),
               child: const Text('Vincular'),
             ),
+          ],
+        ),
+      );
+    }
+
+    // Caso 2/3: vinculado → conectado o desconectado, con batería.
+    final connected = s.connected;
+    final color = connected ? AppColors.statusOk : AppColors.statusAttention;
+    final label = connected ? 'Reloj conectado' : 'Reloj desconectado';
+    final subtitle = connected
+        ? 'Midiendo y enviando signos vitales'
+        : 'Sin señal: puede estar apagado, sin batería o fuera de alcance';
+    final battery = s.batteryPct;
+
+    return Column(
+      children: [
+        AppCard(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Icon(connected ? Icons.watch_rounded : Icons.watch_off_rounded,
+                  color: color),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        style: TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14)),
+                    Text(subtitle,
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
+              if (battery != null) ...[
+                Icon(
+                  battery > 20
+                      ? Icons.battery_std_rounded
+                      : Icons.battery_alert_rounded,
+                  size: 18,
+                  color: battery > 20
+                      ? AppColors.textSecondary
+                      : AppColors.critical,
+                ),
+                const SizedBox(width: 2),
+                Text('$battery%',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: battery > 20
+                            ? AppColors.textSecondary
+                            : AppColors.critical)),
+              ],
+            ],
+          ),
+        ),
+        // Aviso de batería baja (≤15%) SOLO si el reloj está conectado: es un
+        // aviso preventivo ("cárgalo antes de que se apague"). Si ya está
+        // desconectado, el banner de arriba lo cubre y repetirlo es redundante.
+        if (connected && s.batteryLow) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.critical.withOpacity(.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Text('🪫', style: TextStyle(fontSize: 18)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Batería del reloj baja (${battery ?? 0}%). Ponlo a cargar '
+                    'para no perder el monitoreo.',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.critical,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
-      ),
+      ],
     );
   }
 }

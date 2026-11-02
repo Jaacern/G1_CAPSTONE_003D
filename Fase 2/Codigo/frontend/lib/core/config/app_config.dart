@@ -16,6 +16,26 @@ class AppConfig {
     defaultValue: 'https://api-dev.agecare.app',
   );
 
+  /// Service token de Cloudflare Access. Necesario cuando el backend está
+  /// detrás de Cloudflare Access (p. ej. el despliegue en srv01). Si quedan
+  /// vacíos, no se envían las cabeceras (backend sin Access / local).
+  /// Se pasan por --dart-define para no quemar el secreto en el repo:
+  ///   --dart-define=CF_ACCESS_CLIENT_ID=xxxxx.access
+  ///   --dart-define=CF_ACCESS_CLIENT_SECRET=xxxxx
+  static const String cfAccessClientId =
+      String.fromEnvironment('CF_ACCESS_CLIENT_ID', defaultValue: '');
+  static const String cfAccessClientSecret =
+      String.fromEnvironment('CF_ACCESS_CLIENT_SECRET', defaultValue: '');
+
+  /// Mapa de cabeceras de Access, vacío si no está configurado el token.
+  static Map<String, String> get cfAccessHeaders =>
+      (cfAccessClientId.isNotEmpty && cfAccessClientSecret.isNotEmpty)
+          ? {
+              'CF-Access-Client-Id': cfAccessClientId,
+              'CF-Access-Client-Secret': cfAccessClientSecret,
+            }
+          : <String, String>{};
+
   /// Application ID de Spike API (https://docs.spikeapi.com).
   static const int spikeAppId =
       int.fromEnvironment('SPIKE_APP_ID', defaultValue: 0);

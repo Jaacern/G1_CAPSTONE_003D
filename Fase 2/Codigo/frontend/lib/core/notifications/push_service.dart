@@ -102,6 +102,47 @@ class PushService {
 
   Future<void> cancelDoseReminder(int id) => _local.cancel(id);
 
+  /// Notificación del sistema para una CAÍDA detectada. Suena, vibra y aparece
+  /// en la barra de notificaciones aunque el usuario esté en otra app o con la
+  /// pantalla bloqueada (mientras el proceso siga vivo). Usa el canal de
+  /// alertas (importancia máxima). Para disparo con la app completamente
+  /// cerrada por largos periodos se necesita push remoto (FCM); eso queda como
+  /// siguiente paso. Esta notificación local cubre el caso de la demo y el uso
+  /// normal con la app en segundo plano.
+  Future<void> showFallAlert({
+    required String alertId,
+    required String patientName,
+    required String message,
+  }) async {
+    final title = patientName.isNotEmpty
+        ? '🚨 Posible caída · $patientName'
+        : '🚨 Posible caída detectada';
+    await _local.show(
+      // id estable por alerta: no duplica la misma caída, pero sí notifica
+      // caídas distintas.
+      alertId.hashCode,
+      title,
+      message.isNotEmpty ? message : 'Revisa el estado del paciente de inmediato.',
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _fallChannel.id,
+          _fallChannel.name,
+          channelDescription: _fallChannel.description,
+          importance: Importance.max,
+          priority: Priority.max,
+          category: AndroidNotificationCategory.alarm,
+          fullScreenIntent: true,
+          enableVibration: true,
+          playSound: true,
+        ),
+        iOS: const DarwinNotificationDetails(
+          interruptionLevel: InterruptionLevel.critical,
+        ),
+      ),
+      payload: _encode({'type': 'alert', 'alert_type': 'fall', 'alert_id': alertId}),
+    );
+  }
+
   NotificationDetails _details(AndroidNotificationChannel ch) => NotificationDetails(
         android: AndroidNotificationDetails(
           ch.id,
@@ -117,6 +158,12 @@ class PushService {
       'meds', 'Medicación', description: 'Alarmas de medicamentos');
   static const _alertChannel = AndroidNotificationChannel(
       'alerts', 'Alertas', description: 'Alertas de salud y SOS');
+  // Canal dedicado a caídas: máxima prioridad, sonido y vibración. Separado
+  // para que el usuario no pueda silenciarlo junto con alertas menores.
+  static const _fallChannel = AndroidNotificationChannel(
+      'falls', 'Caídas',
+      description: 'Alertas críticas de caída del paciente',
+      importance: Importance.max);
   static const _generalChannel = AndroidNotificationChannel(
       'general', 'General', description: 'Notificaciones generales');
 

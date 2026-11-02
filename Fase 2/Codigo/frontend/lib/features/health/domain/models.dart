@@ -16,8 +16,13 @@ enum VitalSource {
   final String emoji;
 
   /// Resuelve a partir de origin (meta) o source. origin tiene prioridad.
+  ///
+  /// Nota: la mini-app del reloj manda source='wearable' + meta.origin='watch'.
+  /// Son la MISMA fuente (el reloj propio), así que 'wearable' se consolida en
+  /// 'watch' para no mostrar dos filas duplicadas ("Wearable" y "Reloj AgeCare").
   static VitalSource resolve(String? origin, String? source) {
     final key = (origin != null && origin.isNotEmpty) ? origin : (source ?? '');
+    if (key == 'wearable') return VitalSource.watch;
     return VitalSource.values.firstWhere(
       (s) => s.apiValue == key,
       orElse: () => VitalSource.unknown,

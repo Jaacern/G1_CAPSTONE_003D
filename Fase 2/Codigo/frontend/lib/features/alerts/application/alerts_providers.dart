@@ -73,9 +73,17 @@ class AlertsController extends AsyncNotifier<AlertsState> {
     state = AsyncData(_desde(pagina, [...actual.items, ...pagina.items]));
   }
 
+  /// Recarga manteniendo en pantalla los datos actuales mientras llega la
+  /// nueva página. Evita el parpadeo del spinner a pantalla completa (antes
+  /// hacía state = AsyncLoading, que dejaba el centro en blanco al refrescar).
   Future<void> recargar() async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(_cargarPrimeraPagina);
+    try {
+      final nuevo = await _cargarPrimeraPagina();
+      state = AsyncData(nuevo);
+    } catch (e, st) {
+      // Si no hay datos previos, propaga el error; si los hay, los conserva.
+      if (state.value == null) state = AsyncError(e, st);
+    }
   }
 }
 

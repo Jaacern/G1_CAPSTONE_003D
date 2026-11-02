@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Permite HTTP en texto plano SOLO hacia el backend de desarrollo en la red
-  local. Todo lo demás sigue exigiendo HTTPS.
-  Reemplaza la IP de ejemplo por la IP local de tu backend.
-  PRODUCCIÓN: el backend iría por HTTPS y esta excepción se quita.
+  Producción: el reloj llega al backend por HTTPS a través del subdominio
+  público de Cloudflare Tunnel (https://agecare-api.javiercerna.dev).
+  No se permite tráfico en texto plano (cleartext/HTTP): toda la comunicación
+  va cifrada. Si en algún momento necesitas apuntar a un backend local por
+  HTTP (p. ej. 192.168.x.x:8000 para pruebas sin túnel), agrega aquí un
+  <domain-config cleartextTrafficPermitted="true"> con esa IP.
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false" />
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">10.0.2.2</domain>
-    </domain-config>
 </network-security-config>

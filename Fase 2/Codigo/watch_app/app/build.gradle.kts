@@ -47,11 +47,17 @@ dependencies {
     implementation("androidx.wear.compose:compose-foundation:1.4.0")
     // Red (envío al backend).
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    // Health Services de Wear OS (lectura de HR en background, gratis).
+    // Samsung Health Sensor SDK (sensores del Galaxy Watch: HR, SpO2, temperatura
+    // de piel). Librería local .aar descargada del portal Samsung. Funciona con
+    // el modo desarrollador de Health Sensor Service activado en el reloj.
+    implementation(files("libs/samsung-health-sensor-api-1.4.1.aar"))
+    // Health Services de Wear OS (respaldo de HR; también se usa como fallback).
     implementation("androidx.health:health-services-client:1.1.0-alpha05")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("androidx.concurrent:concurrent-futures-ktx:1.2.0")
     implementation("androidx.lifecycle:lifecycle-service:2.8.6")
+    // Almacenamiento cifrado del token de dispositivo (emparejamiento por código).
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
     // ListenableFuture (lo exponen las APIs async de Health Services).
     implementation("com.google.guava:guava:33.3.1-android")
 }

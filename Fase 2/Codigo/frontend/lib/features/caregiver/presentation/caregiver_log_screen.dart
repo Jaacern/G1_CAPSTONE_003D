@@ -116,16 +116,19 @@ class _ObservationCard extends StatelessWidget {
           Row(
             children: [
               if (obs.category != null) ...[
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(.08),
-                    borderRadius: BorderRadius.circular(8),
+                Flexible(
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(.08),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(categoryLabel(obs.category),
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.primary)),
                   ),
-                  child: Text(categoryLabel(obs.category),
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.primary)),
                 ),
                 const Spacer(),
               ] else

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../marketplace/marketplace_repo_fake.dart';
@@ -20,8 +21,10 @@ void main() {
     await montarMarketplace(tester);
     await irAProductos(tester);
 
-    // La tira es un ListView horizontal y perezoso: sólo construye los chips
-    // que caben, así que 'Nutrición' y 'Otros' se prueban en el dominio.
+    // Se busca dentro del ChoiceChip porque la misma palabra también aparece
+    // como etiqueta en la tarjeta del producto. La tira es un ListView
+    // horizontal y perezoso: sólo construye los chips que caben, así que
+    // 'Nutrición' y 'Otros' se prueban en el dominio.
     for (final etiqueta in [
       'Todas',
       'Movilidad',
@@ -29,7 +32,8 @@ void main() {
       'Dormitorio',
       'Higiene',
     ]) {
-      expect(find.text(etiqueta), findsOne, reason: 'falta $etiqueta');
+      expect(find.widgetWithText(ChoiceChip, etiqueta), findsOne,
+          reason: 'falta $etiqueta');
     }
   });
 
@@ -37,7 +41,7 @@ void main() {
     final repo = await montarMarketplace(tester);
     await irAProductos(tester);
 
-    await tester.tap(find.text('Baño'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Baño'));
     await tester.pump();
     await tester.pump();
 
@@ -49,10 +53,23 @@ void main() {
     await montarMarketplace(tester);
     await irAProductos(tester);
 
-    await tester.tap(find.text('Dormitorio'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Dormitorio'));
     await tester.pump();
     await tester.pump();
 
     expect(find.text('No hay productos en Dormitorio.'), findsOne);
+  });
+
+  testWidgets('una categoría con productos los deja al lado del precio',
+      (tester) async {
+    await montarMarketplace(tester);
+    await irAProductos(tester);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Movilidad'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Silla de ruedas estándar'), findsOne);
+    expect(find.text('\$139.990'), findsOne);
   });
 }

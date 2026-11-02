@@ -26,19 +26,47 @@ class MarketplaceRepoFake implements MarketplaceRepository {
     ),
   ];
 
+  /// Las cuidadoras que devuelve el listado, para probar la tarjeta con
+  /// nombres y especialidades largas.
+  List<CaregiverProfileSummary> cuidadoras = const [];
+
+  /// El catálogo que devuelve la tira de productos, filtrado por categoría
+  /// igual que hace la API.
+  List<MarketProduct> productos = const [
+    MarketProduct(
+      id: 'p-silla-ruedas',
+      name: 'Silla de ruedas estándar',
+      price: 139990,
+      category: 'mobility',
+      description:
+          'Silla plegable de acero con apoyapiés desmontables y frenos en '
+          'ambas ruedas. Para uso domiciliario y traslados cortos.',
+    ),
+    MarketProduct(
+      id: 'p-pastillero',
+      name: 'Pastillero semanal con alarma',
+      price: 24990,
+      category: 'monitoring',
+      description:
+          'Organizador de 7 días con 4 tomas diarias y alarma sonora '
+          'programable, para no saltarse ni repetir una dosis.',
+    ),
+  ];
+
   @override
   Future<List<CaregiverProfileSummary>> listCaregivers({
     String? zone,
     String? specialty,
   }) async {
     zonaEnviada = zone;
-    return const [];
+    return cuidadoras;
   }
 
   @override
   Future<List<MarketProduct>> listProducts({String? category}) async {
     categoriaEnviada = category;
-    return const [];
+    if (category == null) return productos;
+    return productos.where((p) => p.category == category).toList();
   }
 
   @override
@@ -62,12 +90,14 @@ class MarketplaceRepoFake implements MarketplaceRepository {
 }
 
 /// Monta el marketplace como familiar (dos pestañas) o como cuidadora (tres)
-/// y deja la primera visible.
+/// y deja la primera visible. El listado de cuidadoras hay que darlo acá y no
+/// después: la pantalla ya pide la lista en el primer frame.
 Future<MarketplaceRepoFake> montarMarketplace(
   WidgetTester tester, {
   RoleType rol = RoleType.family,
+  List<CaregiverProfileSummary> cuidadoras = const [],
 }) async {
-  final repo = MarketplaceRepoFake();
+  final repo = MarketplaceRepoFake()..cuidadoras = cuidadoras;
   await tester.pumpWidget(ProviderScope(
     overrides: [
       currentUserProvider.overrideWith(
@@ -89,4 +119,18 @@ Future<MarketplaceRepoFake> montarMarketplace(
   ));
   await tester.pump();
   return repo;
+}
+
+/// El mismo montaje, pero en un teléfono de 320 dp de ancho. La letra que usa
+/// el juego de pruebas es más ancha que la de la app: lo que cabe acá cabe
+/// también con el texto grande del celular.
+Future<MarketplaceRepoFake> montarMarketplaceEnTelefono(
+  WidgetTester tester, {
+  List<CaregiverProfileSummary> cuidadoras = const [],
+}) async {
+  tester.view.physicalSize = const Size(320 * 3, 640 * 3);
+  tester.view.devicePixelRatio = 3.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  return montarMarketplace(tester, cuidadoras: cuidadoras);
 }

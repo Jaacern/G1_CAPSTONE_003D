@@ -54,6 +54,9 @@ class _ServidorDelChat implements HttpClientAdapter {
 
   final List<String> rutas = [];
 
+  /// Los query params del último GET, para comprobar cómo se serializa `before`.
+  Map<String, dynamic> ultimoQuery = const {};
+
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
@@ -61,6 +64,7 @@ class _ServidorDelChat implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     rutas.add(options.path);
+    ultimoQuery = options.queryParameters;
     return ResponseBody.fromString(
       jsonEncode({'items': items}),
       200,
@@ -126,5 +130,19 @@ void main() {
     // fallo original.
     expect(servidor.rutas, contains('/patients/p-elena/chat/messages'));
     expect(servidor.rutas.any((r) => r.contains('/ws/')), isFalse);
+  });
+
+  test('before viaja como fecha ISO-8601 en UTC, no como id de mensaje',
+      () async {
+    // El backend declara `before: datetime | None`, así que un id de mensaje
+    // (o una fecha local con espacios) devolvería 422 y la paginación no
+    // cargaría nunca la página anterior.
+    await repo.fetchMessages(
+      'p-elena',
+      before: DateTime.utc(2026, 11, 1, 17, 30),
+    );
+
+    expect(servidor.ultimoQuery['before'], '2026-11-01T17:30:00.000Z');
+    expect(servidor.ultimoQuery['limit'], 50);
   });
 }

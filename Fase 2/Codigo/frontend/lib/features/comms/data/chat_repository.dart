@@ -8,12 +8,15 @@ import '../../../core/network/api_client.dart';
 import '../domain/models.dart';
 
 abstract class ChatRepository {
-  /// Historial de mensajes (más reciente primero o cronológico según backend).
-  /// [before] permite paginar hacia atrás (id/timestamp del mensaje más antiguo
-  /// ya cargado). [limit] limita la cantidad.
+  /// Historial del chat, del mensaje más nuevo al más viejo: así lo devuelve
+  /// `GET /chat/messages` y así lo espera la pantalla al pagar hacia arriba.
+  ///
+  /// [before] paginaba hacia atrás con la FECHA del mensaje más antiguo ya
+  /// cargado (el backend la declara `datetime | None`, no un id: mandarle un
+  /// id devolvería 422). [limit] es el tamaño de página, entre 1 y 200.
   Future<List<ChatMessage>> fetchMessages(
     String patientId, {
-    String? before,
+    DateTime? before,
     int limit = 50,
   });
 
@@ -54,13 +57,15 @@ class ChatRepositoryHttp implements ChatRepository {
   @override
   Future<List<ChatMessage>> fetchMessages(
     String patientId, {
-    String? before,
+    DateTime? before,
     int limit = 50,
   }) async {
     final data = await _api.get<Map<String, dynamic>>(
       '/patients/$patientId/chat/messages',
       query: {
-        if (before != null) 'before': before,
+        // Se manda en UTC e ISO-8601: es el formato que FastAPI parsea como
+        // datetime. Una fecha local con espacio o guiones de más daría 422.
+        if (before != null) 'before': before.toUtc().toIso8601String(),
         'limit': limit,
       },
     );
@@ -207,11 +212,19 @@ class ChatRepositoryMock implements ChatRepository {
   @override
   Future<List<ChatMessage>> fetchMessages(
     String patientId, {
-    String? before,
+    DateTime? before,
     int limit = 50,
   }) async {
     await Future.delayed(const Duration(milliseconds: 350));
-    return List<ChatMessage>.from(_list(patientId));
+    // Mismo contrato que el backend: del más nuevo al más viejo, cortando en
+    // la fecha de `before` y trayendo a lo más `limit`. Se ordena una copia
+    // para no reacomodar el historial que el repositorio guarda por dentro.
+    final todos = List<ChatMessage>.from(_list(patientId))
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return todos
+        .where((m) => before == null || m.createdAt.isBefore(before))
+        .take(limit)
+        .toList();
   }
 
   @override

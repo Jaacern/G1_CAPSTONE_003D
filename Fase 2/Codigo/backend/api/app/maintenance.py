@@ -632,12 +632,16 @@ async def calcular_semaforo(*, verbose: bool = True) -> dict[str, int]:
         familia ve otro para el mismo dia.
 
     LA FECHA
-        El dia es el dia chileno, igual que las dosis. OJO: vitals.py cuenta
-        las dosis de hoy con current_date, que es la fecha de la zona de la
-        sesion de Postgres, y el contenedor corre en UTC. Desde las nueve de
-        la noche en Chile, para ese endpoint ya es manana. Aca se usa la
-        hora local a proposito; dejar de lado ese desfase en el endpoint es
-        una decision aparte, no de este proceso.
+        El dia es el dia chileno, igual que las dosis, y aca se escribe
+        explicito como en el resto del archivo.
+
+        Esta advertencia decia que vitals.py contaba las dosis de hoy en
+        UTC y que por eso los dos podian no coincidir. Ya no corresponde:
+        db.py le fija la zona de la operacion a cada conexion del pool, asi
+        que el current_date de ese endpoint es el dia chileno y da lo mismo
+        que esta consulta. Se deja dicho porque la advertencia anterior
+        quedo en el historial de este archivo y no vale que alguien la
+        encuentre y crea que el desfase sigue ahi.
 
     No se filtra por antiguedad de la medicion, igual que la pantalla: la
     ultima medicion conocida es el ultimo estado conocido. La alerta si

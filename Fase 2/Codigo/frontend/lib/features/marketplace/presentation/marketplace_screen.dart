@@ -374,10 +374,16 @@ class _ProductCard extends StatelessWidget {
                     style: const TextStyle(
                         color: AppColors.textSecondary, fontSize: 13)),
                 const SizedBox(height: 8),
-                Row(
+                // Etiqueta y precio comparten línea; si el teléfono es chico
+                // o el texto está grande, el precio baja a la línea de abajo
+                // en vez de desbordar la tarjeta.
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     _Pill(label: categoriaProducto(product.category)),
-                    const Spacer(),
                     Text(
                       product.precioLabel,
                       style: const TextStyle(

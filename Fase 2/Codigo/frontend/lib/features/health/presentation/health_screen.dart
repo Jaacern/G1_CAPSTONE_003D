@@ -140,24 +140,34 @@ class _VitalsTab extends ConsumerWidget {
               orElse: () => const SizedBox.shrink(),
             ),
             // Fila: interruptor "En vivo" (auto-refresco) + sincronizar reloj.
-            Row(
+            // En un teléfono de 320 dp no cabe todo en una línea, así que los
+            // botones bajan solos en vez de desbordar la pantalla.
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 const _LiveToggle(),
-                const Spacer(),
-                IconButton(
-                  tooltip: 'Rangos de alerta',
-                  onPressed: () => context.push('/health/thresholds'),
-                  icon: const Icon(Icons.tune_rounded, size: 20),
-                ),
-                TextButton.icon(
-                  onPressed: () {
-                    final p = ref.read(selectedPatientProvider);
-                    if (p != null) {
-                      context.push('/wearable/link/${p.patientId}');
-                    }
-                  },
-                  icon: const Text('⌚'),
-                  label: const Text('Sincronizar reloj'),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Rangos de alerta',
+                      onPressed: () => context.push('/health/thresholds'),
+                      icon: const Icon(Icons.tune_rounded, size: 20),
+                    ),
+                    TextButton.icon(
+                      onPressed: () {
+                        final p = ref.read(selectedPatientProvider);
+                        if (p != null) {
+                          context.push('/wearable/link/${p.patientId}');
+                        }
+                      },
+                      icon: const Text('⌚'),
+                      label: const Text('Sincronizar'),
+                    ),
+                  ],
                 ),
               ],
             ),

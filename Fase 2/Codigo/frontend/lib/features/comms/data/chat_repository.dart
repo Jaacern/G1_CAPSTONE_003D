@@ -1,12 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
-import '../../../core/storage/token_storage.dart';
 import '../domain/models.dart';
 
 abstract class ChatRepository {
@@ -30,18 +28,28 @@ abstract class ChatRepository {
   /// Marca como leídos los mensajes del chat.
   Future<void> markRead(String patientId);
 
-  /// Suscripción en tiempo real a mensajes nuevos vía WebSocket.
+  /// Stream de mensajes nuevos del chat.
+  ///
+  /// El backend solo sabe de `GET /chat/messages`, así que esto es un sondeo
+  /// periódico de ese endpoint, no una conexión en tiempo real. Se entrega
+  /// como Stream para que la pantalla no tenga que cambiar nada.
   Stream<ChatMessage> connect(String patientId);
 }
 
 // ---------------------------------------------------------------------------
-// HTTP + WebSocket
+// HTTP
 // ---------------------------------------------------------------------------
 class ChatRepositoryHttp implements ChatRepository {
-  ChatRepositoryHttp(this._api, this._tokens);
+  ChatRepositoryHttp(this._api, {this.sondeoCada = _sondeoCadaPorDefecto});
 
   final ApiClient _api;
-  final TokenStorage _tokens;
+
+  /// Cada cuánto se pregunta al backend por mensajes nuevos. Es configurable
+  /// solo para que la prueba no tenga que esperar los 5 s reales.
+  @visibleForTesting
+  final Duration sondeoCada;
+
+  static const Duration _sondeoCadaPorDefecto = Duration(seconds: 5);
 
   @override
   Future<List<ChatMessage>> fetchMessages(
@@ -84,38 +92,44 @@ class ChatRepositoryHttp implements ChatRepository {
       _api.post<void>('/patients/$patientId/chat/read');
 
   @override
-  Stream<ChatMessage> connect(String patientId) async* {
-    // El WebSocket no pasa por el interceptor de ApiClient, así que NO lleva
-    // la cabecera Authorization automáticamente. Supuesto: el backend acepta
-    // el access token como query param `?token=` en el handshake del WS
-    // (patrón común cuando no se pueden fijar cabeceras del lado del cliente).
-    final token = await _tokens.accessToken;
+  Stream<ChatMessage> connect(String patientId) {
+    // Antes esto abría un WebSocket a /ws/patients/{id}/chat. Ese endpoint no
+    // existe en el backend (no hay ninguna ruta ws registrada), así que el
+    // handshake respondía 404 y nunca llegaba un mensaje: el chat parecía en
+    // vivo pero no se actualizaba hasta salir y volver a entrar.
+    //
+    // Se sondea el único endpoint que sí existe. `GET /chat/messages` entrega
+    // del más nuevo al más viejo, por eso se recorre al revés: la conversación
+    // se lee cronológica.
+    late final StreamController<ChatMessage> controller;
+    Timer? timer;
+    final vistos = <String>{};
 
-    // Construimos la URL ws/wss a partir de la base HTTP.
-    final httpBase = AppConfig.apiBaseUrl + AppConfig.apiVersion;
-    final wsBase = httpBase
-        .replaceFirst('https://', 'wss://')
-        .replaceFirst('http://', 'ws://');
-    final wsUrl = '$wsBase/ws/patients/$patientId/chat'
-        '${token != null ? '?token=$token' : ''}';
-
-    final channel = WebSocketChannel.connect(Uri.parse(wsUrl));
-    try {
-      await for (final event in channel.stream) {
-        final decoded = jsonDecode(event as String);
-        if (decoded is Map<String, dynamic>) {
-          // El backend puede envolver el evento: {type, data} o el mensaje plano.
-          final payload = decoded['data'] is Map<String, dynamic>
-              ? decoded['data'] as Map<String, dynamic>
-              : decoded;
-          if (payload['id'] != null) {
-            yield ChatMessage.fromJson(payload);
-          }
+    Future<void> sondeo() async {
+      try {
+        final mensajes = await fetchMessages(patientId, limit: 50);
+        if (controller.isClosed) return;
+        for (final m in mensajes.reversed) {
+          if (vistos.add(m.id)) controller.add(m);
         }
+      } catch (_) {
+        // Un fallo de red no corta el stream: el próximo sondeo reintenta. Si
+        // lo propagáramos, StreamProvider quedaría en error y el chat no se
+        // recuperaría aunque el backend volviera.
       }
-    } finally {
-      await channel.sink.close();
     }
+
+    controller = StreamController<ChatMessage>(
+      onListen: () {
+        sondeo();
+        timer = Timer.periodic(sondeoCada, (_) => sondeo());
+      },
+      onCancel: () {
+        timer?.cancel();
+        controller.close();
+      },
+    );
+    return controller.stream;
   }
 }
 
@@ -262,8 +276,5 @@ class ChatRepositoryMock implements ChatRepository {
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   if (AppConfig.useMocks) return ChatRepositoryMock();
-  return ChatRepositoryHttp(
-    ref.watch(apiClientProvider),
-    ref.watch(tokenStorageProvider),
-  );
+  return ChatRepositoryHttp(ref.watch(apiClientProvider));
 });

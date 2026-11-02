@@ -1,0 +1,41 @@
+# ─────────────────────────────────────────────────────────────
+# Carpeta de apoyo LOCAL del equipo (documentos .docx convertidos a .md
+# para consulta rapida). NO se versiona: es material de trabajo interno.
+# ─────────────────────────────────────────────────────────────
+docs/
+
+# Respaldos manuales locales (copias de la carpeta de trabajo).
+Fase 2 (Copiar)/
+*(Copiar)/
+*backup*/
+*.bak
+*.bak_*
+
+# Secretos / entorno
+.env
+*.env
+!*.env.example
+
+# Artefactos y temporales
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+*~
+.~lock.*#
+
+# ── Android / watch_app: artefactos de compilacion y dependencias binarias ──
+# El codigo fuente .kt SI se versiona; los build/ y .gradle/ NO.
+**/.gradle/
+**/build/
+watch_app/app/libs/
+# SDK de Samsung Health (binario de terceros, se baja aparte, no al repo).
+**/samsung-health-sensor-sdk-*/
+**/samsung-health-sensor-sdk-*.zip
+*.aar
+*.jar
+
+# IDE
+.idea/
+*.iml
+local.properties

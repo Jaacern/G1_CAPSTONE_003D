@@ -64,3 +64,38 @@ def refresh_token_expiry() -> datetime:
     return datetime.now(timezone.utc) + timedelta(
         days=settings.refresh_token_expire_days
     )
+
+
+# --------------------------------------------------------------------------
+# Vinculación de dispositivos del adulto mayor (RF-68)
+# --------------------------------------------------------------------------
+def generate_link_code() -> str:
+    """Código de vinculación de 6 dígitos para emparejar un dispositivo.
+
+    Corto por diseño: la cuidadora lo dicta en voz alta para escribirlo en el
+    reloj. La seguridad no está en la longitud sino en que vence rápido
+    (device_link_codes.expires_at) y se bloquea a los 5 intentos fallidos
+    (CHECK ck_device_link_codes_attempts). Se usa secrets para que no sea
+    predecible.
+    """
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def generate_device_token() -> str:
+    """Token de sesión opaco para un dispositivo del adulto mayor (reloj/tablet).
+
+    Igual que el refresh token: 256 bits aleatorios en hex. Su SHA-256 se
+    guarda en elder_devices.session_token_hash. Reemplaza al par correo y
+    contraseña: el dispositivo opera con este token, no con una cuenta de
+    persona (ver 603_elder_devices.sql, RF-68).
+    """
+    return secrets.token_hex(32)  # 32 bytes -> 64 chars hex
+
+
+def link_code_expiry(minutes: int = 10) -> datetime:
+    """Vencimiento del código de vinculación: 10 minutos por defecto.
+
+    Tiempo suficiente para dictarlo y escribirlo, corto para limitar el
+    riesgo de un código de 6 dígitos.
+    """
+    return datetime.now(timezone.utc) + timedelta(minutes=minutes)

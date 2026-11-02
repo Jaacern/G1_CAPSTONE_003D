@@ -84,6 +84,9 @@ class BatchReadingIn(BaseModel):
 
 class BatchIn(BaseModel):
     readings: list[BatchReadingIn] = Field(min_length=1, max_length=MAX_BATCH)
+    # Nivel de batería del dispositivo (0–100). Opcional: lo envía la app del
+    # reloj en cada lote. Si viene, actualiza wearables.battery_pct.
+    battery_pct: int | None = Field(default=None, ge=0, le=100)
 
 
 class BatchOut(BaseModel):
@@ -437,6 +440,22 @@ async def ingest_batch(
         ).first()
         if row is not None:
             accepted += 1
+
+    # Actualiza el estado del wearable activo del paciente: se recibió un lote,
+    # así que last_sync_at = ahora. Si el dispositivo reportó batería, se guarda
+    # (RF-16). Solo afecta al aparato vigente (unlinked_at IS NULL).
+    await db.execute(
+        text(
+            """
+            UPDATE wearables
+               SET last_sync_at = now(),
+                   battery_pct = COALESCE(:battery, battery_pct)
+             WHERE patient_id = :pid
+               AND unlinked_at IS NULL
+            """
+        ),
+        {"pid": ctx.patient_id, "battery": payload.battery_pct},
+    )
 
     await db.commit()
     duplicates = len(payload.readings) - accepted

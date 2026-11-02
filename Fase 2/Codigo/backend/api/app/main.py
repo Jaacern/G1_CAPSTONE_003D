@@ -13,6 +13,7 @@ from app.routers import (
     caregiver,
     chat,
     content,
+    devices,
     documents,
     files,
     gallery,
@@ -150,6 +151,7 @@ app.include_router(chat.router)
 app.include_router(assistant.router)
 app.include_router(content.router)
 app.include_router(speech.router)
+app.include_router(devices.router)
 
 
 @app.get("/", tags=["root"])

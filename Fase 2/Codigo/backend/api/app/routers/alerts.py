@@ -351,8 +351,15 @@ async def resolve_alert(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # RESOLVER solo lo puede hacer quien está FÍSICAMENTE con el paciente: la
+    # cuidadora (y el propio adulto mayor/elder). El familiar está a distancia,
+    # por lo que solo puede RECONOCER (acknowledge), no cerrar la emergencia.
+    # Esto evita que una caída se cierre desde lejos sin que nadie haya
+    # verificado al paciente en persona. (Antes permitía family|caregiver;
+    # se restringe a caregiver|elder por decisión de diseño del flujo de
+    # respuesta ante emergencias.)
     alert = await _load_alert_for_action(
-        db, alert_id, user, allowed_roles=["family", "caregiver"]
+        db, alert_id, user, allowed_roles=["caregiver", "elder"]
     )
 
     if alert["status"] == "resolved":

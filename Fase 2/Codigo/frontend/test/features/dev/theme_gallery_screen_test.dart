@@ -78,4 +78,23 @@ void main() {
     expect(find.byType(OutlinedButton), findsOneWidget);
     expect(find.byType(TextField), findsOneWidget);
   });
+
+  testWidgets('la galería no desborda en un teléfono de 320 dp',
+      (tester) async {
+    // La misma galería, angosta: es la forma barata de pasar revista a los
+    // componentes compartidos, porque cualquier fila que pida más ancho del
+    // que hay revienta la prueba con la franja de desborde.
+    tester.view.physicalSize = const Size(320, 4200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.light(),
+      home: const ThemeGalleryScreen(),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Widgets compartidos'), findsOneWidget);
+  });
 }

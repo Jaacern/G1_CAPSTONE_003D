@@ -116,7 +116,7 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.surface,
-        indicatorColor: AppColors.primary.withOpacity(.12),
+        indicatorColor: AppColors.primary.withValues(alpha: .12),
         // Fiel al wireframe: ítem activo en azul de marca, inactivos gris apagado.
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
@@ -182,7 +182,7 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.darkSurface,
-        indicatorColor: AppColors.primary.withOpacity(.22),
+        indicatorColor: AppColors.primary.withValues(alpha: .22),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return IconThemeData(

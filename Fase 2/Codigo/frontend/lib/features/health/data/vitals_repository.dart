@@ -244,7 +244,7 @@ class VitalsRepositoryMock implements VitalsRepository {
       ));
     }
     Threshold? threshold;
-    for (final t in _thresholds) {
+    for (final t in _effectiveThresholds(patientId)) {
       if (t.type == type) threshold = t;
     }
     return VitalSeries(type: type, points: points, threshold: threshold);
@@ -265,19 +265,19 @@ class VitalsRepositoryMock implements VitalsRepository {
           type: VitalType.heartRate,
           value: hrValue,
           measuredAt: now.subtract(const Duration(minutes: 12)),
-          inRange: _inRange(VitalType.heartRate, hrValue),
+          inRange: _inRange(patientId, VitalType.heartRate, hrValue),
           source: VitalSource.simulator),
       LatestVital(
           type: VitalType.spo2,
           value: spo2Value,
           measuredAt: now.subtract(const Duration(minutes: 12)),
-          inRange: _inRange(VitalType.spo2, spo2Value),
+          inRange: _inRange(patientId, VitalType.spo2, spo2Value),
           source: VitalSource.simulator),
       LatestVital(
           type: VitalType.temperature,
           value: tempValue,
           measuredAt: now.subtract(const Duration(minutes: 12)),
-          inRange: _inRange(VitalType.temperature, tempValue),
+          inRange: _inRange(patientId, VitalType.temperature, tempValue),
           source: VitalSource.simulator),
       LatestVital(
           type: VitalType.sleep,
@@ -303,11 +303,11 @@ class VitalsRepositoryMock implements VitalsRepository {
     return base.values.toList();
   }
 
-  /// Compara un valor contra el umbral médico normal del tipo (AC1:
-  /// "...indicadores de estado según rangos médicos normales"). Sin
+  /// Compara un valor contra el umbral del paciente para ese tipo: el rango
+  /// médico por defecto, salvo que alguien lo haya editado en Umbrales. Sin
   /// umbral definido para el tipo, se asume en rango (ej. sueño, pasos).
-  bool _inRange(VitalType type, double value) {
-    for (final t in _thresholds) {
+  bool _inRange(String patientId, VitalType type, double value) {
+    for (final t in _effectiveThresholds(patientId)) {
       if (t.type == type) return !t.isOutOfRange(value);
     }
     return true;

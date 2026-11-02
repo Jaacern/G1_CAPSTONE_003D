@@ -283,10 +283,14 @@ class _VitalsSummaryCard extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  const Text('Vitals del wearable',
-                      style: TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w700)),
-                  const Spacer(),
+                  // El título cede ancho antes que "Ver todo": sin Expanded,
+                  // en una fila de 256 dp empujaba el enlace fuera de pantalla.
+                  const Expanded(
+                    child: Text('Vitals del wearable',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w700)),
+                  ),
                   const Text('Ver todo ›',
                       style: TextStyle(
                           fontSize: 12, color: AppColors.textSecondary)),
@@ -361,10 +365,12 @@ class _MedsTodayCard extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  const Text('Medicamentos de hoy',
-                      style: TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w700)),
-                  const Spacer(),
+                  const Expanded(
+                    child: Text('Medicamentos de hoy',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w700)),
+                  ),
                   if (m.pending > 0)
                     _Pill(
                       text: '${m.pending} pendiente${m.pending == 1 ? '' : 's'}',
@@ -447,9 +453,11 @@ class _LastObservationCard extends StatelessWidget {
           Row(
             children: [
               const Text('👩‍⚕️ ', style: TextStyle(fontSize: 16)),
-              const Text('Última observación',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-              const Spacer(),
+              const Expanded(
+                child: Text('Última observación',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+              ),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

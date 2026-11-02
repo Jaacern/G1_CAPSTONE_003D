@@ -45,7 +45,8 @@ class CommsScreen extends ConsumerWidget {
             description:
                 'Conversa en tiempo real con la familia y la cuidadora. '
                 'Envía texto, fotos y notas de voz.',
-            // Backend aún no implementa el chat: deshabilitado fuera de demo.
+            // El backend ya expone el chat (GET/POST /patients/{id}/chat/...);
+            // la bandera queda por si el módulo se mueve.
             comingSoon: !AppConfig.hasComms,
             onTap: () =>
                 context.push('/chat?patient=${patient.patientId}'),
@@ -58,7 +59,8 @@ class CommsScreen extends ConsumerWidget {
             description:
                 'Pregunta sobre el expediente: sueño, medicamentos, signos '
                 'vitales y más. Responde con referencias al expediente.',
-            // Backend aún no implementa el asistente IA.
+            // POST /patients/{id}/assistant/messages ya responde con
+            // referencias al expediente; cobra cupo del plan antes de responder.
             comingSoon: !AppConfig.hasComms,
             onTap: () =>
                 context.push('/assistant?patient=${patient.patientId}'),

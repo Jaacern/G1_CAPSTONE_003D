@@ -292,9 +292,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Módulo en desarrollo: el backend aún no expone el chat del equipo de
-    // cuidado. En modo backend real se muestra "Próximamente" en lugar de
-    // llamar a endpoints inexistentes.
+    // El chat del equipo de cuidado ya existe en el backend (GET/POST
+    // /patients/{id}/chat/messages y /chat/read). La bandera queda por si se
+    // mueve, para no llamar a un endpoint que de pronto deja de estar.
     if (!AppConfig.hasComms) {
       return Scaffold(
         appBar: AppBar(title: const Text('Equipo de cuidado')),

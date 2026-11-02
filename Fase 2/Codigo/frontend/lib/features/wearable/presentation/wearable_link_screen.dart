@@ -13,6 +13,7 @@ import '../../../core/wearable/health_connect/health_connect_live.dart';
 import '../../../core/wearable/simulator/wearable_simulator.dart';
 import '../../health/application/health_providers.dart';
 import '../../health/domain/models.dart';
+import '../application/watch_link_service.dart';
 
 /// Pantalla de vinculación del wearable de un paciente.
 ///
@@ -84,7 +85,7 @@ class _WearableLinkScreenState extends ConsumerState<WearableLinkScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           // Panel de transparencia: qué fuentes están aportando datos hoy.
-          const _SourcesPanel(),
+          _SourcesPanel(patientId: widget.patientId),
           const SizedBox(height: 20),
 
           // Selector de fuente: reloj real o datos de prueba.
@@ -112,7 +113,7 @@ class _WearableLinkScreenState extends ConsumerState<WearableLinkScreen> {
           ),
           const SizedBox(height: 16),
           if (mode == DataSourceMode.real)
-            _HealthConnectCard(patientId: widget.patientId)
+            _RealSourceSection(patientId: widget.patientId)
           else
             _SimulatorCard(patientId: widget.patientId),
           const SizedBox(height: 20),
@@ -256,11 +257,20 @@ class _WearableLinkScreenState extends ConsumerState<WearableLinkScreen> {
 /// aportó cada una hoy y si el Reloj AgeCare está emitiendo en vivo.
 /// Hace visible el origen del dato (nada oculto), como piden las apps serias.
 class _SourcesPanel extends ConsumerWidget {
-  const _SourcesPanel();
+  const _SourcesPanel({required this.patientId});
+
+  final String patientId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(sourcesTodayProvider);
+    // Estado real del reloj: vinculación + conexión + batería. Manda sobre las
+    // lecturas de hoy para decidir la etiqueta de la fuente "Reloj".
+    final watch = ref.watch(watchStatusProvider(patientId)).valueOrNull;
+    final watchLinked = watch?.linked ?? false;
+    final watchConnected = watch?.connected ?? false;
+    final battery = watch?.batteryPct;
+    final batteryLow = watch?.batteryLow ?? false;
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -275,10 +285,20 @@ class _SourcesPanel extends ConsumerWidget {
               IconButton(
                 visualDensity: VisualDensity.compact,
                 icon: const Icon(Icons.refresh_rounded, size: 20),
-                onPressed: () => ref.invalidate(sourcesTodayProvider),
+                onPressed: () {
+                  ref.invalidate(sourcesTodayProvider);
+                  ref.invalidate(watchStatusProvider(patientId));
+                },
               ),
             ],
           ),
+          // Aviso de batería baja: solo si el reloj está CONECTADO y baja
+          // (aviso preventivo). Si está desconectado, la propia fila ya lo dice
+          // y repetir lo de batería es redundante.
+          if (watchLinked && watchConnected && batteryLow) ...[
+            const SizedBox(height: 6),
+            _BatteryWarning(battery: battery ?? 0),
+          ],
           const SizedBox(height: 4),
           async.when(
             loading: () => const Padding(
@@ -296,7 +316,10 @@ class _SourcesPanel extends ConsumerWidget {
                 _SourceRow(
                   source: VitalSource.watch,
                   count: s.countOf(VitalSource.watch),
-                  live: s.watchLive,
+                  live: s.watchLive && watchConnected,
+                  linked: watchLinked,
+                  connected: watchConnected,
+                  battery: battery,
                 ),
                 _SourceRow(
                   source: VitalSource.healthConnect,
@@ -316,14 +339,51 @@ class _SourcesPanel extends ConsumerWidget {
 }
 
 class _SourceRow extends StatelessWidget {
-  const _SourceRow({required this.source, required this.count, this.live = false});
+  const _SourceRow({
+    required this.source,
+    required this.count,
+    this.live = false,
+    this.linked = true,
+    this.connected = false,
+    this.battery,
+  });
   final VitalSource source;
   final int count;
   final bool live;
+  // Para la fuente 'watch':
+  final bool linked; // vinculado al paciente ahora mismo
+  final bool connected; // vinculado Y con datos recientes
+  final int? battery; // nivel de batería del reloj (0–100)
 
   @override
   Widget build(BuildContext context) {
     final active = count > 0;
+    final isWatch = source == VitalSource.watch;
+
+    // Estado del reloj en 3 niveles: Sin vincular / Desconectado / Conectado.
+    final String watchLabel;
+    final Color watchColor;
+    final String watchSubtitle;
+    if (!linked) {
+      watchLabel = 'Sin vincular';
+      watchColor = AppColors.textSecondary;
+      watchSubtitle = active
+          ? '$count lecturas hoy (antes de desvincular)'
+          : 'Reloj no vinculado';
+    } else if (!connected) {
+      watchLabel = 'Desconectado';
+      watchColor = AppColors.statusAttention;
+      watchSubtitle = 'Vinculado, sin señal (apagado o sin batería)';
+    } else if (live) {
+      watchLabel = 'En vivo';
+      watchColor = AppColors.statusOk;
+      watchSubtitle = '$count lecturas de ritmo hoy';
+    } else {
+      watchLabel = 'Conectado';
+      watchColor = AppColors.statusOk;
+      watchSubtitle = '$count lecturas de ritmo hoy';
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -334,27 +394,70 @@ class _SourceRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(source.label,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                Row(
+                  children: [
+                    Text(source.label,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    // Batería del reloj (si vinculado y la conocemos).
+                    if (isWatch && linked && battery != null) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        '🔋$battery%',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: (battery! <= 15)
+                              ? AppColors.statusAttention
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
                 Text(
-                  active
-                      ? '$count lecturas de ritmo hoy'
-                      : 'Sin datos hoy',
+                  isWatch
+                      ? watchSubtitle
+                      : (active ? '$count lecturas de ritmo hoy' : 'Sin datos hoy'),
                   style: const TextStyle(
                       fontSize: 12, color: AppColors.textSecondary),
                 ),
               ],
             ),
           ),
-          if (source == VitalSource.watch)
-            _StatusDot(
-              label: live ? 'En vivo' : (active ? 'Conectado' : 'Sin señal'),
-              color: live
-                  ? AppColors.statusOk
-                  : (active ? AppColors.statusWarning : AppColors.textSecondary),
-            )
+          if (isWatch)
+            _StatusDot(label: watchLabel, color: watchColor)
           else if (active)
             _StatusDot(label: 'Activa', color: AppColors.statusOk),
+        ],
+      ),
+    );
+  }
+}
+
+/// Banner de batería baja del reloj.
+class _BatteryWarning extends StatelessWidget {
+  const _BatteryWarning({required this.battery});
+  final int battery;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.statusAttention.withOpacity(.10),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const Text('🪫', style: TextStyle(fontSize: 16)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Batería del reloj baja ($battery%). Ponlo a cargar para no '
+              'perder el monitoreo.',
+              style: const TextStyle(
+                  fontSize: 12, color: AppColors.statusAttention),
+            ),
+          ),
         ],
       ),
     );
@@ -378,6 +481,260 @@ class _StatusDot extends StatelessWidget {
         const SizedBox(width: 5),
         Text(label, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
       ],
+    );
+  }
+}
+
+/// Sección "Reloj real": decide la fuente de datos según el estado del Reloj
+/// AgeCare.
+///
+/// REGLA (corrige el bug de fuentes mezcladas): si hay un Reloj AgeCare
+/// vinculado por código, ESA es la fuente y Health Connect NO se ofrece como
+/// sincronización automática (solo quedaría como respaldo manual, oculto por
+/// defecto). Si no hay reloj vinculado, se muestra la tarjeta para vincularlo
+/// y, debajo, Health Connect como alternativa manual.
+class _RealSourceSection extends ConsumerWidget {
+  const _RealSourceSection({required this.patientId});
+
+  final String patientId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statusAsync = ref.watch(watchStatusProvider(patientId));
+    return statusAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Center(
+          child: SizedBox(
+              width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
+      ),
+      // Si no se puede leer el estado, caemos al flujo de vinculación (seguro).
+      error: (_, __) => _WatchAgeCareCard(patientId: patientId),
+      data: (status) {
+        if (status.linked) {
+          // Reloj vinculado: es la fuente activa. Corta cualquier sondeo
+          // automático de Health Connect que hubiera quedado encendido, para
+          // que no compita ni meta datos viejos.
+          Future.microtask(
+              () => ref.read(healthConnectLiveProvider.notifier).stop());
+          return _WatchLinkedCard(patientId: patientId, status: status);
+        }
+        // Sin reloj: ofrecer vincular + Health Connect como alternativa manual.
+        return Column(
+          children: [
+            _WatchAgeCareCard(patientId: patientId),
+            const SizedBox(height: 12),
+            _HealthConnectCard(patientId: patientId),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Tarjeta cuando YA hay un Reloj AgeCare vinculado: muestra que es la fuente
+/// activa. No arranca ningún sondeo automático de Health Connect. Permite
+/// desvincular para reasignar el reloj a otro paciente.
+class _WatchLinkedCard extends ConsumerStatefulWidget {
+  const _WatchLinkedCard({required this.patientId, required this.status});
+
+  final String patientId;
+  final WatchStatus status;
+
+  @override
+  ConsumerState<_WatchLinkedCard> createState() => _WatchLinkedCardState();
+}
+
+class _WatchLinkedCardState extends ConsumerState<_WatchLinkedCard> {
+  bool _unlinking = false;
+
+  Future<void> _confirmUnlink() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Desvincular reloj'),
+        content: const Text(
+          'El reloj dejará de enviar datos de este paciente y volverá a pedir '
+          'un código. Podrás vincularlo a otra persona. ¿Continuar?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Desvincular'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    setState(() => _unlinking = true);
+    try {
+      await ref.read(watchLinkServiceProvider).unlink(widget.patientId);
+      if (!mounted) return;
+      showAppSnackBar(context, 'Reloj desvinculado.');
+      ref.invalidate(watchStatusProvider(widget.patientId));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(context, e.message, error: true);
+    } catch (_) {
+      if (!mounted) return;
+      showAppSnackBar(context, 'No se pudo desvincular. Intenta de nuevo.',
+          error: true);
+    } finally {
+      if (mounted) setState(() => _unlinking = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = widget.status;
+    final patientId = widget.patientId;
+    final seen = status.lastSeenAt;
+    final seenText =
+        seen == null ? 'Aún sin datos' : 'Último contacto: ${_ago(seen)}';
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('⌚', style: TextStyle(fontSize: 20)),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text('Reloj AgeCare',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ),
+              _Badge(text: 'Vinculado'),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '${status.deviceLabel ?? 'Reloj'} está vinculado y es la fuente de '
+            'datos de este paciente. Mide ritmo cardíaco, oxígeno y temperatura '
+            'y avisa ante una caída.',
+            style: const TextStyle(
+                color: AppColors.textSecondary, height: 1.4, fontSize: 14),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(Icons.check_circle_rounded,
+                  size: 16, color: AppColors.statusOk),
+              const SizedBox(width: 6),
+              Text(seenText,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => context.push('/wearable/watch/$patientId'),
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Otro reloj'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _unlinking ? null : _confirmUnlink,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.statusAttention,
+                    side: const BorderSide(color: AppColors.statusAttention),
+                  ),
+                  icon: _unlinking
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.link_off_rounded, size: 18),
+                  label: const Text('Desvincular'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _ago(DateTime t) {
+    final d = DateTime.now().difference(t.toLocal());
+    if (d.inMinutes < 1) return 'hace instantes';
+    if (d.inMinutes < 60) return 'hace ${d.inMinutes} min';
+    if (d.inHours < 24) return 'hace ${d.inHours} h';
+    return 'hace ${d.inDays} d';
+  }
+}
+
+/// Tarjeta destacada para vincular el Reloj AgeCare (app nativa del reloj) a
+/// este paciente mediante un código de un solo uso. Es el flujo recomendado:
+/// el reloj mide en vivo HR, SpO2 y temperatura y avisa caídas.
+class _WatchAgeCareCard extends StatelessWidget {
+  const _WatchAgeCareCard({required this.patientId});
+
+  final String patientId;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Text('⌚', style: TextStyle(fontSize: 20)),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text('Reloj AgeCare',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ),
+              _Badge(text: 'Recomendado'),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Vincula el reloj del paciente con un código de 6 dígitos. Mide en '
+            'vivo ritmo cardíaco, oxígeno y temperatura, y avisa ante una caída.',
+            style: TextStyle(
+                color: AppColors.textSecondary, height: 1.4, fontSize: 14),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: () => context.push('/wearable/watch/$patientId'),
+            icon: const Icon(Icons.watch_rounded),
+            label: const Text('Vincular Reloj AgeCare'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  const _Badge({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.statusOk.withOpacity(.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(text,
+          style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: AppColors.statusOk)),
     );
   }
 }

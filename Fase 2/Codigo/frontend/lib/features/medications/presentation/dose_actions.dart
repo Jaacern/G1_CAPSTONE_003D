@@ -26,8 +26,13 @@ Future<bool> registrarDosis({
   String? motivo;
   DateTime? hasta;
 
-  if (status == DoseStatus.missed || status == DoseStatus.skipped) {
-    motivo = await _pedirMotivo(context);
+  const pideMotivo = {
+    DoseStatus.missed,
+    DoseStatus.skipped,
+    DoseStatus.adverse,
+  };
+  if (pideMotivo.contains(status)) {
+    motivo = await _pedirMotivo(context, status);
     if (motivo == null) return false;
     if (motivo.trim().isEmpty) motivo = 'Sin motivo indicado';
   } else if (status == DoseStatus.postponed) {
@@ -71,6 +76,8 @@ Future<bool> registrarDosis({
           DoseStatus.taken => 'Toma registrada',
           DoseStatus.postponed => 'Dosis pospuesta hasta las '
               '${_hora(hasta!)}',
+          DoseStatus.adverse =>
+            'Registrado el problema. Se avisó al círculo de cuidado.',
           _ => 'Dosis marcada como no tomada',
         });
   }
@@ -83,21 +90,28 @@ String _hora(DateTime? cuando) => cuando == null
         '${cuando.minute.toString().padLeft(2, '0')}';
 
 /// Cuadro de motivo obligatorio: sin él, el backend rechaza el registro.
-Future<String?> _pedirMotivo(BuildContext context) {
+///
+/// El texto es LIBRE a propósito: la realidad no cabe en una lista cerrada
+/// (la vomitó, la escupió, se atragantó, estaba dormida, sin stock...). El
+/// título cambia según el desenlace para guiar a la cuidadora.
+Future<String?> _pedirMotivo(BuildContext context, DoseStatus status) {
   final controller = TextEditingController();
+  final esAdverso = status == DoseStatus.adverse;
   return showDialog<String>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('¿Por qué no la tomó?'),
+      title: Text(esAdverso ? '¿Qué pasó al administrarla?' : '¿Por qué no la tomó?'),
       content: TextField(
         controller: controller,
         autofocus: true,
         minLines: 2,
         maxLines: 4,
         textCapitalization: TextCapitalization.sentences,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           labelText: 'Motivo',
-          hintText: 'Por ejemplo: se mareó después del desayuno',
+          hintText: esAdverso
+              ? 'Por ejemplo: la vomitó a los 10 minutos'
+              : 'Por ejemplo: se mareó después del desayuno',
         ),
       ),
       actions: [

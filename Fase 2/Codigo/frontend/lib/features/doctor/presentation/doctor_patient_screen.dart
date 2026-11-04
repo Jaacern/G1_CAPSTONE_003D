@@ -9,9 +9,10 @@ import '../../caregiver/domain/models.dart';
 import '../../health/application/health_providers.dart';
 import '../../health/domain/models.dart' as health;
 import '../../medications/application/medications_providers.dart';
-import '../../medications/data/medications_repository.dart';
-import '../../medications/domain/models.dart';
+import '../../medications/application/treatments_providers.dart';
+import '../../medications/domain/treatment.dart';
 import '../../patients/application/patients_providers.dart';
+import '../../patients/domain/models.dart';
 
 /// Ficha clínica del paciente para el rol médico (solo lectura del historial +
 /// recetar). Toda la información viene de endpoints existentes:
@@ -29,200 +30,332 @@ class DoctorPatientScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final patient = ref.watch(selectedPatientProvider);
-    final latestVitals = ref.watch(latestVitalsProvider);
-    final medications = ref.watch(medicationsProvider);
-    final adherence = ref.watch(adherenceProvider);
-    final observations = ref.watch(observationsProvider);
-
-    // Si entró por deep link sin tener el paciente seleccionado, cargamos el
-    // detalle para mostrar al menos nombre y estado.
     final name = patient?.fullName ?? 'Paciente';
 
-    return Scaffold(
-      appBar: AppBar(title: Text(name)),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-        children: [
-          if (patient != null)
-            AppCard(
-              child: Row(
+    // Ficha organizada en pestañas para que el médico llegue y ubique todo sin
+    // una columna infinita (Fase 1). La cabecera del paciente queda fija arriba.
+    return DefaultTabController(
+      length: 5,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(name),
+          bottom: const TabBar(
+            isScrollable: true,
+            tabs: [
+              Tab(text: 'Resumen'),
+              Tab(text: 'Tratamientos'),
+              Tab(text: 'Controles'),
+              Tab(text: 'Bitácora'),
+              Tab(text: 'Documentos'),
+            ],
+          ),
+        ),
+        body: Column(
+          children: [
+            if (patient != null)
+              _PatientHeader(patient: patient, patientId: patientId),
+            Expanded(
+              child: TabBarView(
                 children: [
-                  InitialsAvatar(
-                    name: patient.fullName,
-                    photoUrl: patient.photoUrl,
-                    radius: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(patient.fullName,
-                            style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.w700)),
-                        if ((patient.topReason ?? '').isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(patient.topReason!,
-                              style: const TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.textSecondary)),
-                        ],
-                      ],
-                    ),
-                  ),
-                  WellbeingChip(status: patient.wellbeingStatus),
+                  _ResumenTab(patientId: patientId),
+                  _TratamientosTab(patientId: patientId),
+                  const _ControlesTab(),
+                  _BitacoraTab(patientId: patientId),
+                  _DocumentosTab(patientId: patientId),
                 ],
               ),
             ),
-          const _SectionLabel('Signos vitales actuales'),
-          latestVitals.when(
-            loading: () => const AppCard(
-              child: SizedBox(height: 70, child: LoadingView()),
-            ),
-            error: (_, __) => AppCard(
-              child: ErrorView(
-                message: 'No se pudieron cargar las constantes.',
-                onRetry: () => ref.invalidate(latestVitalsProvider),
-              ),
-            ),
-            data: (vitals) {
-              final withData = vitals.where((v) => v.hasData).toList();
-              if (withData.isEmpty) {
-                return const AppCard(
-                  child: Text(
-                    'Aún no hay lecturas del wearable para este paciente.',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                );
-              }
-              return AppCard(
-                padding: EdgeInsets.zero,
-                child: Column(
-                  children: [
-                    for (var i = 0; i < withData.length; i++) ...[
-                      if (i != 0) const Divider(height: 1),
-                      _VitalTile(vital: withData[i]),
-                    ],
-                  ],
-                ),
-              );
-            },
-          ),
-          const _SectionLabel('Medicación activa'),
-          medications.when(
-            loading: () => const AppCard(
-              child: SizedBox(height: 70, child: LoadingView()),
-            ),
-            error: (_, __) => AppCard(
-              child: ErrorView(
-                message: 'No se pudo cargar la medicación.',
-                onRetry: () => ref.invalidate(medicationsProvider),
-              ),
-            ),
-            data: (meds) {
-              final active = meds.where((m) => m.active).toList();
-              if (active.isEmpty) {
-                return const AppCard(
-                  child: Text(
-                    'No hay medicación activa.',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                );
-              }
-              return AppCard(
-                padding: EdgeInsets.zero,
-                child: Column(
-                  children: [
-                    for (var i = 0; i < active.length; i++) ...[
-                      if (i != 0) const Divider(height: 1),
-                      _MedicationTile(
-                          medication: active[i],
-                          patientId: patientId,
-                          onDiscontinue: () => _discontinuarReceta(
-                              context, ref, patientId, active[i])),
-                    ],
-                  ],
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: () =>
-                context.push('/meds/plan?patient=$patientId'),
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Recetar medicamento'),
-          ),
-          const _SectionLabel('Adherencia (últimos 7 días)'),
-          adherence.when(
-            loading: () => const AppCard(
-              child: SizedBox(height: 70, child: LoadingView()),
-            ),
-            error: (_, __) => AppCard(
-              child: ErrorView(
-                message: 'No se pudo calcular la adherencia.',
-                onRetry: () => ref.invalidate(adherenceProvider),
-              ),
-            ),
-            data: (adh) {
-              if (adh == null) return const SizedBox.shrink();
-              return AppCard(
-                child: Row(
-                  children: [
-                    Text('${adh.pct.round()}%',
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Cabecera fija: identidad, edad, enfermedades y semáforo. Toca para abrir el
+/// perfil clínico completo.
+class _PatientHeader extends StatelessWidget {
+  const _PatientHeader({required this.patient, required this.patientId});
+  final PatientCard patient;
+  final String patientId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: AppCard(
+        onTap: () => context.push('/patient/profile?patient=$patientId'),
+        child: Row(
+          children: [
+            InitialsAvatar(
+                name: patient.fullName, photoUrl: patient.photoUrl, radius: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                      patient.age != null
+                          ? '${patient.fullName}, ${patient.age} años'
+                          : patient.fullName,
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w700)),
+                  if (patient.conditions.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                        patient.conditions
+                            .map((c) => c.replaceAll('_', ' '))
+                            .join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primary,
-                        )),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Text(
-                        'de las dosis registradas en la semana',
-                        style:
-                            TextStyle(color: AppColors.textSecondary),
-                      ),
-                    ),
+                            fontSize: 13, color: AppColors.textSecondary)),
                   ],
-                ),
-              );
-            },
-          ),
-          const _SectionLabel('Notas del círculo de cuidado'),
-          observations.when(
-            loading: () => const AppCard(
-              child: SizedBox(height: 70, child: LoadingView()),
-            ),
-            error: (_, __) => AppCard(
-              child: ErrorView(
-                message: 'No se pudieron cargar las observaciones.',
-                onRetry: () => ref.invalidate(observationsProvider),
+                ],
               ),
             ),
-            data: (notes) {
-              if (notes.isEmpty) {
-                return const AppCard(
-                  child: Text(
-                    'Aún no hay observaciones registradas.',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                );
-              }
-              final recent = notes.take(5).toList();
-              return AppCard(
-                padding: EdgeInsets.zero,
-                child: Column(
-                  children: [
-                    for (var i = 0; i < recent.length; i++) ...[
-                      if (i != 0) const Divider(height: 1),
-                      _ObservationTile(observation: recent[i]),
-                    ],
-                  ],
+            WellbeingChip(status: patient.wellbeingStatus),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right_rounded,
+                color: AppColors.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Resumen: signos vitales actuales + adherencia. La vista de 5 segundos.
+class _ResumenTab extends ConsumerWidget {
+  const _ResumenTab({required this.patientId});
+  final String patientId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final latestVitals = ref.watch(latestVitalsProvider);
+    final adherence = ref.watch(adherenceProvider);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      children: [
+        const _SectionLabel('Signos vitales actuales'),
+        latestVitals.when(
+          loading: () =>
+              const AppCard(child: SizedBox(height: 70, child: LoadingView())),
+          error: (_, __) => AppCard(
+            child: ErrorView(
+              message: 'No se pudieron cargar las constantes.',
+              onRetry: () => ref.invalidate(latestVitalsProvider),
+            ),
+          ),
+          data: (vitals) {
+            final withData = vitals.where((v) => v.hasData).toList();
+            if (withData.isEmpty) {
+              return const AppCard(
+                child: Text(
+                  'Aún no hay lecturas del wearable para este paciente.',
+                  style: TextStyle(color: AppColors.textSecondary),
                 ),
               );
-            },
+            }
+            return AppCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  for (var i = 0; i < withData.length; i++) ...[
+                    if (i != 0) const Divider(height: 1),
+                    _VitalTile(vital: withData[i]),
+                  ],
+                ],
+              ),
+            );
+          },
+        ),
+        const _SectionLabel('Adherencia (últimos 7 días)'),
+        adherence.when(
+          loading: () =>
+              const AppCard(child: SizedBox(height: 70, child: LoadingView())),
+          error: (_, __) => AppCard(
+            child: ErrorView(
+              message: 'No se pudo calcular la adherencia.',
+              onRetry: () => ref.invalidate(adherenceProvider),
+            ),
           ),
-        ],
+          data: (adh) {
+            if (adh == null) return const SizedBox.shrink();
+            return AppCard(
+              child: Row(
+                children: [
+                  Text('${adh.pct.round()}%',
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                      )),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Text('de las dosis registradas en la semana',
+                        style: TextStyle(color: AppColors.textSecondary)),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+/// Tratamientos por especialidad + nuevo tratamiento + acceso al historial.
+class _TratamientosTab extends ConsumerWidget {
+  const _TratamientosTab({required this.patientId});
+  final String patientId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final treatment = ref.watch(treatmentsProvider);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      children: [
+        Row(
+          children: [
+            const Expanded(
+                child: _SectionLabel('Tratamientos por especialidad')),
+            TextButton.icon(
+              onPressed: () =>
+                  context.push('/treatment/history?patient=$patientId'),
+              icon: const Icon(Icons.history_rounded, size: 18),
+              label: const Text('Historial'),
+            ),
+          ],
+        ),
+        treatment.when(
+          loading: () =>
+              const AppCard(child: SizedBox(height: 70, child: LoadingView())),
+          error: (_, __) => AppCard(
+            child: ErrorView(
+              message: 'No se pudo cargar el tratamiento.',
+              onRetry: () => ref.invalidate(treatmentsProvider),
+            ),
+          ),
+          data: (bundle) {
+            final grupos = bundle.vigentes;
+            return Column(
+              children: [
+                if (grupos.isEmpty)
+                  const AppCard(
+                    child: Text('Aún no hay tratamientos definidos.',
+                        style: TextStyle(color: AppColors.textSecondary)),
+                  ),
+                for (final g in grupos)
+                  _SpecialtyTreatmentCard(
+                    group: g,
+                    patientId: patientId,
+                    onChanged: () => ref.invalidate(treatmentsProvider),
+                  ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () => _nuevaEspecialidad(context, ref, patientId),
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Nuevo tratamiento (otra especialidad)'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Controles / consultas clínicas. Entidad propia en la Fase 6; por ahora
+/// placeholder honesto en vez de prometer lo que aún no existe.
+class _ControlesTab extends StatelessWidget {
+  const _ControlesTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(24),
+        child: EmptyView(
+          icon: Icons.event_note_rounded,
+          title: 'Controles clínicos',
+          subtitle:
+              'Aquí irán las consultas con fecha, profesional, mediciones y '
+              'próximo control. En construcción.',
+        ),
+      ),
+    );
+  }
+}
+
+/// Bitácora: notas del círculo de cuidado (observaciones).
+class _BitacoraTab extends ConsumerWidget {
+  const _BitacoraTab({required this.patientId});
+  final String patientId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final observations = ref.watch(observationsProvider);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      children: [
+        const _SectionLabel('Notas del círculo de cuidado'),
+        observations.when(
+          loading: () =>
+              const AppCard(child: SizedBox(height: 70, child: LoadingView())),
+          error: (_, __) => AppCard(
+            child: ErrorView(
+              message: 'No se pudieron cargar las observaciones.',
+              onRetry: () => ref.invalidate(observationsProvider),
+            ),
+          ),
+          data: (notes) {
+            if (notes.isEmpty) {
+              return const AppCard(
+                child: Text('Aún no hay observaciones registradas.',
+                    style: TextStyle(color: AppColors.textSecondary)),
+              );
+            }
+            return AppCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  for (var i = 0; i < notes.length; i++) ...[
+                    if (i != 0) const Divider(height: 1),
+                    _ObservationTile(observation: notes[i]),
+                  ],
+                ],
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+/// Documentos del expediente (recetas, exámenes).
+class _DocumentosTab extends StatelessWidget {
+  const _DocumentosTab({required this.patientId});
+  final String patientId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: EmptyView(
+          icon: Icons.folder_rounded,
+          title: 'Documentos del expediente',
+          subtitle: 'Recetas, exámenes e informes escaneados.',
+          action: FilledButton.icon(
+            onPressed: () => context.push('/documents?patient=$patientId'),
+            icon: const Icon(Icons.open_in_new_rounded),
+            label: const Text('Abrir documentos'),
+          ),
+        ),
       ),
     );
   }
@@ -280,94 +413,154 @@ class _VitalTile extends StatelessWidget {
   }
 }
 
-/// Saca una medicación del plan del paciente. El backend responde 204 y deja
-/// la receta con discontinued_at, conservando las dosis ya registradas.
-Future<void> _discontinuarReceta(BuildContext context, WidgetRef ref,
-    String patientId, Medication medication) async {
-  final confirmar = await showDialog<bool>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: Text('¿Discontinuar ${medication.name}?'),
-      content: const Text(
-        'Deja de estar activa en el plan del paciente. '
-        'Las dosis ya registradas se conservan.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(false),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: AppColors.critical),
-          onPressed: () => Navigator.of(dialogContext).pop(true),
-          child: const Text('Discontinuar'),
-        ),
-      ],
-    ),
-  );
-  if (confirmar != true) return;
-  try {
-    await ref
-        .read(medicationsRepositoryProvider)
-        .deleteMedication(patientId, medication.id);
-    ref.invalidate(medicationsProvider);
-    // Las dosis de hoy se generan desde la medicación activa: al salir una del
-    // plan, su dosis pendiente ya no debe aparecer en el día.
-    ref.invalidate(todayDosesProvider);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${medication.name} salió del plan.')),
-      );
-    }
-  } catch (_) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo discontinuar la receta.')),
-      );
-    }
-  }
-}
+// La gestión de medicación del médico pasó al modelo de tratamientos
+// (treatment_editor_screen / treatment_history_screen). Se quitó la edición
+// fármaco a fármaco a propósito: el médico cambia el esquema completo.
 
-class _MedicationTile extends StatelessWidget {
-  const _MedicationTile(
-      {required this.medication,
-      required this.patientId,
-      required this.onDiscontinue});
+/// Tarjeta de un tratamiento vigente de una especialidad: qué área, qué médico
+/// lo definió, los fármacos, y el botón para cambiar el esquema de esa área.
+class _SpecialtyTreatmentCard extends StatelessWidget {
+  const _SpecialtyTreatmentCard({
+    required this.group,
+    required this.patientId,
+    required this.onChanged,
+  });
 
-  final Medication medication;
+  final SpecialtyGroup group;
   final String patientId;
-  final VoidCallback onDiscontinue;
+  final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: const Icon(Icons.medication_rounded, color: AppColors.primary),
-      title: Text(medication.name),
-      subtitle: Text(
-        '${medication.dose} ${medication.unit} · ${medication.form} · '
-        '${medication.schedule.join(', ')}',
-        style: const TextStyle(
-            fontSize: 12, color: AppColors.textSecondary),
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            tooltip: 'Editar receta',
-            icon: const Icon(Icons.edit_outlined,
-                color: AppColors.textSecondary),
-            onPressed: () => context.push(
-                '/meds/plan?patient=$patientId&medication=${medication.id}'),
-          ),
-          IconButton(
-            tooltip: 'Discontinuar receta',
-            icon: const Icon(Icons.delete_outline_rounded,
-                color: AppColors.critical),
-            onPressed: onDiscontinue,
-          ),
-        ],
+    final t = group.current!;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AppCard(
+        padding: EdgeInsets.zero,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 8, 6),
+              child: Row(
+                children: [
+                  const Icon(Icons.local_hospital_rounded,
+                      size: 18, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(specialtyLabel(t.specialty),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 14)),
+                        if ((t.prescriberName ?? '').isNotEmpty)
+                          Text('Médico: ${t.prescriberName}',
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary)),
+                        Text(
+                          t.reviewDate == null
+                              ? 'Permanente'
+                              : 'Hasta ${_fechaCorta(t.reviewDate!)}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: t.reviewDate == null
+                                ? AppColors.statusOk
+                                : AppColors.statusWarning,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      await context.push(
+                          '/treatment?patient=$patientId&specialty=${t.specialty}');
+                      onChanged();
+                    },
+                    child: const Text('Cambiar'),
+                  ),
+                ],
+              ),
+            ),
+            for (final it in t.items) ...[
+              const Divider(height: 1),
+              ListTile(
+                dense: true,
+                leading: Icon(
+                    it.isPrn
+                        ? Icons.emergency_rounded
+                        : Icons.medication_rounded,
+                    color: it.isPrn
+                        ? AppColors.statusWarning
+                        : AppColors.primary),
+                title: Row(
+                  children: [
+                    Flexible(child: Text(it.name)),
+                    if (it.isPrn) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.statusWarning.withValues(alpha: .15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text('SOS',
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.statusWarning)),
+                      ),
+                    ],
+                  ],
+                ),
+                subtitle: Text(
+                    it.isPrn
+                        ? '${it.dose} · solo si se necesita'
+                        : '${it.dose} · ${it.times.join(', ')}'
+                            '${(it.scheduleLabel ?? '').isNotEmpty ? ' (${it.scheduleLabel})' : ''}',
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary)),
+              ),
+            ],
+          ],
+        ),
       ),
     );
+  }
+}
+
+/// Selector de especialidad para iniciar un tratamiento de un área nueva.
+Future<void> _nuevaEspecialidad(
+    BuildContext context, WidgetRef ref, String patientId) async {
+  final elegida = await showModalBottomSheet<String>(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Text('¿Para qué especialidad?',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          ),
+          for (final e in kEspecialidades)
+            ListTile(
+              leading: const Icon(Icons.local_hospital_outlined),
+              title: Text(specialtyLabel(e)),
+              onTap: () => Navigator.of(ctx).pop(e),
+            ),
+        ],
+      ),
+    ),
+  );
+  if (elegida == null) return;
+  if (context.mounted) {
+    await context.push('/treatment?patient=$patientId&specialty=$elegida');
+    ref.invalidate(treatmentsProvider);
   }
 }
 
@@ -389,6 +582,9 @@ class _ObservationTile extends StatelessWidget {
     );
   }
 }
+
+String _fechaCorta(DateTime d) =>
+    '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
 String _timeAgo(DateTime dt) {
   final diff = DateTime.now().difference(dt);

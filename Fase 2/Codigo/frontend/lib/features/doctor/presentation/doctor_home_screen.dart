@@ -41,9 +41,22 @@ class DoctorHomeScreen extends ConsumerWidget {
                   'rol médico, verás a tus pacientes aquí.',
             );
           }
+          final requierenAtencion = patients
+              .where((p) => p.wellbeingStatus != WellbeingStatus.ok)
+              .length;
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8, left: 2),
+                child: Text(
+                  requierenAtencion > 0
+                      ? '$requierenAtencion de ${patients.length} requieren atención · ordenados por prioridad'
+                      : '${patients.length} paciente(s) · todo en orden',
+                  style: const TextStyle(
+                      fontSize: 13, color: AppColors.textSecondary),
+                ),
+              ),
               for (final p in patients)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -81,14 +94,64 @@ class _DoctorPatientCard extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(patient.fullName,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700)),
-                if ((patient.topReason ?? '').isNotEmpty) ...[
+                // Nombre completo + edad: el médico interpreta los signos según
+                // la edad (54 lpm no es lo mismo a los 50 que a los 90).
+                Text(
+                  patient.age != null
+                      ? '${patient.fullName}, ${patient.age} años'
+                      : patient.fullName,
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                if ((patient.rut ?? '').isNotEmpty) ...[
                   const SizedBox(height: 2),
-                  Text(patient.topReason!,
+                  Text('RUT ${patient.rut}',
                       style: const TextStyle(
-                          fontSize: 13, color: AppColors.textSecondary)),
+                          fontSize: 12, color: AppColors.textSecondary)),
+                ],
+                if (patient.conditions.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      for (final c in patient.conditions)
+                        _ConditionChip(label: _bonito(c)),
+                    ],
+                  ),
+                ],
+                if (patient.vitalsSummary.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.favorite_rounded,
+                          size: 13, color: AppColors.textSecondary),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          patient.vitalsSummary.map((v) => v.display).join('  ·  '),
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.textSecondary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                if ((patient.topReason ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          size: 14, color: AppColors.statusAttention),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(patient.topReason!,
+                            style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.statusAttention)),
+                      ),
+                    ],
+                  ),
                 ],
               ],
             ),
@@ -117,4 +180,33 @@ class _DoctorPatientCard extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Chip compacto de enfermedad para la tarjeta del médico.
+class _ConditionChip extends StatelessWidget {
+  const _ConditionChip({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: .10),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+              fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600),
+        ),
+      );
+}
+
+/// Convierte el código de enfermedad del backend ("diabetes_tipo_2") en una
+/// etiqueta legible ("Diabetes tipo 2"). Es presentación: el dato crudo sigue
+/// siendo el del expediente.
+String _bonito(String codigo) {
+  final limpio = codigo.replaceAll('_', ' ').trim();
+  if (limpio.isEmpty) return codigo;
+  return limpio[0].toUpperCase() + limpio.substring(1);
 }

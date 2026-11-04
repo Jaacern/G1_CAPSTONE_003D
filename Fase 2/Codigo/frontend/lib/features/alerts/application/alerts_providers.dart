@@ -1,7 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../patients/application/patients_providers.dart';
 import '../data/alerts_repository.dart';
 import '../domain/models.dart';
+
+/// Filtro del centro de alertas: todas mis alertas, o solo las del paciente
+/// seleccionado. Antes el centro mezclaba a todos los pacientes sin forma de
+/// acotar (DEF-016). false = todos; true = solo el paciente seleccionado.
+final alertsOnlySelectedPatientProvider = StateProvider<bool>((ref) => false);
 
 /// Lo que necesita la pantalla para pintar el centro de alertas.
 class AlertsState {
@@ -43,12 +49,28 @@ class AlertsController extends AsyncNotifier<AlertsState> {
   static const pageSize = 20;
 
   @override
-  Future<AlertsState> build() => _cargarPrimeraPagina();
+  Future<AlertsState> build() {
+    // Al cambiar el filtro (todos / solo el paciente seleccionado) o el
+    // paciente activo, el centro se reconstruye con la consulta correcta.
+    ref.watch(alertsOnlySelectedPatientProvider);
+    ref.watch(selectedPatientProvider);
+    return _cargarPrimeraPagina();
+  }
+
+  /// patient_id a enviar según el filtro activo. null = todos mis pacientes.
+  String? get _patientFilter {
+    final soloSeleccionado = ref.read(alertsOnlySelectedPatientProvider);
+    if (!soloSeleccionado) return null;
+    return ref.read(selectedPatientProvider)?.patientId;
+  }
 
   Future<AlertsState> _cargarPrimeraPagina() async {
-    final pagina = await ref
-        .watch(alertsRepositoryProvider)
-        .listAlerts(activeOnly: true, page: 1, pageSize: pageSize);
+    final pagina = await ref.read(alertsRepositoryProvider).listAlerts(
+          activeOnly: true,
+          patientId: _patientFilter,
+          page: 1,
+          pageSize: pageSize,
+        );
     return _desde(pagina, pagina.items);
   }
 
@@ -67,6 +89,7 @@ class AlertsController extends AsyncNotifier<AlertsState> {
     state = AsyncData(actual.copyWith(cargandoMas: true));
     final pagina = await ref.read(alertsRepositoryProvider).listAlerts(
           activeOnly: true,
+          patientId: _patientFilter,
           page: actual.items.length ~/ pageSize + 1,
           pageSize: pageSize,
         );

@@ -319,8 +319,10 @@ async def _medications_today(db: AsyncSession, patient_id: str) -> MedicationsTo
                 """
                 SELECT sd.status, count(*) AS n
                 FROM scheduled_doses sd
-                JOIN medications m ON m.id = sd.medication_id
-                WHERE m.patient_id = :pid
+                LEFT JOIN medications m ON m.id = sd.medication_id
+                LEFT JOIN treatment_items ti ON ti.id = sd.treatment_item_id
+                LEFT JOIN treatments tr ON tr.id = ti.treatment_id
+                WHERE COALESCE(m.patient_id, tr.patient_id) = :pid
                   AND sd.scheduled_at::date = current_date
                 GROUP BY sd.status
                 """
@@ -336,8 +338,10 @@ async def _medications_today(db: AsyncSession, patient_id: str) -> MedicationsTo
                 """
                 SELECT sd.scheduled_at
                 FROM scheduled_doses sd
-                JOIN medications m ON m.id = sd.medication_id
-                WHERE m.patient_id = :pid
+                LEFT JOIN medications m ON m.id = sd.medication_id
+                LEFT JOIN treatment_items ti ON ti.id = sd.treatment_item_id
+                LEFT JOIN treatments tr ON tr.id = ti.treatment_id
+                WHERE COALESCE(m.patient_id, tr.patient_id) = :pid
                   AND sd.status = 'pending'
                   AND sd.scheduled_at::date = current_date
                 ORDER BY sd.scheduled_at ASC

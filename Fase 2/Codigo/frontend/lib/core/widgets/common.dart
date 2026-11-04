@@ -16,19 +16,22 @@ class AppCard extends StatelessWidget {
   Widget build(BuildContext context) {
     // Tarjeta estilo wireframe v2: superficie, borde sutil, radio 18 y una
     // sombra suave azulada para dar profundidad. Respeta claro/oscuro.
+    // Tarjeta AgeCare: superficie blanca sobre crema, borde sutil de 1 px y
+    // radio xl. La guía casi no usa sombras —las tarjetas se distinguen por
+    // contraste de superficie y borde— así que la sombra es muy tenue.
     final dark = Theme.of(context).brightness == Brightness.dark;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: dark ? AppColors.darkSurface : AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
+        color: dark ? AgeColors.darkSurfaceCard : AgeColors.surfaceCard,
+        borderRadius: BorderRadius.circular(AgeRadius.xl),
         border: Border.all(
-            color: dark ? AppColors.darkDivider : AppColors.divider),
+            color: dark ? AgeColors.darkBorder : AgeColors.border),
         boxShadow: dark
             ? null
             : const [
                 BoxShadow(
-                  color: Color(0x141A2A46),
-                  blurRadius: 24,
+                  color: Color(0x0F12283F),
+                  blurRadius: 18,
                   offset: Offset(0, 6),
                 ),
               ],
@@ -36,7 +39,7 @@ class AppCard extends StatelessWidget {
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(AgeRadius.xl),
           onTap: onTap,
           child: Padding(
             padding: padding ?? const EdgeInsets.all(16),
@@ -124,11 +127,21 @@ class EmptyView extends StatelessWidget {
 }
 
 class InitialsAvatar extends StatelessWidget {
-  const InitialsAvatar({super.key, required this.name, this.radius = 20, this.photoUrl});
+  const InitialsAvatar(
+      {super.key,
+      required this.name,
+      this.radius = 20,
+      this.photoUrl,
+      this.accentFg,
+      this.accentBg});
 
   final String name;
   final double radius;
   final String? photoUrl;
+
+  /// Acento de rol opcional (sección 4.5 de la guía). Por defecto, teal.
+  final Color? accentFg;
+  final Color? accentBg;
 
   @override
   Widget build(BuildContext context) {
@@ -148,17 +161,18 @@ class InitialsAvatar extends StatelessWidget {
         .join();
     return CircleAvatar(
       radius: radius,
-      backgroundColor: AppColors.primary.withValues(alpha: .15),
+      backgroundColor: accentBg ?? AgeColors.teal100,
       child: Text(initials,
           style: TextStyle(
-              color: AppColors.primaryDark,
+              color: accentFg ?? AgeColors.teal700,
               fontWeight: FontWeight.w700,
               fontSize: radius * .8)),
     );
   }
 }
 
-/// Chip del semáforo de bienestar.
+/// Chip / badge del semáforo de bienestar (sección 7.2 de la guía): fondo
+/// tinte, punto en el color fuerte y texto en el tono 700 del estado.
 class WellbeingChip extends StatelessWidget {
   const WellbeingChip({super.key, required this.status, this.large = false});
 
@@ -168,19 +182,27 @@ class WellbeingChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: large ? 16 : 10, vertical: large ? 8 : 5),
+      padding: EdgeInsets.symmetric(
+          horizontal: large ? 16 : 12, vertical: large ? 8 : 5),
       decoration: BoxDecoration(
-        color: status.color.withValues(alpha: .12),
-        borderRadius: BorderRadius.circular(999),
+        color: status.tint,
+        borderRadius: BorderRadius.circular(AgeRadius.full),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(status.icon, size: large ? 22 : 16, color: status.color),
-          const SizedBox(width: 6),
+          Container(
+            width: large ? 12 : 10,
+            height: large ? 12 : 10,
+            decoration: BoxDecoration(
+              color: status.color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 7),
           Text(status.label,
               style: TextStyle(
-                  color: status.color,
+                  color: status.onTint,
                   fontWeight: FontWeight.w700,
                   fontSize: large ? 16 : 13)),
         ],
@@ -281,14 +303,14 @@ class ComingSoonView extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: .18),
-                borderRadius: BorderRadius.circular(999),
+                color: AgeColors.gold100,
+                borderRadius: BorderRadius.circular(AgeRadius.full),
               ),
               child: const Text('Próximamente',
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF8A6300))),
+                      color: AgeColors.gold700)),
             ),
             if (subtitle != null) ...[
               const SizedBox(height: 14),

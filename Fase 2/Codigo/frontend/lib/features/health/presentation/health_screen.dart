@@ -342,7 +342,9 @@ class _VitalCard extends ConsumerWidget {
     // Tarjeta "sin datos aún": no navega ni muestra sparkline (transparencia).
     if (!vital.hasData) return _EmptyVitalCard(type: vital.type);
 
-    final color = vital.inRange ? AppColors.primary : AppColors.statusAttention;
+    // Número en estado (verde/rojo); la tendencia usa el color fijo del vital.
+    final color = vital.inRange ? AppColors.textPrimary : AppColors.statusAttention;
+    final sparkColor = vital.type.seriesColor;
     final spark = ref.watch(sparkSeriesProvider(vital.type));
     return AppCard(
       onTap: () => context.push('/health/vital/${vital.type.apiValue}'),
@@ -404,7 +406,7 @@ class _VitalCard extends ConsumerWidget {
                   height: 34,
                   child: _Sparkline(
                     values: pts.map((p) => p.value).toList(),
-                    color: color,
+                    color: sparkColor,
                   ),
                 ),
               );

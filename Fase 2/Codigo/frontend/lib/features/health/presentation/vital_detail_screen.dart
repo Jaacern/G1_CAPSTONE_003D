@@ -248,6 +248,9 @@ class _TrendChart extends StatelessWidget {
     if (t?.maxValue != null && t!.maxValue! > maxY) maxY = t.maxValue!;
     final pad = (maxY - minY) * .15 + 1;
 
+    // Color fijo de la serie según el vital (guía AgeCare 9.1).
+    final lineColor = series.type.seriesColor;
+
     return LineChart(
       LineChartData(
         minY: minY - pad,
@@ -297,30 +300,30 @@ class _TrendChart extends StatelessWidget {
           ],
         ),
         extraLinesData: ExtraLinesData(horizontalLines: [
+          // Umbrales: línea discontinua en ámbar (guía 9.1), no en rojo —el
+          // rojo se reserva para eventos (caídas, dosis omitidas).
           if (t?.minValue != null)
             HorizontalLine(
                 y: t!.minValue!,
-                color: AppColors.statusAttention.withOpacity(.45),
+                color: AgeChart.threshold.withOpacity(.75),
                 strokeWidth: 1,
                 dashArray: [6, 6],
                 label: HorizontalLineLabel(
                   show: true,
                   alignment: Alignment.topRight,
-                  style: const TextStyle(
-                      fontSize: 9, color: AppColors.statusAttention),
+                  style: const TextStyle(fontSize: 9, color: AgeColors.warn700),
                   labelResolver: (_) => 'mín ${t.minValue!.toStringAsFixed(0)}',
                 )),
           if (t?.maxValue != null)
             HorizontalLine(
                 y: t!.maxValue!,
-                color: AppColors.statusAttention.withOpacity(.45),
+                color: AgeChart.threshold.withOpacity(.75),
                 strokeWidth: 1,
                 dashArray: [6, 6],
                 label: HorizontalLineLabel(
                   show: true,
                   alignment: Alignment.bottomRight,
-                  style: const TextStyle(
-                      fontSize: 9, color: AppColors.statusAttention),
+                  style: const TextStyle(fontSize: 9, color: AgeColors.warn700),
                   labelResolver: (_) => 'máx ${t.maxValue!.toStringAsFixed(0)}',
                 )),
         ]),
@@ -336,7 +339,7 @@ class _TrendChart extends StatelessWidget {
               dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
-                color: AppColors.primary.withOpacity(.10),
+                color: lineColor.withOpacity(.10),
                 // Recorta el relleno a la línea del mínimo → queda la banda.
                 cutOffY: 0,
                 applyCutOffY: false,
@@ -362,7 +365,7 @@ class _TrendChart extends StatelessWidget {
             spots: avgSpots,
             isCurved: true,
             curveSmoothness: .2,
-            color: AppColors.primary,
+            color: lineColor,
             barWidth: 3,
             dotData: FlDotData(
               show: points.length <= 31,
@@ -370,7 +373,7 @@ class _TrendChart extends StatelessWidget {
                 final out = _outOfRange(spot.y, t);
                 return FlDotCirclePainter(
                   radius: out ? 4 : 3,
-                  color: out ? AppColors.statusAttention : AppColors.primary,
+                  color: out ? AgeChart.event : lineColor,
                   strokeWidth: out ? 1.5 : 0,
                   strokeColor: Colors.white,
                 );
@@ -378,7 +381,7 @@ class _TrendChart extends StatelessWidget {
             ),
             belowBarData: BarAreaData(
               show: true,
-              color: AppColors.primary.withOpacity(.06),
+              color: lineColor.withOpacity(.06),
             ),
           ),
         ],

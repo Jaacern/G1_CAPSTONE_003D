@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_theme.dart';
+
 /// Origen de un dato de salud (transparencia de fuente: nada oculto).
 /// El backend lo entrega en meta.origin (o source) de cada lectura.
 enum VitalSource {
@@ -74,6 +76,19 @@ enum VitalType {
   final String unit;
   final String emoji;
   final IconData icon;
+
+  /// Color fijo de la serie en las gráficas (guía AgeCare 9.1): el familiar lo
+  /// aprende una vez. Ritmo cardíaco teal, oxígeno navy, actividad coral,
+  /// sueño teal claro. El resto hereda el teal de acción.
+  Color get seriesColor => switch (this) {
+        VitalType.heartRate => AgeChart.heart,
+        VitalType.spo2 => AgeChart.spo2,
+        VitalType.steps ||
+        VitalType.sedentaryMin =>
+          AgeChart.activity,
+        VitalType.sleep => AgeChart.sleep,
+        _ => AgeChart.heart,
+      };
 
   static VitalType fromApi(String v) => VitalType.values
       .firstWhere((t) => t.apiValue == v, orElse: () => VitalType.heartRate);

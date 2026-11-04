@@ -22,6 +22,61 @@ abstract class PatientsRepository {
   /// de cuidado del paciente. Devuelve la tarjeta del paciente ya vinculado.
   Future<PatientCard> acceptInvitation(String token);
   Future<WearableStatus> wearableStatus(String patientId);
+
+  /// Actualiza la lista de enfermedades del paciente (descubrir una nueva o
+  /// dar de baja una que remitió). Solo el familiar administrador.
+  Future<Patient> updateConditions(String patientId, List<String> conditions);
+
+  /// Actualiza campos del perfil clínico (domicilio, estado civil, previsión,
+  /// nivel de riesgo cardiovascular). Solo el familiar administrador.
+  Future<Patient> updateProfile(String patientId, Map<String, dynamic> fields);
+
+  /// Registra una medición antropométrica (peso/altura). Devuelve el paciente
+  /// con la medición nueva como la más reciente.
+  Future<Patient> addMeasurement(String patientId,
+      {double? weightKg, double? heightCm});
+
+  /// Catálogo de patologías agrupables por sistema (para el selector).
+  Future<List<ConditionDetail>> conditionCatalog();
+
+  /// Catálogo de alérgenos (para el selector de alergias).
+  Future<List<AllergenCatalogItem>> allergenCatalog();
+
+  /// Registra una alergia descubierta (al diagnosticar, por test, o por una
+  /// reacción en tratamiento). Devuelve la lista vigente de alergias.
+  Future<List<AllergyDetail>> addAllergy(String patientId, AllergyDetail allergy);
+
+  /// Da de baja una alergia (baja lógica). Devuelve la lista vigente.
+  Future<List<AllergyDetail>> removeAllergy(String patientId, String substance);
+
+  /// Catálogo de vacunas (para el selector de inmunizaciones).
+  Future<List<VaccineCatalogItem>> vaccineCatalog();
+
+  /// Registra una vacuna (aplicada o programada). Devuelve el carnet vigente.
+  Future<List<Immunization>> addImmunization(
+      String patientId, Immunization immunization);
+
+  /// Da de baja la última dosis de una vacuna. Devuelve el carnet vigente.
+  Future<List<Immunization>> removeImmunization(
+      String patientId, String vaccine);
+
+  /// Contactos de emergencia del paciente (del grupo, rotativos).
+  Future<List<EmergencyContact>> emergencyContacts(String patientId);
+
+  /// Agrega un contacto eligiendo un miembro del grupo. Solo el administrador.
+  Future<List<EmergencyContact>> addEmergencyContact(
+      String patientId, {required String memberUserId, String? notes});
+
+  /// Activa/desactiva un contacto (rotación). Sin orden/prioridad.
+  Future<List<EmergencyContact>> updateEmergencyContact(
+      String patientId, String contactId, {required bool isActive});
+
+  /// Da de baja un contacto de emergencia.
+  Future<List<EmergencyContact>> removeEmergencyContact(
+      String patientId, String contactId);
+
+  /// Equipo de cuidado del paciente (miembros vivos con su profesión).
+  Future<List<CareMember>> listMembers(String patientId);
 }
 
 // ---------------------------------------------------------------------------
@@ -33,50 +88,196 @@ class PatientsRepositoryHttp implements PatientsRepository {
 
   @override
   Future<List<PatientCard>> listMyPatients() async {
-    // /patients trae el rol, pero su wellbeing_status viene fijo en "ok".
-    // /users/me/dashboard sí calcula el semáforo real (vitals, dosis, alertas).
-    // Se combinan por patient_id: rol de /patients + semáforo del dashboard.
+    // /patients ya calcula el semáforo real y trae edad, enfermedades, RUT y
+    // el mini-resumen de vitales. Antes se combinaba con /users/me/dashboard y
+    // al reconstruir la tarjeta se perdían esos campos nuevos; ya no hace falta.
     final data = await _api.get<Map<String, dynamic>>('/patients');
-    final base = ((data['items'] ?? []) as List)
+    return ((data['items'] ?? []) as List)
         .map((e) => PatientCard.fromJson(e as Map<String, dynamic>))
-        .toList();
-
-    Map<String, Map<String, dynamic>> board = {};
-    try {
-      final dash = await _api.get<Map<String, dynamic>>('/users/me/dashboard');
-      for (final e in (dash['items'] ?? []) as List) {
-        final m = e as Map<String, dynamic>;
-        board[m['patient_id'] as String] = m;
-      }
-    } catch (_) {
-      // Si el dashboard falla, se muestran los pacientes sin semáforo calculado.
-    }
-
-    return [
-      for (final p in base)
-        board[p.patientId] == null
+        .map((p) => p.topReason == null
             ? p
-            : PatientCard(
-                patientId: p.patientId,
-                fullName: p.fullName,
-                photoUrl: p.photoUrl,
-                role: p.role,
-                wellbeingStatus: WellbeingStatus.fromApi(
-                    (board[p.patientId]!['wellbeing_status'] ?? 'ok') as String),
-                activeAlertsCount:
-                    (board[p.patientId]!['active_alerts_count'] ?? 0) as int,
-                topReason: board[p.patientId]!['top_reason'] == null
-                    ? null
-                    : humanizeReason(
-                        board[p.patientId]!['top_reason'] as String),
-              ),
-    ];
+            : p.withHumanizedReason(humanizeReason(p.topReason!)))
+        .toList();
   }
 
   @override
   Future<Patient> getPatient(String patientId) async {
     final data = await _api.get<Map<String, dynamic>>('/patients/$patientId');
     return Patient.fromJson(data);
+  }
+
+  @override
+  Future<Patient> updateConditions(
+      String patientId, List<String> conditions) async {
+    final data = await _api.patch<Map<String, dynamic>>(
+      '/patients/$patientId',
+      data: {'conditions': conditions},
+    );
+    return Patient.fromJson(data);
+  }
+
+  @override
+  Future<Patient> updateProfile(
+      String patientId, Map<String, dynamic> fields) async {
+    final data = await _api.patch<Map<String, dynamic>>(
+      '/patients/$patientId',
+      data: fields,
+    );
+    return Patient.fromJson(data);
+  }
+
+  @override
+  Future<Patient> addMeasurement(String patientId,
+      {double? weightKg, double? heightCm}) async {
+    await _api.post<Map<String, dynamic>>(
+      '/patients/$patientId/measurements',
+      data: {
+        if (weightKg != null) 'weight_kg': weightKg,
+        if (heightCm != null) 'height_cm': heightCm,
+      },
+    );
+    return getPatient(patientId);
+  }
+
+  @override
+  Future<List<AllergenCatalogItem>> allergenCatalog() async {
+    final data = await _api.get<List<dynamic>>('/allergens/catalog');
+    return data
+        .map((e) => AllergenCatalogItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  @override
+  Future<List<AllergyDetail>> addAllergy(
+      String patientId, AllergyDetail allergy) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      '/patients/$patientId/allergies',
+      data: {
+        'substance': allergy.substance,
+        'category': allergy.category,
+        'severity': allergy.severity,
+        if (allergy.reaction != null && allergy.reaction!.trim().isNotEmpty)
+          'reaction': allergy.reaction,
+        'source': allergy.source ?? 'reportada',
+      },
+    );
+    return ((data['allergies'] ?? []) as List)
+        .map((e) => AllergyDetail.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  @override
+  Future<List<AllergyDetail>> removeAllergy(
+      String patientId, String substance) async {
+    final data = await _api.delete<Map<String, dynamic>>(
+      '/patients/$patientId/allergies/$substance',
+    );
+    return ((data['allergies'] ?? []) as List)
+        .map((e) => AllergyDetail.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  @override
+  Future<List<VaccineCatalogItem>> vaccineCatalog() async {
+    final data = await _api.get<List<dynamic>>('/vaccines/catalog');
+    return data
+        .map((e) => VaccineCatalogItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  @override
+  Future<List<Immunization>> addImmunization(
+      String patientId, Immunization im) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      '/patients/$patientId/immunizations',
+      data: {
+        'vaccine': im.vaccine,
+        if (im.administeredOn != null)
+          'administered_on': _soloFecha(im.administeredOn!),
+        if (im.doseNumber != null) 'dose_number': im.doseNumber,
+        if (im.exposureEvent != null && im.exposureEvent!.trim().isNotEmpty)
+          'exposure_event': im.exposureEvent,
+        if (im.note != null && im.note!.trim().isNotEmpty) 'note': im.note,
+      },
+    );
+    return ((data['immunizations'] ?? []) as List)
+        .map((e) => Immunization.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  @override
+  Future<List<Immunization>> removeImmunization(
+      String patientId, String vaccine) async {
+    final data = await _api.delete<Map<String, dynamic>>(
+      '/patients/$patientId/immunizations/$vaccine',
+    );
+    return ((data['immunizations'] ?? []) as List)
+        .map((e) => Immunization.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  List<EmergencyContact> _parseContacts(Map<String, dynamic> data) =>
+      ((data['contacts'] ?? []) as List)
+          .map((e) => EmergencyContact.fromJson(e as Map<String, dynamic>))
+          .toList();
+
+  @override
+  Future<List<EmergencyContact>> emergencyContacts(String patientId) async {
+    final data = await _api
+        .get<Map<String, dynamic>>('/patients/$patientId/emergency-contacts');
+    return _parseContacts(data);
+  }
+
+  @override
+  Future<List<EmergencyContact>> addEmergencyContact(
+      String patientId, {required String memberUserId, String? notes}) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      '/patients/$patientId/emergency-contacts',
+      data: {
+        'member_user_id': memberUserId,
+        if (notes != null && notes.trim().isNotEmpty) 'notes': notes,
+      },
+    );
+    return _parseContacts(data);
+  }
+
+  @override
+  Future<List<EmergencyContact>> updateEmergencyContact(
+      String patientId, String contactId, {required bool isActive}) async {
+    final data = await _api.patch<Map<String, dynamic>>(
+      '/patients/$patientId/emergency-contacts/$contactId',
+      data: {'is_active': isActive},
+    );
+    return _parseContacts(data);
+  }
+
+  @override
+  Future<List<EmergencyContact>> removeEmergencyContact(
+      String patientId, String contactId) async {
+    final data = await _api.delete<Map<String, dynamic>>(
+      '/patients/$patientId/emergency-contacts/$contactId',
+    );
+    return _parseContacts(data);
+  }
+
+  static String _soloFecha(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  @override
+  Future<List<ConditionDetail>> conditionCatalog() async {
+    final data = await _api.get<List<dynamic>>('/conditions/catalog');
+    return data
+        .map((e) => ConditionDetail.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  @override
+  Future<List<CareMember>> listMembers(String patientId) async {
+    final data =
+        await _api.get<Map<String, dynamic>>('/patients/$patientId/members');
+    return ((data['members'] ?? []) as List)
+        .map((e) => CareMember.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   @override
@@ -275,6 +476,244 @@ class PatientsRepositoryMock implements PatientsRepository {
     final p = await getPatient(patientId);
     return p.wearable ?? const WearableStatus();
   }
+
+  @override
+  Future<Patient> updateConditions(
+      String patientId, List<String> conditions) async {
+    final p = _patients[patientId];
+    if (p == null) throw StateError('paciente no encontrado');
+    final actualizado = Patient(
+      patientId: p.patientId,
+      fullName: p.fullName,
+      birthDate: p.birthDate,
+      sex: p.sex,
+      photoUrl: p.photoUrl,
+      conditions: conditions,
+      wearable: p.wearable,
+    );
+    _patients[patientId] = actualizado;
+    return actualizado;
+  }
+
+  @override
+  Future<Patient> updateProfile(
+      String patientId, Map<String, dynamic> fields) async {
+    final p = _patients[patientId];
+    if (p == null) throw StateError('paciente no encontrado');
+    final actualizado = Patient(
+      patientId: p.patientId,
+      fullName: p.fullName,
+      birthDate: p.birthDate,
+      sex: p.sex,
+      photoUrl: p.photoUrl,
+      conditions: p.conditions,
+      wearable: p.wearable,
+      rut: p.rut,
+      address: fields['address'] as String? ?? p.address,
+      maritalStatus: fields['marital_status'] as String? ?? p.maritalStatus,
+      insurance: fields['insurance'] as String? ?? p.insurance,
+      rcvLevel: fields['rcv_level'] as String? ?? p.rcvLevel,
+      latestMeasurement: p.latestMeasurement,
+    );
+    _patients[patientId] = actualizado;
+    return actualizado;
+  }
+
+  @override
+  Future<Patient> addMeasurement(String patientId,
+      {double? weightKg, double? heightCm}) async {
+    final p = _patients[patientId];
+    if (p == null) throw StateError('paciente no encontrado');
+    double? bmi;
+    if (weightKg != null && heightCm != null && heightCm > 0) {
+      final m = heightCm / 100.0;
+      bmi = double.parse((weightKg / (m * m)).toStringAsFixed(1));
+    }
+    final actualizado = Patient(
+      patientId: p.patientId,
+      fullName: p.fullName,
+      birthDate: p.birthDate,
+      sex: p.sex,
+      photoUrl: p.photoUrl,
+      conditions: p.conditions,
+      wearable: p.wearable,
+      rut: p.rut,
+      address: p.address,
+      maritalStatus: p.maritalStatus,
+      insurance: p.insurance,
+      rcvLevel: p.rcvLevel,
+      latestMeasurement: PatientMeasurement(
+          weightKg: weightKg,
+          heightCm: heightCm,
+          bmi: bmi,
+          measuredAt: DateTime.now()),
+    );
+    _patients[patientId] = actualizado;
+    return actualizado;
+  }
+
+  @override
+  Future<List<ConditionDetail>> conditionCatalog() async => const [
+        ConditionDetail(
+            condition: 'hipertension',
+            system: 'cardiovascular',
+            label: 'Hipertensión arterial (HTA)'),
+        ConditionDetail(
+            condition: 'diabetes_tipo_2',
+            system: 'metabolico',
+            label: 'Diabetes mellitus tipo 2 (DM2)'),
+        ConditionDetail(
+            condition: 'epoc',
+            system: 'respiratorio',
+            label: 'Enfermedad pulmonar obstructiva crónica (EPOC)'),
+        ConditionDetail(
+            condition: 'artrosis_rodilla',
+            system: 'osteomuscular',
+            label: 'Artrosis de rodillas'),
+      ];
+
+  @override
+  Future<List<AllergenCatalogItem>> allergenCatalog() async => const [
+        AllergenCatalogItem(
+            code: 'penicilina', label: 'Penicilina', category: 'medicamento'),
+        AllergenCatalogItem(
+            code: 'aines', label: 'AINEs (antiinflamatorios)', category: 'medicamento'),
+        AllergenCatalogItem(
+            code: 'mariscos', label: 'Mariscos', category: 'alimento'),
+        AllergenCatalogItem(
+            code: 'latex', label: 'Látex', category: 'ambiental'),
+      ];
+
+  final Map<String, List<AllergyDetail>> _allergies = {};
+
+  @override
+  Future<List<AllergyDetail>> addAllergy(
+      String patientId, AllergyDetail allergy) async {
+    await Future.delayed(const Duration(milliseconds: 150));
+    final lista = _allergies.putIfAbsent(patientId, () => []);
+    lista.removeWhere((a) => a.substance == allergy.substance);
+    lista.add(allergy);
+    return List.unmodifiable(lista);
+  }
+
+  @override
+  Future<List<AllergyDetail>> removeAllergy(
+      String patientId, String substance) async {
+    await Future.delayed(const Duration(milliseconds: 150));
+    final lista = _allergies.putIfAbsent(patientId, () => []);
+    lista.removeWhere((a) => a.substance == substance);
+    return List.unmodifiable(lista);
+  }
+
+  @override
+  Future<List<VaccineCatalogItem>> vaccineCatalog() async => const [
+        VaccineCatalogItem(
+            code: 'influenza',
+            label: 'Influenza (anual)',
+            kindDefault: 'preventiva',
+            isRecurrent: true,
+            intervalMonths: 12),
+        VaccineCatalogItem(
+            code: 'neumococica_23',
+            label: 'Neumocócica polisacárida 23v',
+            kindDefault: 'preventiva',
+            isRecurrent: false),
+        VaccineCatalogItem(
+            code: 'antirrabica',
+            label: 'Antirrábica',
+            kindDefault: 'post_exposicion',
+            isRecurrent: false),
+      ];
+
+  final Map<String, List<Immunization>> _immunizations = {};
+
+  @override
+  Future<List<Immunization>> addImmunization(
+      String patientId, Immunization im) async {
+    await Future.delayed(const Duration(milliseconds: 150));
+    final lista = _immunizations.putIfAbsent(patientId, () => []);
+    lista.add(im);
+    return List.unmodifiable(lista);
+  }
+
+  @override
+  Future<List<Immunization>> removeImmunization(
+      String patientId, String vaccine) async {
+    await Future.delayed(const Duration(milliseconds: 150));
+    final lista = _immunizations.putIfAbsent(patientId, () => []);
+    final idx = lista.lastIndexWhere((v) => v.vaccine == vaccine);
+    if (idx >= 0) lista.removeAt(idx);
+    return List.unmodifiable(lista);
+  }
+
+  final Map<String, List<EmergencyContact>> _contacts = {};
+
+  @override
+  Future<List<EmergencyContact>> emergencyContacts(String patientId) async {
+    await Future.delayed(const Duration(milliseconds: 150));
+    return List.unmodifiable(_contacts[patientId] ?? const []);
+  }
+
+  @override
+  Future<List<EmergencyContact>> addEmergencyContact(
+      String patientId, {required String memberUserId, String? notes}) async {
+    await Future.delayed(const Duration(milliseconds: 150));
+    final lista = _contacts.putIfAbsent(patientId, () => []);
+    lista.add(EmergencyContact(
+      id: 'ec-${DateTime.now().millisecondsSinceEpoch}',
+      name: 'Miembro $memberUserId',
+      isActive: true,
+      memberUserId: memberUserId,
+      notes: notes,
+    ));
+    return List.unmodifiable(lista);
+  }
+
+  @override
+  Future<List<EmergencyContact>> updateEmergencyContact(
+      String patientId, String contactId, {required bool isActive}) async {
+    await Future.delayed(const Duration(milliseconds: 150));
+    final lista = _contacts.putIfAbsent(patientId, () => []);
+    final i = lista.indexWhere((c) => c.id == contactId);
+    if (i >= 0) {
+      final c = lista[i];
+      lista[i] = EmergencyContact(
+        id: c.id,
+        name: c.name,
+        isActive: isActive,
+        memberUserId: c.memberUserId,
+        phone: c.phone,
+        avatarUrl: c.avatarUrl,
+        notes: c.notes,
+      );
+    }
+    return List.unmodifiable(lista);
+  }
+
+  @override
+  Future<List<EmergencyContact>> removeEmergencyContact(
+      String patientId, String contactId) async {
+    await Future.delayed(const Duration(milliseconds: 150));
+    final lista = _contacts.putIfAbsent(patientId, () => []);
+    lista.removeWhere((c) => c.id == contactId);
+    return List.unmodifiable(lista);
+  }
+
+  @override
+  Future<List<CareMember>> listMembers(String patientId) async => const [
+        CareMember(
+            userId: 'u1',
+            fullName: 'Javier Cerna',
+            email: 'ja.cernac@duocuc.cl',
+            role: 'family',
+            isOwner: true),
+        CareMember(
+            userId: 'u2',
+            fullName: 'Rosa Medina',
+            email: 'rosa@cuidados.cl',
+            role: 'caregiver',
+            profession: 'cuidadora'),
+      ];
 }
 
 final patientsRepositoryProvider = Provider<PatientsRepository>((ref) {

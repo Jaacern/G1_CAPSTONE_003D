@@ -292,17 +292,18 @@ class _RoleBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Acento por rol (guía AgeCare 4.5): cada rol tiene su color fijo.
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(.12),
-        borderRadius: BorderRadius.circular(6),
+        color: role.accentBg,
+        borderRadius: BorderRadius.circular(AgeRadius.m),
       ),
       child: Text(role.label,
-          style: const TextStyle(
-              fontSize: 10,
+          style: TextStyle(
+              fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: AppColors.primaryDark)),
+              color: role.accentFg)),
     );
   }
 }

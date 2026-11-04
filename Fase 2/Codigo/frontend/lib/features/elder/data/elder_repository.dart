@@ -155,6 +155,27 @@ class ElderRepositoryMock implements ElderRepository {
             'cambiando.',
       ),
       const ContentItem(
+        id: 'c-joke-2',
+        type: ContentType.joke,
+        title: 'Otro chiste cortito',
+        body: '¿Por qué el libro de matemáticas estaba triste? Porque tenía '
+            'demasiados problemas.',
+      ),
+      const ContentItem(
+        id: 'c-news',
+        type: ContentType.news,
+        title: 'Hoy en el mundo',
+        body: 'Un resumen sencillo de tres noticias del día, contado en '
+            'lenguaje claro y cercano. Pulsa "Escuchar en voz alta" para oírlo.',
+      ),
+      const ContentItem(
+        id: 'c-news-2',
+        type: ContentType.news,
+        title: 'En tu ciudad',
+        body: 'El clima estará templado esta semana, con tardes agradables '
+            'para salir a caminar un rato si te apetece.',
+      ),
+      const ContentItem(
         id: 'c-memory',
         type: ContentType.memory,
         title: 'Un recuerdo bonito',

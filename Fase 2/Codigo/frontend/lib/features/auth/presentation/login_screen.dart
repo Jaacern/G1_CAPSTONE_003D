@@ -176,7 +176,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   style: TextStyle(
                                       fontSize: 14,
                                       color: dark
-                                          ? const Color(0xFF9AA6B5)
+                                          ? AgeColors.darkTextSecondary
                                           : AppColors.textSecondary)),
                               TextButton(
                                 onPressed: _loading
@@ -227,7 +227,7 @@ class _BrandHeader extends StatelessWidget {
             fontSize: 22,
             fontWeight: FontWeight.w800,
             letterSpacing: -.2,
-            color: dark ? Colors.white : AppColors.textPrimary,
+            color: dark ? AgeColors.darkTextPrimary : AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 6),
@@ -237,7 +237,7 @@ class _BrandHeader extends StatelessWidget {
           style: TextStyle(
             fontSize: 14,
             height: 1.3,
-            color: dark ? const Color(0xFF9AA6B5) : AppColors.textSecondary,
+            color: dark ? AgeColors.darkTextSecondary : AppColors.textSecondary,
           ),
         ),
       ],
@@ -278,9 +278,10 @@ class _FormPanel extends StatelessWidget {
 }
 
 /// Aviso de que la app corre con datos simulados.
-/// Aviso de modo demo con las tres personas que autentican por contraseña. Cada
-/// ficha escribe su correo en el formulario, así que no hay que teclear para
-/// cambiar de rol. El adulto mayor no está: autentica su dispositivo.
+/// Aviso de modo demo con las personas de prueba. Cada ficha escribe su correo
+/// en el formulario, así que no hay que teclear para cambiar de rol. En
+/// producción el adulto mayor autentica su dispositivo (sin contraseña); aquí
+/// se incluye solo para poder revisar su vista desde el navegador.
 class _DemoBadge extends StatelessWidget {
   const _DemoBadge({required this.onSelect});
 
@@ -290,6 +291,7 @@ class _DemoBadge extends StatelessWidget {
     ('Familiar', AuthRepositoryMock.demoEmail),
     ('Cuidadora', AuthRepositoryMock.demoCaregiverEmail),
     ('Médico', AuthRepositoryMock.demoDoctorEmail),
+    ('Adulto mayor', AuthRepositoryMock.demoElderEmail),
   ];
 
   @override

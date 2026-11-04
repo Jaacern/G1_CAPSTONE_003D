@@ -134,6 +134,21 @@ class ApiClient {
   Future<T> get<T>(String path, {Map<String, dynamic>? query}) =>
       _wrap(() => _dio.get<T>(path, queryParameters: query));
 
+  /// Descarga binaria (PDF, imágenes) con el token ya inyectado por el
+  /// interceptor. Devuelve los bytes crudos de la respuesta.
+  Future<List<int>> getBytes(String path, {Map<String, dynamic>? query}) async {
+    try {
+      final res = await _dio.get<List<int>>(
+        path,
+        queryParameters: query,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      return res.data ?? const <int>[];
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   Future<T> post<T>(String path, {Object? data}) =>
       _wrap(() => _dio.post<T>(path, data: data));
 

@@ -35,3 +35,8 @@ python-multipart==0.0.12
 # (NVIDIA expone su catalogo con API compatible con OpenAI). Import perezoso:
 # con ASSISTANT_PROVIDER=none la app no lo toca.
 openai==1.57.4
+
+# Generacion de PDF (hoja de emergencia y reportes clinicos, Fase 6). ReportLab
+# es Python puro: no necesita librerias nativas del sistema (a diferencia de
+# WeasyPrint, que exige Cairo/Pango), asi el Dockerfile queda igual de simple.
+reportlab==4.2.5

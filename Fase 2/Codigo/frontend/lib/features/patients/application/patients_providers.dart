@@ -47,3 +47,16 @@ final selectedPatientDetailProvider = FutureProvider<Patient?>((ref) async {
   if (selected == null) return null;
   return ref.watch(patientsRepositoryProvider).getPatient(selected.patientId);
 });
+
+/// Equipo de cuidado del paciente seleccionado (miembros con su profesión).
+final careTeamProvider = FutureProvider.autoDispose<List<CareMember>>((ref) async {
+  final selected = ref.watch(selectedPatientProvider);
+  if (selected == null) return const [];
+  return ref.watch(patientsRepositoryProvider).listMembers(selected.patientId);
+});
+
+/// Contactos de emergencia de un paciente (del grupo, rotativos).
+final emergencyContactsProvider = FutureProvider.autoDispose
+    .family<List<EmergencyContact>, String>((ref, patientId) async {
+  return ref.watch(patientsRepositoryProvider).emergencyContacts(patientId);
+});

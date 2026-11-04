@@ -15,6 +15,7 @@ Notas de alcance / desviaciones respecto a la spec por el hito actual:
   y ck_alerts_order impiden resolver sin haber atendido antes.
 """
 import json
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
@@ -201,6 +202,20 @@ async def list_my_alerts(
             code="VALIDATION_ERROR",
             message="Hay datos inválidos en la solicitud. Revisa los campos marcados.",
         )
+
+    # patient_id es opcional, pero si viene debe ser un UUID válido. Sin esta
+    # validación, un valor como "abc" llegaba hasta Postgres y reventaba con
+    # 500 en el cast a uuid (DEF-018). Se responde 422 como el resto de la API.
+    if patient_id is not None:
+        try:
+            UUID(patient_id)
+        except ValueError:
+            raise ApiError(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="Hay datos inválidos en la solicitud. Revisa los campos marcados.",
+                details=[{"field": "patient_id", "message": "Debe ser un UUID válido."}],
+            )
 
     # Filtro común: alertas de pacientes donde el usuario tiene membresía viva.
     where = [

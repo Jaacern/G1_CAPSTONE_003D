@@ -5,6 +5,7 @@ Cambios 2FN aplicados:
 - scheduled_doses: patient_id eliminado; todas las queries filtran por paciente
   haciendo JOIN medications.patient_id.
 """
+import json
 from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, Query, Response, status
@@ -368,12 +369,17 @@ async def list_doses(
         await db.execute(
             text(
                 """
-                SELECT sd.id AS dose_id, sd.medication_id, m.name AS medication_name,
-                       m.dose_text, sd.scheduled_at, sd.status, sd.administered_at,
+                SELECT sd.id AS dose_id,
+                       COALESCE(sd.medication_id, ti.id) AS medication_id,
+                       COALESCE(m.name, ti.name)         AS medication_name,
+                       COALESCE(m.dose_text, ti.dose_text) AS dose_text,
+                       sd.scheduled_at, sd.status, sd.administered_at,
                        sd.logged_by, sd.logged_at, sd.reason
                 FROM scheduled_doses sd
-                JOIN medications m ON m.id = sd.medication_id
-                WHERE m.patient_id = :pid
+                LEFT JOIN medications m ON m.id = sd.medication_id
+                LEFT JOIN treatment_items ti ON ti.id = sd.treatment_item_id
+                LEFT JOIN treatments tr ON tr.id = ti.treatment_id
+                WHERE COALESCE(m.patient_id, tr.patient_id) = :pid
                   AND sd.scheduled_at::date = :d
                 ORDER BY sd.scheduled_at
                 """
@@ -417,10 +423,15 @@ async def log_dose(
         await db.execute(
             text(
                 """
-                SELECT sd.id, m.patient_id, sd.scheduled_at, sd.status,
-                       sd.logged_by
+                SELECT sd.id,
+                       COALESCE(m.patient_id, tr.patient_id) AS patient_id,
+                       sd.scheduled_at, sd.status, sd.logged_by,
+                       COALESCE(m.name, ti.name)         AS medication_name,
+                       COALESCE(m.dose_text, ti.dose_text) AS dose_text
                 FROM scheduled_doses sd
-                JOIN medications m ON m.id = sd.medication_id
+                LEFT JOIN medications m ON m.id = sd.medication_id
+                LEFT JOIN treatment_items ti ON ti.id = sd.treatment_item_id
+                LEFT JOIN treatments tr ON tr.id = ti.treatment_id
                 WHERE sd.id = :did
                 """
             ),
@@ -462,22 +473,28 @@ async def log_dose(
     #                        se administro.
     #
     # Lo que no se puede es pisar lo que alguien ya declaro: taken, skipped,
-    # o missed con el motivo que escribio la cuidadora.
+    # adverse, o missed con el motivo que escribio la cuidadora. 'adverse' es
+    # terminal: ya gatillo una alerta y dejo constancia del problema, no puede
+    # reescribirse como si no hubiera pasado.
     resuelta_por_alguien = (
-        dose["status"] in ("taken", "skipped")
+        dose["status"] in ("taken", "skipped", "adverse")
         or (dose["status"] == "missed" and dose["logged_by"] is not None)
     )
     if resuelta_por_alguien:
         raise ApiError(status_code=409, code="DOSE_ALREADY_LOGGED",
                        message="Esta dosis ya fue registrada.")
 
-    if payload.status not in ("taken", "postponed", "missed"):
+    if payload.status not in ("taken", "postponed", "missed", "adverse"):
         raise ApiError(status_code=422, code="VALIDATION_ERROR",
                        message="Hay datos inválidos en la solicitud. Revisa los campos marcados.")
 
-    if payload.status == "missed" and not payload.reason:
+    # missed y adverse exigen motivo: dejan constancia de por qué la dosis no
+    # quedó administrada con normalidad. 'adverse' cubre cualquier caso real
+    # (la vomitó, la escupió, se atragantó, reacción...) sin estados fijos; el
+    # texto libre es donde la cuidadora describe lo que de verdad pasó.
+    if payload.status in ("missed", "adverse") and not payload.reason:
         raise ApiError(status_code=400, code="MISSING_REASON",
-                       message="Debes indicar el motivo cuando la dosis se marca como omitida.")
+                       message="Debes indicar el motivo cuando la dosis no se administró con normalidad.")
 
     postponed_until = None
     if payload.status == "postponed":
@@ -499,6 +516,13 @@ async def log_dose(
         if administered_at < dose["scheduled_at"]:
             administered_at = dose["scheduled_at"]
 
+    # 'adverse' = se administró pero hubo un problema: el fármaco entró al
+    # cuerpo, así que lleva administered_at como 'taken' (hecho clínico).
+    if payload.status == "adverse" and administered_at is None:
+        administered_at = payload.administered_at or datetime.now(dose["scheduled_at"].tzinfo)
+        if administered_at < dose["scheduled_at"]:
+            administered_at = dose["scheduled_at"]
+
     await db.execute(
         text(
             "UPDATE scheduled_doses SET status = :status, logged_by = :uid, "
@@ -510,8 +534,44 @@ async def log_dose(
          "administered_at": administered_at, "reason": payload.reason,
          "postponed_until": postponed_until, "did": dose_id},
     )
+
+    # Un evento adverso al administrar avisa a la red de apoyo (DEF-003). Es una
+    # alerta 'incident' igual que las de la bitácora: el familiar y el médico
+    # tienen que enterarse de que la dosis se dio pero no quedó bien. El texto
+    # libre (reason) describe el caso real; el sistema no lo encasilla.
+    alert_triggered = False
+    if payload.status == "adverse":
+        detalle = (f"{dose['medication_name']} {dose['dose_text']}: "
+                   f"{payload.reason}")[:500]
+        await db.execute(
+            text(
+                """
+                INSERT INTO alerts
+                    (patient_id, type, severity, title, detail,
+                     payload, dedup_key, status)
+                VALUES
+                    (:pid, 'incident', 'warning', :title, :detalle,
+                     CAST(:payload AS jsonb), NULL, 'active')
+                """
+            ),
+            {
+                "pid": str(dose["patient_id"]),
+                "title": f"Problema al administrar {dose['medication_name']}",
+                "detalle": detalle,
+                "payload": json.dumps({
+                    "dose_id": dose_id,
+                    "medication": dose["medication_name"],
+                    "dose": dose["dose_text"],
+                    "dose_status": payload.status,
+                    "reason": payload.reason,
+                }),
+            },
+        )
+        alert_triggered = True
+
     await db.commit()
-    return DoseLogOut(dose_id=dose_id, status=payload.status, alert_triggered=False)
+    return DoseLogOut(dose_id=dose_id, status=payload.status,
+                      alert_triggered=alert_triggered)
 
 
 # --------------------------------------------------------------------------
@@ -528,11 +588,14 @@ async def adherence(
         await db.execute(
             text(
                 """
-                SELECT sd.medication_id, m.name AS medication_name,
+                SELECT COALESCE(sd.medication_id, ti.id) AS medication_id,
+                       COALESCE(m.name, ti.name) AS medication_name,
                        sd.status, sd.scheduled_at::date AS day
                 FROM scheduled_doses sd
-                JOIN medications m ON m.id = sd.medication_id
-                WHERE m.patient_id = :pid
+                LEFT JOIN medications m ON m.id = sd.medication_id
+                LEFT JOIN treatment_items ti ON ti.id = sd.treatment_item_id
+                LEFT JOIN treatments tr ON tr.id = ti.treatment_id
+                WHERE COALESCE(m.patient_id, tr.patient_id) = :pid
                   AND sd.scheduled_at::date BETWEEN :df AND :dt
                 """
             ),
@@ -544,6 +607,10 @@ async def adherence(
     per_med: dict[str, dict] = {}
     per_day: dict[date, dict] = {}
 
+    # 'adverse' cuenta como "no tomada": el medicamento no quedó administrado
+    # con normalidad, así que penaliza la adherencia igual que missed/skipped.
+    NO_TOMADA = ("missed", "skipped", "adverse")
+
     for r in rows:
         s   = r["status"]
         mid = str(r["medication_id"])
@@ -552,14 +619,15 @@ async def adherence(
         if s == "taken":   taken   += 1
         elif s == "missed": missed  += 1
         elif s == "skipped": skipped += 1
+        elif s == "adverse": missed += 1
 
         med = per_med.setdefault(mid, {"name": r["medication_name"], "taken": 0, "not_taken": 0})
         if s == "taken":              med["taken"]     += 1
-        elif s in ("missed","skipped"): med["not_taken"] += 1
+        elif s in NO_TOMADA:          med["not_taken"] += 1
 
         d = per_day.setdefault(day, {"taken": 0, "missed": 0, "pending": 0})
         if s == "taken":               d["taken"]   += 1
-        elif s in ("missed","skipped"): d["missed"]  += 1
+        elif s in NO_TOMADA:           d["missed"]  += 1
         elif s == "pending":            d["pending"] += 1
 
     def _pct(t: int, nt: int) -> float:

@@ -14,6 +14,7 @@ en pantalla, en espanol, mientras la base guarda codigos de una lista
 cerrada. La traduccion ocurre aca: el CHECK del motor es lo que mantiene la
 columna analizable, y la pantalla no tiene por que saber de codigos.
 """
+import json
 import re
 from datetime import datetime
 from uuid import UUID
@@ -304,10 +305,29 @@ _TIPOS_BASE = {"fall", "wandering", "aggression", "refusal", "injury",
                "choking", "disorientation", "adverse_reaction",
                "medical_emergency", "other"}
 
-# La pantalla ofrece tres niveles y la columna guarda cuatro. 'medium' y
+# La pantalla ofrece cuatro niveles y la columna guarda cuatro. 'medium' y
 # 'moderate' son el mismo nivel con otro nombre.
 _SEVERIDAD = {"low": "low", "medium": "moderate", "moderate": "moderate",
-              "high": "high"}
+              "high": "high", "critical": "critical"}
+
+# Severidad del incidente -> severidad de la ALERTA que gatilla (ck_alerts_severity).
+# low/moderate no generan alerta (quedan solo en la bitacora).
+_SEV_INCIDENTE_A_ALERTA = {"high": "warning", "critical": "critical"}
+
+# Etiqueta legible por tipo de incidente, para el titulo/detalle de la alerta.
+# Sin esto la alerta mostraria el codigo interno ('adverse_reaction') al familiar.
+_ETIQUETA_INCIDENTE = {
+    "fall":              "Caída",
+    "wandering":         "Fuga o desorientación",
+    "aggression":        "Agresión",
+    "refusal":           "Rechazo de cuidado",
+    "injury":            "Golpe o lesión",
+    "choking":           "Atragantamiento",
+    "disorientation":    "Desorientación",
+    "adverse_reaction":  "Reacción adversa a un medicamento",
+    "medical_emergency": "Emergencia médica",
+    "other":             "Incidente",
+}
 
 
 class IncidentIn(BaseModel):
@@ -348,19 +368,52 @@ async def create_incident(
 
     severidad = _SEVERIDAD.get(_sin_tildes(payload.severity))
     if severidad is None:
-        # 'critical' obliga a crear la alerta asociada por
-        # ck_incidents_critical_has_alert, y las alertas tienen su propia
-        # lista cerrada de tipos y su propio flujo de escalamiento. Mientras
-        # ese flujo no exista, aceptar 'critical' aca dejaria incidentes que
-        # el motor rechaza o alertas a medias.
         raise ApiError(
             status_code=422, code="VALIDATION_ERROR",
             message="Esa severidad no es valida.",
             details=[{"field": "severity",
-                      "message": "Valores aceptados: low, medium, high."}],
+                      "message": "Valores aceptados: low, moderate, high, critical."}],
         )
 
     file_id = await _archivo_del_paciente(db, payload.media_url, ctx.patient_id)
+
+    # Un incidente grave o critico avisa a la red de apoyo (DEF-003, RF-36). Se
+    # crea PRIMERO la alerta y se enlaza en el INSERT del incidente, porque el
+    # constraint ck_incidents_critical_has_alert exige que un incidente
+    # 'critical' nazca con su alert_id ya presente. Los niveles low/moderate
+    # quedan solo en la bitacora, sin alerta.
+    etiqueta = _ETIQUETA_INCIDENTE.get(tipo, "Incidente")
+    sev_alerta = _SEV_INCIDENTE_A_ALERTA.get(severidad)
+    alert_id = None
+    if sev_alerta is not None:
+        detalle = payload.description[:500]
+        alert_row = (
+            await db.execute(
+                text(
+                    """
+                    INSERT INTO alerts
+                        (patient_id, type, severity, title, detail,
+                         payload, dedup_key, status)
+                    VALUES
+                        (:pid, 'incident', :sev, :title, :detalle,
+                         CAST(:payload AS jsonb), NULL, 'active')
+                    RETURNING id
+                    """
+                ),
+                {
+                    "pid": ctx.patient_id,
+                    "sev": sev_alerta,
+                    "title": f"{etiqueta} ({ 'crítico' if severidad == 'critical' else 'grave' })",
+                    "detalle": detalle,
+                    "payload": json.dumps({
+                        "incident_type": tipo,
+                        "incident_severity": severidad,
+                        "reported_by": ctx.user.full_name,
+                    }),
+                },
+            )
+        ).mappings().first()
+        alert_id = alert_row["id"]
 
     fila = (
         await db.execute(
@@ -368,9 +421,9 @@ async def create_incident(
                 """
                 INSERT INTO incidents (
                     patient_id, reported_by, type, severity,
-                    occurred_at, description, photo_file_id
+                    occurred_at, description, photo_file_id, alert_id
                 ) VALUES (
-                    :pid, :uid, :tipo, :sev, now(), :desc, :fid
+                    :pid, :uid, :tipo, :sev, now(), :desc, :fid, :aid
                 )
                 RETURNING id, type, severity, description,
                           photo_file_id, occurred_at
@@ -379,7 +432,7 @@ async def create_incident(
             {
                 "pid": ctx.patient_id, "uid": ctx.user.user_id,
                 "tipo": tipo, "sev": severidad,
-                "desc": payload.description, "fid": file_id,
+                "desc": payload.description, "fid": file_id, "aid": alert_id,
             },
         )
     ).mappings().first()
@@ -394,6 +447,73 @@ async def create_incident(
         occurred_at=fila["occurred_at"],
         author_name=ctx.user.full_name,
     )
+
+
+class IncidentListItem(BaseModel):
+    id:            UUID
+    type:          str
+    severity:      str
+    description:   str
+    action_taken:  str | None
+    media_url:     str | None
+    occurred_at:   datetime
+    author_name:   str
+    alert_id:      UUID | None
+
+
+class IncidentsOut(BaseModel):
+    items: list[IncidentListItem]
+
+
+@router.get("/patients/{patient_id}/incidents", response_model=IncidentsOut)
+async def list_incidents(
+    request: Request,
+    ctx: PatientContext = Depends(get_patient_member()),
+    db: AsyncSession = Depends(get_db),
+):
+    """Historial de incidentes del paciente (DEF-003, RF-36).
+
+    Lo lee cualquier miembro del circulo de cuidado: el familiar y el medico
+    tienen que poder ver que paso (una caida, una reaccion adversa), no solo
+    la cuidadora que lo reporto. Orden cronologico inverso, los mas recientes
+    primero, igual que la bitacora de observaciones.
+    """
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT i.id, i.type, i.severity, i.description, i.action_taken,
+                       i.photo_file_id, i.occurred_at, i.alert_id,
+                       u.first_name || ' ' || u.last_name AS author_name
+                FROM incidents i
+                JOIN users u ON u.id = i.reported_by
+                WHERE i.patient_id = :pid
+                ORDER BY i.occurred_at DESC
+                """
+            ),
+            {"pid": ctx.patient_id},
+        )
+    ).mappings().all()
+
+    # 'logbook' es la sección válida del expediente (ck_record_access_log_section);
+    # los incidentes son parte de la bitácora, no una sección propia.
+    await _registrar_lectura(db, ctx, request, seccion="logbook")
+    await db.commit()
+
+    return IncidentsOut(items=[
+        IncidentListItem(
+            id=r["id"],
+            type=r["type"],
+            severity=r["severity"],
+            description=r["description"],
+            action_taken=r["action_taken"],
+            media_url=_media_url(r["photo_file_id"]),
+            occurred_at=r["occurred_at"],
+            author_name=r["author_name"],
+            alert_id=r["alert_id"],
+        )
+        for r in rows
+    ])
 
 
 # ---------------------------------------------------------------------------

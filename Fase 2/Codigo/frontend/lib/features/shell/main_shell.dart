@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_theme.dart';
 import '../auth/application/auth_controller.dart';
 import '../auth/domain/models.dart';
 import '../alerts/presentation/alerts_screen.dart';
@@ -41,13 +42,24 @@ class MainShell extends ConsumerWidget {
     };
     final index = ref.watch(shellTabIndexProvider);
     final safeIndex = index.clamp(0, tabs.length - 1);
+    final tab = tabs[safeIndex];
+    // El contexto de paciente se ofrece donde se lee información de un
+    // paciente concreto. El médico elige paciente desde su lista de "Hoy",
+    // así que allí no necesita desplegable; la cuidadora además lo usa en
+    // Alertas para ver solo los avisos del paciente seleccionado.
+    final showPatientSelector = role == RoleType.doctor
+        ? tab.label == 'Salud'
+        : (tab.label == 'Hoy' ||
+            tab.label == 'Salud' ||
+            tab.label == 'Alertas');
 
     return Scaffold(
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            const PatientSelectorBar(),
+            _ShellTitleBar(title: tab.full ?? tab.label),
+            if (showPatientSelector) const PatientSelectorBar(),
             Expanded(
               child: IndexedStack(
                 index: safeIndex,
@@ -110,6 +122,49 @@ class MainShell extends ConsumerWidget {
     ShellTab('Salud', '❤️', HealthScreen()),
     ShellTab('Más', '☰', MoreScreen()),
   ];
+}
+
+/// Barra superior de [MainShell]: muestra el título de la pestaña activa en
+/// lugar del nombre del paciente. El contexto de paciente vive ahora en el
+/// desplegable ([PatientSelectorBar]) que va debajo, solo en Hoy y Salud.
+class _ShellTitleBar extends StatelessWidget {
+  const _ShellTitleBar({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      child: Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        alignment: Alignment.centerLeft,
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: AppColors.divider)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.health_and_safety_rounded,
+                size: 22, color: AppColors.primary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                title,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 19,
+                  letterSpacing: -0.3,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Pestaña de la barra inferior. Las listas de cada rol son públicas para que

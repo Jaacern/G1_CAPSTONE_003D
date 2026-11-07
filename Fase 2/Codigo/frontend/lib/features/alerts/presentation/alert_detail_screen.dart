@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../auth/application/auth_controller.dart';
+import '../../auth/domain/models.dart';
 import '../../health/domain/models.dart' show VitalType;
 import '../application/alerts_providers.dart';
 import '../data/alerts_repository.dart';
@@ -68,6 +70,8 @@ class _AlertDetailScreenState extends ConsumerState<AlertDetailScreen> {
           return _AlertDetailBody(
             alert: alert,
             busy: _busy,
+            readOnly:
+                ref.watch(currentUserProvider)?.primaryRole == RoleType.family,
             onCall: () => showAppSnackBar(
                 context,
                 'Llamando a ${alert.patientName.isEmpty ? 'el adulto mayor' : alert.patientName}... '
@@ -92,6 +96,7 @@ class _AlertDetailBody extends StatelessWidget {
     required this.onCall,
     required this.onAcknowledge,
     required this.onResolve,
+    this.readOnly = false,
   });
 
   final Alert alert;
@@ -99,6 +104,9 @@ class _AlertDetailBody extends StatelessWidget {
   final VoidCallback onCall;
   final VoidCallback onAcknowledge;
   final VoidCallback onResolve;
+
+  /// true para el familiar: ficha de solo lectura, sin reconocer ni resolver.
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -221,8 +229,8 @@ class _AlertDetailBody extends StatelessWidget {
         ),
         const SizedBox(height: 24),
 
-        // Acciones
-        if (!resolved) ...[
+        // Acciones (solo roles que gestionan; el familiar únicamente lee).
+        if (!resolved && !readOnly) ...[
           if (alert.status == AlertStatus.active)
             OutlinedButton.icon(
               onPressed: busy ? null : onAcknowledge,
@@ -243,7 +251,8 @@ class _AlertDetailBody extends StatelessWidget {
                 : const Icon(Icons.task_alt_rounded),
             label: Text(isFall ? 'Marcar atendida' : 'Resolver alerta'),
           ),
-        ] else
+        ],
+        if (resolved)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(

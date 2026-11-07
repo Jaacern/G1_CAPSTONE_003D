@@ -61,8 +61,6 @@ class FamilyHomeScreen extends ConsumerWidget {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 96),
                 children: [
-                  const _ScreenTitle('Hoy'),
-                  const SizedBox(height: 14),
                   const _AlertBand(),
                   const _SectionLabel('Tus pacientes'),
                   for (final p in patients) _PatientSemCard(patient: p),
@@ -94,22 +92,6 @@ class FamilyHomeScreen extends ConsumerWidget {
     if (full == null || full.trim().isEmpty) return 'tu paciente';
     return full.trim().split(RegExp(r'\s+')).first;
   }
-}
-
-class _ScreenTitle extends StatelessWidget {
-  const _ScreenTitle(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Text(
-        text,
-        style: const TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.w800,
-          color: AppColors.textPrimary,
-          letterSpacing: -.5,
-        ),
-      );
 }
 
 class _SectionLabel extends StatelessWidget {

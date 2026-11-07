@@ -105,11 +105,14 @@ class MainShell extends ConsumerWidget {
   ];
 
   // Barra de la cuidadora: solo pestañas con backend real.
-  // 🏠 Hoy (resumen + dosis) · ❤️ Salud · 🔔 Alertas · ☰ Más
+  // 🏠 Hoy (resumen + dosis) · ❤️ Salud · 🔔 Alertas · 💬 Mensajes · ☰ Más
+  // Mensajes reutiliza el hub de Comunicación del familiar: la cuidadora
+  // conversa con la familia por el mismo chat de equipo (/patients/{id}/chat).
   static const caregiverTabs = <ShellTab>[
     ShellTab('Hoy', '🏠', CaregiverHomeScreen()),
     ShellTab('Salud', '❤️', HealthScreen()),
-    ShellTab('Alertas', '🔔', AlertsScreen()),
+    ShellTab('Alertas', '🔔', AlertsScreen(embedded: true)),
+    ShellTab('Mensajes', '💬', CommsScreen(), full: 'Comunicación'),
     ShellTab('Más', '☰', MoreScreen()),
   ];
 

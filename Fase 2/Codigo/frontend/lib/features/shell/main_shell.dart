@@ -90,17 +90,18 @@ class MainShell extends ConsumerWidget {
   }
 
   // Orden, emojis y etiquetas fieles al wireframe Suite/Familiar v1:
-  // 🏠 Hoy · ❤️ Salud · 💬 Comunicación · 🛍️ Marketplace · ☰ Más
+  // 🏠 Hoy · ❤️ Salud · 💬 Comunicación · 🛍️ Marketplace · 🔔 Alertas · ☰ Más
   //
-  // Cinco destinos en 360 dp dan ~72 dp por etiqueta y "Comunicación" no cabe:
-  // la barra la cortaba con puntos suspensivos. Se muestra un nombre corto y el
-  // del wireframe queda en [full], que alimenta el tooltip y al lector de
-  // pantalla.
+  // Seis destinos en 360 dp dan ~60 dp por etiqueta; "Mensajes" (8 caracteres)
+  // es el más largo y aún cabe. Alertas va al final, antes de Más, para no
+  // mover los índices que el inicio familiar usa para saltar a Salud/Mensajes.
+  // El familiar ve las alertas en modo lectura: sin reconocer ni resolver.
   static const familyTabs = <ShellTab>[
     ShellTab('Hoy', '🏠', FamilyHomeScreen()),
     ShellTab('Salud', '❤️', HealthScreen()),
     ShellTab('Mensajes', '💬', CommsScreen(), full: 'Comunicación'),
     ShellTab('Tienda', '🛍️', MarketplaceScreen(), full: 'Marketplace'),
+    ShellTab('Alertas', '🔔', AlertsScreen(embedded: true)),
     ShellTab('Más', '☰', MoreScreen()),
   ];
 

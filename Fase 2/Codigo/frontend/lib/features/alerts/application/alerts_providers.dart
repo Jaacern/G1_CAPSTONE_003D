@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../patients/application/patients_providers.dart';
 import '../data/alerts_repository.dart';
 import '../domain/models.dart';
 
@@ -43,12 +44,21 @@ class AlertsController extends AsyncNotifier<AlertsState> {
   static const pageSize = 20;
 
   @override
-  Future<AlertsState> build() => _cargarPrimeraPagina();
+  Future<AlertsState> build() {
+    // Al cambiar el paciente seleccionado el notifier se reconstruye y el
+    // centro pasa a mostrar solo las alertas de ese paciente (el backend
+    // filtra y pagina por patient_id, no se filtra en el cliente).
+    final patientId = ref.watch(selectedPatientProvider)?.patientId;
+    return _cargarPrimeraPagina(patientId);
+  }
 
-  Future<AlertsState> _cargarPrimeraPagina() async {
-    final pagina = await ref
-        .watch(alertsRepositoryProvider)
-        .listAlerts(activeOnly: true, page: 1, pageSize: pageSize);
+  Future<AlertsState> _cargarPrimeraPagina(String? patientId) async {
+    final pagina = await ref.watch(alertsRepositoryProvider).listAlerts(
+          patientId: patientId,
+          activeOnly: true,
+          page: 1,
+          pageSize: pageSize,
+        );
     return _desde(pagina, pagina.items);
   }
 
@@ -66,6 +76,7 @@ class AlertsController extends AsyncNotifier<AlertsState> {
 
     state = AsyncData(actual.copyWith(cargandoMas: true));
     final pagina = await ref.read(alertsRepositoryProvider).listAlerts(
+          patientId: ref.read(selectedPatientProvider)?.patientId,
           activeOnly: true,
           page: actual.items.length ~/ pageSize + 1,
           pageSize: pageSize,
@@ -78,7 +89,8 @@ class AlertsController extends AsyncNotifier<AlertsState> {
   /// hacía state = AsyncLoading, que dejaba el centro en blanco al refrescar).
   Future<void> recargar() async {
     try {
-      final nuevo = await _cargarPrimeraPagina();
+      final nuevo = await _cargarPrimeraPagina(
+          ref.read(selectedPatientProvider)?.patientId);
       state = AsyncData(nuevo);
     } catch (e, st) {
       // Si no hay datos previos, propaga el error; si los hay, los conserva.

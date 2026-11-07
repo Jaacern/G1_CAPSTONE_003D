@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
-import '../../auth/application/auth_controller.dart';
 import '../../patients/application/patients_providers.dart';
 import '../../patients/domain/models.dart';
 
@@ -19,15 +18,9 @@ class DoctorHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
-    final firstName =
-        (user?.fullName ?? '').trim().split(RegExp(r'\s+')).first;
     final patientsAsync = ref.watch(myPatientsProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(firstName.isEmpty ? 'Mis pacientes' : 'Hola, $firstName'),
-      ),
       body: patientsAsync.when(
         loading: () => const LoadingView(),
         error: (e, _) => ErrorView(message: e.toString()),

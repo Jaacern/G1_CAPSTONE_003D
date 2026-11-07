@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../auth/application/auth_controller.dart';
+import '../../auth/domain/models.dart';
 import '../application/alerts_providers.dart';
 import '../data/alerts_repository.dart';
 import '../domain/models.dart';
@@ -47,6 +49,10 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
   @override
   Widget build(BuildContext context) {
     final alertsAsync = ref.watch(alertsControllerProvider);
+    // El familiar observa el centro de alertas pero no las gestiona: reconocer
+    // y resolver quedan para cuidadora y médico.
+    final readOnly =
+        ref.watch(currentUserProvider)?.primaryRole == RoleType.family;
 
     return Scaffold(
       appBar: widget.embedded
@@ -97,7 +103,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                     const SizedBox(height: 8),
                     ...groups[sev]!.map((a) => Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: _AlertCard(alert: a),
+                          child: _AlertCard(alert: a, readOnly: readOnly),
                         )),
                     const SizedBox(height: 8),
                   ],
@@ -181,9 +187,12 @@ class _SeverityHeader extends StatelessWidget {
 }
 
 class _AlertCard extends ConsumerStatefulWidget {
-  const _AlertCard({required this.alert});
+  const _AlertCard({required this.alert, this.readOnly = false});
 
   final Alert alert;
+
+  /// true para el familiar: muestra la alerta sin botones de gestión.
+  final bool readOnly;
 
   @override
   ConsumerState<_AlertCard> createState() => _AlertCardState();
@@ -274,7 +283,8 @@ class _AlertCardState extends ConsumerState<_AlertCard> {
               ],
             ),
           ],
-          const SizedBox(height: 12),
+          if (!widget.readOnly) const SizedBox(height: 12),
+          if (!widget.readOnly)
           Row(
             children: [
               if (!acknowledged)

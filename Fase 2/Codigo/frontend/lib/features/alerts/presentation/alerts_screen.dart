@@ -15,7 +15,11 @@ import '../domain/models.dart';
 /// Se auto-refresca cada pocos segundos (sin parpadeo) para que las alertas
 /// nuevas —en especial las caídas— aparezcan solas sin arrastrar a refrescar.
 class AlertsScreen extends ConsumerStatefulWidget {
-  const AlertsScreen({super.key});
+  /// [embedded] cuando vive como pestaña del shell: el título y el desplegable
+  /// de paciente los pone el shell, así que no duplica su propio AppBar.
+  const AlertsScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   ConsumerState<AlertsScreen> createState() => _AlertsScreenState();
@@ -45,7 +49,9 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
     final alertsAsync = ref.watch(alertsControllerProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Centro de alertas')),
+      appBar: widget.embedded
+          ? null
+          : AppBar(title: const Text('Centro de alertas')),
       body: RefreshIndicator(
         onRefresh: () => ref.read(alertsControllerProvider.notifier).recargar(),
         child: alertsAsync.when(

@@ -23,6 +23,10 @@ COMO SE USA
     Para ver que haria sin tocar nada:
         python -m app.migrate --dry-run
 
+    Y la que usa el contenedor al arrancar, que no necesita que nadie
+    decida nada:
+        python -m app.migrate --auto
+
 Se guarda el sha256 de cada archivo. Si uno que ya corrio cambia despues,
 se avisa: editar un archivo ya aplicado significa que la base de quien lo
 corrio antes y la de quien lo corre ahora no quedan iguales, y eso es de
@@ -32,6 +36,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import os
 import sys
 from pathlib import Path
 
@@ -41,7 +46,8 @@ from app.db import engine
 
 # Los .sql viven fuera del paquete, en backend/sql, que es la carpeta que
 # docker-compose monta en la base.
-CARPETA = Path(__file__).resolve().parents[2] / "sql"
+CARPETA = Path(os.environ.get("AGECARE_SQL_DIR",
+                              Path(__file__).resolve().parents[2] / "sql"))
 
 _TABLA = """
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -157,12 +163,92 @@ async def correr(*, baseline: bool = False, dry_run: bool = False) -> int:
     return 0
 
 
+# Marca que un archivo .sql puede volver a ejecutarse sin romper nada
+# (usa IF NOT EXISTS, ON CONFLICT DO NOTHING y similares).
+#
+# Existe por un caso concreto: la base de alguien que levanto el proyecto
+# antes de que hubiera registro de migraciones. Su esquema esta al dia
+# hasta cierto archivo y nadie sabe cual, asi que los archivos viejos se
+# anotan sin ejecutar y los que llevan esta marca se corren igual. Como son
+# repetibles, correrlos de mas no hace dano, y asi la base se pone al dia
+# sola sin que nadie tenga que averiguar en que version estaba.
+#
+# Todo archivo nuevo deberia escribirse asi y llevar la marca.
+MARCA_IDEMPOTENTE = "-- MIGRACION IDEMPOTENTE"
+
+
+async def _aplicar_idempotentes() -> int:
+    """Corre los archivos marcados como repetibles, sin tocar el registro."""
+    repetibles = [p for p in _archivos()
+                  if MARCA_IDEMPOTENTE in p.read_text(encoding="utf-8")]
+    if not repetibles:
+        return 0
+    print(f"\nSe vuelven a correr {len(repetibles)} archivos repetibles, "
+          "por si faltaba alguno:")
+    for p in repetibles:
+        try:
+            async with engine.begin() as conn:
+                cruda = await conn.get_raw_connection()
+                await cruda.driver_connection.execute(
+                    p.read_text(encoding="utf-8"))
+        except Exception as e:  # noqa: BLE001
+            print(f"   FALLO {p.name}: {str(e).splitlines()[0]}")
+            return 1
+        print(f"   OK  {p.name}")
+    return 0
+
+
+async def auto() -> int:
+    """Deja la base al dia sin que nadie tenga que decidir nada.
+
+    Es lo que corre el contenedor al arrancar, y tiene que portarse bien en
+    los tres estados en que se puede encontrar la base.
+
+    BASE RECIEN CREADA
+        docker-entrypoint-initdb.d ya ejecuto todos los .sql al crear el
+        volumen. El esquema esta completo y no hay registro de migraciones,
+        asi que se anotan todos como aplicados sin volver a ejecutarlos.
+
+    BASE QUE YA VENIA FUNCIONANDO, SIN REGISTRO
+        Es el caso de quien levanto el proyecto antes de que esto
+        existiera. No hay forma de saber hasta que archivo llego su
+        esquema, asi que se anotan todos como aplicados y despues se
+        corren solo los marcados como repetibles. Se evaluo reintentarlos
+        todos y tolerar los errores de "ya existe", y se descarto: entre
+        crear tablas, transformar columnas y sembrar datos, cada archivo
+        falla distinto, y la lista de errores a tolerar crecia tapando
+        tambien los errores de verdad.
+
+    BASE CON REGISTRO
+        El caso normal de todos los dias: se corren los que falten.
+    """
+    async with engine.begin() as conn:
+        hay_registro = await conn.scalar(
+            text("SELECT to_regclass('public.schema_migrations') IS NOT NULL"))
+        hay_esquema = await conn.scalar(
+            text("SELECT to_regclass('public.users') IS NOT NULL"))
+
+    if hay_registro:
+        return await correr()
+    if not hay_esquema:
+        # Base vacia de verdad: se aplica todo desde cero.
+        return await correr()
+
+    print("Base con esquema y sin registro de migraciones.")
+    print("Se anota lo existente y se corren los archivos repetibles.\n")
+    r = await correr(baseline=True)
+    return r or await _aplicar_idempotentes()
+
+
 async def _main(argv: list[str]) -> int:
-    desconocidas = [a for a in argv if a not in ("--baseline", "--dry-run")]
+    validas = ("--baseline", "--dry-run", "--auto")
+    desconocidas = [a for a in argv if a not in validas]
     if desconocidas:
         print(__doc__)
         return 2
     try:
+        if "--auto" in argv:
+            return await auto()
         return await correr(baseline="--baseline" in argv,
                             dry_run="--dry-run" in argv)
     finally:

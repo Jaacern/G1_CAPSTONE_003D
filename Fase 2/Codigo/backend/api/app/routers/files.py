@@ -51,6 +51,10 @@ _KIND_TO_SCOPE = {
     "prescription": "patient",
     "catalog":      "catalog",
     "certification": "caregiver",
+    # La foto de perfil es de la persona y no de ningun paciente, asi que
+    # va con ambito 'user'. Faltaba: profile_screen.dart sube con este kind
+    # y recibia un 422, o sea la foto de perfil no se podia cambiar.
+    "avatar":       "user",
 }
 
 
@@ -346,7 +350,7 @@ async def _cargar_archivo(db: AsyncSession, file_id: UUID):
             text(
                 """
                 SELECT id, patient_id, scope, storage_key, original_name,
-                       mime_type, size_bytes, status
+                       mime_type, size_bytes, status, uploaded_by
                 FROM files
                 WHERE id = :id
                 """
@@ -368,11 +372,39 @@ async def _exigir_acceso(db: AsyncSession, row, user_id: str) -> str | None:
     catalog    cualquier usuario autenticado, es contenido comun
     caregiver  cualquier usuario autenticado, son los certificados que la
                cuidadora publica en el marketplace para que los vean
+    user       su dueno, y quienes comparten algun circulo con el
 
     Devuelve el rol que tiene el usuario sobre el paciente, o None si el
     archivo no es de un expediente. El rol se necesita despues para dejar
     el registro de acceso.
     """
+    if row["scope"] == "user":
+        # La foto de perfil no es contenido comun. La ve su dueno y la ve
+        # quien comparte con el el cuidado de alguien, que es exactamente
+        # donde aparece: en la bitacora, en el chat y en el circulo. Un
+        # usuario cualquiera de la plataforma no tiene por que verla.
+        if str(row["uploaded_by"]) == user_id:
+            return None
+        juntos = (
+            await db.execute(
+                text(
+                    """
+                    SELECT 1
+                      FROM patient_members mio
+                      JOIN patient_members suyo
+                        ON suyo.patient_id = mio.patient_id
+                     WHERE mio.user_id = :yo  AND mio.removed_at IS NULL
+                       AND suyo.user_id = :el AND suyo.removed_at IS NULL
+                     LIMIT 1
+                    """
+                ),
+                {"yo": user_id, "el": str(row["uploaded_by"])},
+            )
+        ).first()
+        if juntos is None:
+            raise _NO_EXISTE
+        return None
+
     if row["scope"] != "patient":
         return None
     miembro = (

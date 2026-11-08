@@ -129,13 +129,18 @@ class _ThresholdRow extends ConsumerWidget {
   }
 
   Future<void> _edit(BuildContext context, WidgetRef ref) async {
+    // Se toma el messenger ANTES de abrir el dialogo. Despues del await la
+    // pantalla puede haberse ido, y buscar el ScaffoldMessenger a partir de
+    // un context ya desmontado lanza una excepcion en vez de mostrar el
+    // aviso. Pasa cuando alguien deja el dialogo abierto y vuelve atras.
+    final messenger = ScaffoldMessenger.of(context);
+
     final result = await showDialog<_ThresholdValues>(
       context: context,
       builder: (_) => _ThresholdDialog(type: type, current: threshold),
     );
     if (result == null) return;
 
-    final messenger = ScaffoldMessenger.of(context);
     try {
       await ref.read(vitalsRepositoryProvider).setThreshold(
             patientId,

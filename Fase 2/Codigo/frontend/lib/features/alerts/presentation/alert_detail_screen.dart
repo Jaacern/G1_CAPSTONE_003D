@@ -157,8 +157,8 @@ class _AlertDetailBody extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: const [
+                const Row(
+                  children: [
                     Icon(Icons.priority_high_rounded,
                         color: AppColors.critical),
                     SizedBox(width: 8),
@@ -194,7 +194,7 @@ class _AlertDetailBody extends StatelessWidget {
         ],
 
         // Mensaje / contexto
-        _SectionTitle('¿Qué ocurrió?'),
+        const _SectionTitle('¿Qué ocurrió?'),
         const SizedBox(height: 6),
         AppCard(
           child: Text(alert.message,
@@ -203,7 +203,7 @@ class _AlertDetailBody extends StatelessWidget {
         const SizedBox(height: 16),
 
         // Detalles
-        _SectionTitle('Detalles'),
+        const _SectionTitle('Detalles'),
         const SizedBox(height: 6),
         AppCard(
           child: Column(

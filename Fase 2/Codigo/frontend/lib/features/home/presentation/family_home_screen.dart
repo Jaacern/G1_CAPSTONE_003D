@@ -269,17 +269,17 @@ class _VitalsSummaryCard extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              const Row(
                 children: [
                   // El título cede ancho antes que "Ver todo": sin Expanded,
                   // en una fila de 256 dp empujaba el enlace fuera de pantalla.
-                  const Expanded(
+                  Expanded(
                     child: Text('Vitals del wearable',
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                             fontSize: 14, fontWeight: FontWeight.w700)),
                   ),
-                  const Text('Ver todo ›',
+                  Text('Ver todo ›',
                       style: TextStyle(
                           fontSize: 12, color: AppColors.textSecondary)),
                 ],

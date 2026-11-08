@@ -209,9 +209,9 @@ class _WatchPairingScreenState extends ConsumerState<WatchPairingScreen> {
             Column(
               children: [
                 // Indicador de que la app está esperando al reloj.
-                Row(
+                const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
+                  children: [
                     SizedBox(
                       width: 14,
                       height: 14,
@@ -344,8 +344,8 @@ class _IntroCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: const [
+          const Row(
+            children: [
               Text('⌚', style: TextStyle(fontSize: 22)),
               SizedBox(width: 10),
               Expanded(
@@ -379,9 +379,9 @@ class _StepsCard extends StatelessWidget {
         color: AppColors.primary.withValues(alpha: .06),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
+        children: [
           Text('Cómo vincular',
               style: TextStyle(fontWeight: FontWeight.w700)),
           SizedBox(height: 10),

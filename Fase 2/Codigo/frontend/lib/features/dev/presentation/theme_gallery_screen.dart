@@ -177,23 +177,23 @@ class _SharedWidgetsShowcase extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('AppCard', style: TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        const AppCard(child: Text('Contenido dentro de un AppCard')),
-        const SizedBox(height: 20),
-        const Text('InitialsAvatar', style: TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        const Row(children: [
+        Text('AppCard', style: TextStyle(fontWeight: FontWeight.w600)),
+        SizedBox(height: 8),
+        AppCard(child: Text('Contenido dentro de un AppCard')),
+        SizedBox(height: 20),
+        Text('InitialsAvatar', style: TextStyle(fontWeight: FontWeight.w600)),
+        SizedBox(height: 8),
+        Row(children: [
           InitialsAvatar(name: 'Elena Ramírez'),
           SizedBox(width: 12),
           InitialsAvatar(name: 'María', radius: 28),
         ]),
-        const SizedBox(height: 20),
-        const Text('EmptyView', style: TextStyle(fontWeight: FontWeight.w600)),
-        const EmptyView(
+        SizedBox(height: 20),
+        Text('EmptyView', style: TextStyle(fontWeight: FontWeight.w600)),
+        EmptyView(
           icon: Icons.inbox_outlined,
           title: 'Sin elementos',
           subtitle: 'Ejemplo de estado vacío',

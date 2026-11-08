@@ -77,8 +77,8 @@ class ToneService {
   Uint8List _wrapWav(Int16List samples) {
     const channels = 1;
     const bitsPerSample = 16;
-    final byteRate = _sampleRate * channels * bitsPerSample ~/ 8;
-    final blockAlign = channels * bitsPerSample ~/ 8;
+    const byteRate = _sampleRate * channels * bitsPerSample ~/ 8;
+    const blockAlign = channels * bitsPerSample ~/ 8;
     final dataSize = samples.length * 2;
     final fileSize = 44 + dataSize;
 

@@ -108,21 +108,21 @@ class AuthRepositoryMock implements AuthRepository {
 
   User? _currentUser;
 
-  static final _demoUser = User(
+  static const _demoUser = User(
     userId: 'u-demo-1',
     fullName: 'María González',
     email: demoEmail,
-    memberships: const [
+    memberships: [
       Membership(patientId: 'p-elena', patientName: 'Elena', role: RoleType.family),
       Membership(patientId: 'p-jose', patientName: 'José', role: RoleType.family),
     ],
   );
 
-  static final _demoDoctor = User(
+  static const _demoDoctor = User(
     userId: 'u-demo-doctor',
     fullName: 'Dra. Carolina Soto',
     email: demoDoctorEmail,
-    memberships: const [
+    memberships: [
       Membership(patientId: 'p-elena', patientName: 'Elena Ramírez', role: RoleType.doctor),
       Membership(patientId: 'p-jose', patientName: 'José Ramírez', role: RoleType.doctor),
     ],

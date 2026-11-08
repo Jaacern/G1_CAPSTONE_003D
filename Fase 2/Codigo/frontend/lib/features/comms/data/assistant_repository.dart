@@ -135,67 +135,118 @@ class AssistantRepositoryMock implements AssistantRepository {
     return AssistantReply(conversationId: convId, message: assistantMsg);
   }
 
+  /// Respuestas de demostración con el mismo comportamiento que el backend
+  /// (routers/assistant.py + assistant_safety.py): solo datos registrados en
+  /// el expediente de demo de Elena (seed del backend), con fecha, promedio
+  /// y rango, sin calificar los valores ("normal", "estable", "buen
+  /// camino") y derivando al médico tratante ante preguntas clínicas. Las
+  /// etiquetas de las fuentes son las mismas que devuelve la API.
   ({String text, List<Citation> citations}) _answerFor(String question) {
     final q = question.toLowerCase();
 
+    const paciente = Citation(label: 'Datos del paciente', reference: 'patients');
+    const mediciones = Citation(label: 'Mediciones', reference: 'vital_readings');
+    const medicamentos = Citation(label: 'Medicamentos', reference: 'medications');
+    const dosis = Citation(label: 'Dosis', reference: 'scheduled_doses');
+    const bitacora = Citation(label: 'Bitácora', reference: 'care_observations');
+    const alertas = Citation(label: 'Alertas', reference: 'alerts');
+
+    // Diagnóstico, interpretación o cambio de tratamiento: el backend no lo
+    // responde. Entrega lo registrado y deriva.
+    final pideCriterio = RegExp(
+      r'(es normal|está bien|esta bien|es grave|qué tiene|que tiene|'
+      r'diagn|subir|bajar|aumentar|reducir|suspender|duplicar|le doy|'
+      r'puedo darle|receta)',
+    ).hasMatch(q);
+    if (pideCriterio) {
+      return (
+        text: 'No puedo interpretar los valores ni indicar cambios de '
+            'tratamiento o dosis. Lo registrado en el expediente: '
+            'condiciones registradas: diabetes tipo 2 e hipertensión. '
+            'Medicamentos vigentes: Losartán 50 mg y Metformina 850 mg. '
+            'Última presión arterial registrada: 138/85 mmHg el 03-11. '
+            'Saturación de oxígeno de la semana: promedio 96.9 %, mínimo '
+            '96.1 % y máximo 97.7 %.\n'
+            'Para interpretar estos datos o decidir sobre tratamientos y '
+            'dosis, consulta con el médico tratante.',
+        citations: const [paciente, medicamentos, mediciones],
+      );
+    }
+
     if (q.contains('durm') || q.contains('sueñ') || q.contains('anoche')) {
       return (
-        text: 'Elena durmió alrededor de 7 h 20 min anoche, con un despertar '
-            'breve hacia las 3:00 a. m. Su descanso profundo fue del 22 %, '
-            'un poco mejor que el promedio de la semana. En general, una '
-            'noche tranquila.',
-        citations: const [
-          Citation(label: 'Sueño', reference: 'Registro del wearable · anoche'),
-        ],
+        text: 'Sueño de la semana: 1 día con registro. El 02-11 se '
+            'registraron 6.7 horas. En la bitácora del 02-11: "Despertó tres '
+            'veces en la noche. Dice que le dolía la cadera."',
+        citations: const [paciente, mediciones, bitacora],
       );
     }
 
     if (q.contains('medic') || q.contains('tomó') || q.contains('dosis') ||
-        q.contains('adheren')) {
+        q.contains('olvid') || q.contains('adheren')) {
       return (
-        text: 'Hoy Elena ha tomado 2 de 3 dosis programadas. Confirmó el '
-            'Losartán de la mañana y la vitamina D; queda pendiente el '
-            'Losartán de la noche (20:00). La adherencia de los últimos 7 '
-            'días es del 94 %.',
-        citations: const [
-          Citation(label: 'Medicamentos', reference: 'Plan de hoy'),
-          Citation(label: 'Adherencia', reference: 'Últimos 7 días'),
-        ],
+        text: 'Sí. En el último mes hubo 28 dosis que no se tomaron, de las '
+            '135 programadas.\n'
+            '6 omitidas a propósito (con motivo: malestar estomacal).\n'
+            '12 no tomadas.\n'
+            '10 sin registrar (pasó la hora y nadie anotó si se tomó).\n'
+            'Por medicamento: Losartán 43 de 54 tomadas; Metformina 64 de 81 '
+            'tomadas.',
+        citations: const [paciente, medicamentos, dosis],
       );
     }
 
     if (q.contains('ritmo') || q.contains('corazón') || q.contains('cardí') ||
         q.contains('pulso') || q.contains('frecuencia')) {
       return (
-        text: 'El último ritmo cardíaco registrado fue de 74 lpm, hace 18 '
-            'minutos, dentro de su rango habitual (62–88 lpm). No se han '
-            'detectado episodios fuera de rango en las últimas 24 horas.',
-        citations: const [
-          Citation(
-              label: 'Ritmo cardíaco', reference: 'Última lectura · hace 18 min'),
-        ],
+        text: 'Frecuencia cardíaca de la semana: 45 mediciones, promedio '
+            '67.3 bpm, mínimo 54.9 y máximo 78.7 bpm.\n'
+            '02-11: promedio 68.2 bpm (rango 54.9-78.7, 24 mediciones).\n'
+            '03-11: promedio 66.3 bpm (rango 55.3-76.6, 21 mediciones).',
+        citations: const [paciente, mediciones],
+      );
+    }
+
+    if (q.contains('presi') || q.contains('tensi')) {
+      return (
+        text: 'Presión arterial de la semana: 1 medición registrada, '
+            '138/85 mmHg el 03-11.',
+        citations: const [paciente, mediciones],
       );
     }
 
     if (q.contains('camin') || q.contains('activ') || q.contains('paso')) {
       return (
-        text: 'Elena lleva 2 340 pasos hoy y alrededor de 35 minutos de '
-            'actividad ligera, principalmente durante su paseo de la mañana '
-            'por el parque. Va en buen camino para su meta diaria.',
-        citations: const [
-          Citation(label: 'Actividad', reference: 'Registro de hoy'),
-        ],
+        text: 'Pasos de la semana: 1 día con registro, 1661 pasos el 02-11. '
+            'En la bitácora del 03-11: "Caminó hasta el patio con el '
+            'andador, sin apoyo adicional."',
+        citations: const [paciente, mediciones, bitacora],
+      );
+    }
+
+    if (q.contains('alert')) {
+      return (
+        text: 'Alertas activas ahora: Wearable sin sincronizar (03-11, '
+            'info).\n'
+            'En el último mes se registraron 9 alertas; las demás ya fueron '
+            'vistas o resueltas, por ejemplo: Caída detectada en el baño '
+            '(31-10, vista).',
+        citations: const [paciente, alertas],
       );
     }
 
     return (
-      text: 'Según el expediente de Elena, sus signos vitales de hoy están '
-          'estables, la adherencia a medicamentos es del 94 % esta semana y '
-          'no hay alertas activas. ¿Quieres que profundice en el sueño, los '
-          'medicamentos o el ritmo cardíaco?',
-      citations: const [
-        Citation(label: 'Resumen del expediente', reference: 'Hoy'),
-      ],
+      text: 'Resumen de la semana con lo registrado en el expediente:\n'
+          'Frecuencia cardíaca: promedio 67.3 bpm (mínimo 54.9, máximo '
+          '78.7).\n'
+          'Presión arterial: 138/85 mmHg el 03-11 (única medición).\n'
+          'Saturación de oxígeno: promedio 96.9 % (mínimo 96.1, máximo '
+          '97.7).\n'
+          'Dosis: 8 tomadas de 20 programadas.\n'
+          'Alertas activas ahora: Wearable sin sincronizar.\n'
+          'Puedes preguntarme por el sueño, las dosis, el pulso o la '
+          'bitácora de un día o período.',
+      citations: const [paciente, mediciones, dosis, alertas],
     );
   }
 }

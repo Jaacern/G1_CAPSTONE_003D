@@ -63,6 +63,16 @@ class AssistantSettings(BaseSettings):
     # convierta en una cuenta abierta.
     assistant_max_tokens: int = 600
     assistant_timeout_seconds: int = 30
+    # Modelos de razonamiento (Nemotron, Qwen, DeepSeek) piensan antes de
+    # responder y ese "pensamiento" gasta el mismo cupo de tokens que la
+    # respuesta. Con 600 tokens Nemotron se los comia todos pensando y
+    # devolvia content vacio (finish_reason=length): el asistente contestaba
+    # "no hay informacion" con los datos delante. Con false se manda
+    # chat_template_kwargs={"enable_thinking": false} y el modelo responde
+    # directo, mas rapido y sin razonamiento que filtrar. Solo lo usa el
+    # proveedor compatible con OpenAI; los modelos que no lo conocen lo
+    # ignoran.
+    assistant_thinking: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
@@ -225,7 +235,9 @@ def _sin_markdown(texto: str) -> str:
         # Encabezados "## ..." -> solo el texto.
         s = s.lstrip("#").lstrip()
         lineas.append(s)
-    return "\n".join(lineas).strip()
+    # Asteriscos sueltos que quedan sin pareja ("Tareas pendientes:*"). La
+    # app muestra texto plano: un asterisco nunca significa nada ahi.
+    return "\n".join(lineas).replace("*", "").strip()
 
 
 class NvidiaDeepSeek(AssistantProvider):
@@ -261,7 +273,9 @@ class NvidiaDeepSeek(AssistantProvider):
         "Si un dato no aparece, es porque no esta registrado.\n"
         "3. Si la respuesta no esta en el expediente, dilo con claridad: "
         "'Eso no esta registrado en el expediente.' No ofrezcas una "
-        "respuesta aproximada ni general en su lugar.\n"
+        "respuesta aproximada ni general en su lugar. Usa esa frase SOLO "
+        "cuando no hay ningun dato relacionado: si hay datos, entregalos y "
+        "no la digas.\n"
         "4. No diagnostiques, no interpretes sintomas, no indiques ni "
         "cambies tratamientos o dosis. Ante una pregunta asi, responde que "
         "debe consultarlo con su medico tratante.\n"
@@ -286,6 +300,22 @@ class NvidiaDeepSeek(AssistantProvider):
         "contradiccion. Si el contexto trae un promedio y un rango de 24h, "
         "usalos: da el ultimo valor y, cuando ayude, menciona el rango del "
         "dia. Nunca te disculpes por que las mediciones sean distintas.\n"
+        "11. No sumes, restes ni calcules porcentajes. Usa los totales que ya "
+        "vienen en el expediente (por ejemplo la linea TOTAL de las dosis) "
+        "tal cual estan escritos.\n"
+        "12. La fecha de hoy es la que dice 'Fecha de hoy' en el expediente. "
+        "No llames 'hoy' a otra fecha: si un dato es de otro dia, di la fecha.\n"
+        "13. Distingue 'Alertas activas ahora' (siguen abiertas) del historial "
+        "de alertas, donde cada una dice su estado actual (activa, vista o "
+        "resuelta). No digas que una alerta esta activa si no lo esta.\n"
+        "14. Las condiciones son 'condiciones registradas en el expediente'. "
+        "No uses la palabra 'diagnostico' para referirte a ellas.\n"
+        "15. No califiques los valores: no digas que estan normales, "
+        "estables, controlados, altos, bajos ni dentro o fuera de rango. "
+        "Entrega el valor, la fecha y el rango registrado (minimo y maximo).\n"
+        "16. Si preguntan por alertas, dosis no tomadas, notas de bitacora o "
+        "tareas, no te quedes en el total: enumera cada una con su fecha y "
+        "estado, como aparecen en el expediente (hasta 10).\n"
     )
 
     def __init__(self, cfg: AssistantSettings):
@@ -348,6 +378,14 @@ class NvidiaDeepSeek(AssistantProvider):
             # Lo mas determinista posible: en salud no queremos variedad
             # creativa, queremos que repita lo que dice el expediente.
             extra = {"temperature": 0.1, "top_p": 0.9}
+        # Apagar el razonamiento en modelos que lo traen encendido (ver
+        # AssistantSettings.assistant_thinking). Anthropic rechaza campos que
+        # no conoce, asi que ahi no se manda.
+        if (not self.cfg.assistant_thinking
+                and "anthropic.com" not in self.cfg.assistant_base_url):
+            extra["extra_body"] = {
+                "chat_template_kwargs": {"enable_thinking": False},
+            }
         salida = await cliente.chat.completions.create(
             model=self.cfg.assistant_model,
             messages=mensajes,

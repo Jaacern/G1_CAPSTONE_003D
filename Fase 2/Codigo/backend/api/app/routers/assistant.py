@@ -10,6 +10,7 @@ La conversacion con el asistente es privada de cada persona:
 ux_conversations_assistant deja una por paciente y usuario, asi que lo que
 le pregunta la cuidadora no lo ve la familia ni al reves.
 """
+import re
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -18,6 +19,11 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.assistant_safety import (
+    limpiar_texto_libre,
+    pide_criterio_clinico,
+    sanitizar_respuesta,
+)
 from app.db import get_db
 from app.deps import CurrentUser, PatientContext, get_current_user, get_patient_member
 from app.errors import ApiError
@@ -231,16 +237,14 @@ def _dosis(m) -> str:
     return m["name"]
 
 
-async def _contexto(db: AsyncSession, patient_id: str) -> tuple[str, list]:
-    """Arma el resumen del expediente que ve el modelo, y sus fuentes.
+async def _ficha_base(db: AsyncSession, patient_id: str) -> tuple[str, list]:
+    """Datos de cabecera del expediente: quien es, que tiene, que toma hoy.
 
-    El modelo NO consulta la base. Recibe un texto armado aca, con lo que
-    esta persona ya tiene derecho a ver, y nada mas. Asi el control de
-    acceso sigue siendo del motor y de la API, y no depende de que el
-    modelo se porte bien.
-
-    Cada bloque deja registrada su fuente para poder citarla despues: una
-    respuesta sobre salud sin de donde salio no sirve para decidir nada.
+    Van en toda consulta, sin importar la pregunta, porque son el marco para
+    leer cualquier dato: la edad y las condiciones cambian como se entiende
+    una medicion, y los medicamentos vigentes y las alertas activas es lo que
+    cualquiera necesita tener presente. El historico que pide la pregunta se
+    agrega aparte, en _contexto.
     """
     from app.assistant_provider import Fuente
 
@@ -281,7 +285,10 @@ async def _contexto(db: AsyncSession, patient_id: str) -> tuple[str, list]:
         )
     ).scalars().all()
     if condiciones:
-        partes.append("Condiciones registradas: " + ", ".join(condiciones) + ".")
+        # Se nombran como estan cargadas: es lo registrado en el expediente,
+        # no un diagnostico que haga el asistente.
+        partes.append("Condiciones registradas en el expediente: "
+                      + ", ".join(c.replace("_", " ") for c in condiciones) + ".")
 
     medicamentos = (
         await db.execute(
@@ -307,116 +314,9 @@ async def _contexto(db: AsyncSession, patient_id: str) -> tuple[str, list]:
             fuentes.append(Fuente(tabla="medications", id=str(m["id"]),
                                   label="Medicamentos"))
 
-    adherencia = (
-        await db.execute(
-            text(
-                """
-                SELECT count(*) FILTER (WHERE d.status = 'taken') AS tomadas,
-                       count(*) AS total
-                FROM scheduled_doses d
-                JOIN medications m ON m.id = d.medication_id
-                WHERE m.patient_id = :pid
-                  AND d.scheduled_at >= now() - interval '7 days'
-                  AND d.scheduled_at <= now()
-                """
-            ),
-            {"pid": patient_id},
-        )
-    ).mappings().first()
-    if adherencia and adherencia["total"]:
-        partes.append(
-            f"Dosis de los ultimos 7 dias: {adherencia['tomadas']} tomadas "
-            f"de {adherencia['total']} programadas."
-        )
-
-    # El reloj inserta signos vitales cada pocos segundos. Pasarle al modelo
-    # la ultima lectura suelta hace que parezca que el valor "cambia" entre
-    # una respuesta y otra (72, luego 65, luego 70...). Por eso se le entrega
-    # un resumen por tipo: la ultima lectura con su hora, y ademas el
-    # promedio/minimo/maximo de las ultimas 24h. Asi el modelo tiene el dato
-    # actual y el rango del dia, y no confunde lecturas distintas con
-    # contradicciones. El agregado se calcula en SQL, que es donde escala.
-    vitales = (
-        await db.execute(
-            text(
-                """
-                WITH ult AS (
-                    SELECT DISTINCT ON (v.type)
-                           v.id, v.type, v.value, v.value_secondary,
-                           -- La conexion ya esta en la zona de la operacion
-                           -- (db.py), asi que to_char da la hora de Chile.
-                           to_char(v.measured_at, 'DD-MM HH24:MI') AS cuando
-                    FROM vital_readings v
-                    WHERE v.patient_id = :pid
-                      AND v.measured_at >= now() - interval '14 days'
-                    ORDER BY v.type, v.measured_at DESC
-                ),
-                agg AS (
-                    SELECT type,
-                           round(avg(value))::int AS prom,
-                           round(min(value))::int AS minimo,
-                           round(max(value))::int AS maximo,
-                           count(*) AS n
-                    FROM vital_readings
-                    WHERE patient_id = :pid
-                      AND measured_at >= now() - interval '24 hours'
-                    GROUP BY type
-                )
-                SELECT ult.id, ult.type, ult.value, ult.value_secondary,
-                       ult.cuando, t.label, t.unit,
-                       agg.prom, agg.minimo, agg.maximo, agg.n
-                FROM ult
-                JOIN vital_types t ON t.code = ult.type
-                LEFT JOIN agg ON agg.type = ult.type
-                """
-            ),
-            {"pid": patient_id},
-        )
-    ).mappings().all()
-    if vitales:
-        lineas = []
-        for v in vitales:
-            valor = f"{v['value']}"
-            if v["value_secondary"] is not None:
-                valor += f"/{v['value_secondary']}"
-            txt_v = f"{v['label']} {valor} {v['unit']} (ultima: {v['cuando']}"
-            # Solo tiene sentido mostrar rango cuando hay varias lecturas en
-            # el dia (tipico del wearable). Una medicion manual unica no.
-            if v["n"] and v["n"] > 1:
-                txt_v += (f"; en 24h promedio {v['prom']}, "
-                          f"rango {v['minimo']}-{v['maximo']} {v['unit']}, "
-                          f"{v['n']} lecturas")
-            txt_v += ")"
-            lineas.append(txt_v)
-        partes.append("Ultimas mediciones: " + "; ".join(lineas) + ".")
-        for v in vitales[:5]:
-            fuentes.append(Fuente(tabla="vital_readings", id=str(v["id"]),
-                                  label="Mediciones"))
-
-    observaciones = (
-        await db.execute(
-            text(
-                """
-                SELECT id, category, note,
-                       -- Zona puesta en la conexion (db.py); da hora Chile.
-                       to_char(observed_at, 'DD-MM') AS cuando
-                FROM care_observations
-                WHERE patient_id = :pid AND deleted_at IS NULL
-                ORDER BY observed_at DESC LIMIT 10
-                """
-            ),
-            {"pid": patient_id},
-        )
-    ).mappings().all()
-    if observaciones:
-        partes.append(
-            "Bitacora reciente: "
-            + " | ".join(f"{o['cuando']} [{o['category']}] {o['note']}"
-                         for o in observaciones) + "."
-        )
-        for o in observaciones[:5]:
-            fuentes.append(Fuente(tabla="care_observations", id=str(o["id"]),
-                                  label="Bitacora"))
+    # La adherencia no va en la ficha: el bloque de dosis del periodo
+    # consultado la trae con sus totales. Con las dos cifras a la vista (7
+    # dias fijos y el periodo de la pregunta) el modelo las mezclaba.
 
     alertas = (
         await db.execute(
@@ -433,14 +333,80 @@ async def _contexto(db: AsyncSession, patient_id: str) -> tuple[str, list]:
     ).mappings().all()
     if alertas:
         partes.append(
-            "Alertas activas: "
+            "Alertas activas ahora (sin atender todavia): "
             + "; ".join(f"{a['title']} ({a['severity']})" for a in alertas) + "."
         )
+    else:
+        partes.append("Alertas activas ahora: ninguna.")
         for a in alertas:
             fuentes.append(Fuente(tabla="alerts", id=str(a["id"]),
                                   label="Alertas"))
 
     return "\n".join(partes), fuentes
+
+
+async def _contexto(db: AsyncSession, patient_id: str, pregunta: str,
+                    pregunta_anterior: str | None = None) -> tuple[str, list]:
+    """Expediente que ve el modelo: la ficha base mas lo que pide la pregunta.
+
+    El modelo NO consulta la base. Recibe un texto armado aca, con lo que
+    esta persona ya tiene derecho a ver, y nada mas: el control de acceso lo
+    hizo la API al validar la membresia (get_patient_member), no el modelo.
+
+    La ficha base (quien es, condiciones, medicamentos, alertas activas) va
+    siempre. Encima se agrega el bloque historico que corresponde al periodo
+    y tema de la pregunta, para que "la presion de la semana pasada" o "se
+    olvido una dosis en el mes" tengan datos detras y no solo el ultimo valor.
+
+    Las fuentes de cada bloque se devuelven para citarlas: una respuesta
+    sobre salud sin de donde salio no sirve para decidir nada.
+    """
+    from app.assistant_context import (
+        contexto_historico,
+        heredar_tema,
+        interpretar_pregunta,
+    )
+    from app.fechas import hoy
+
+    base, fuentes = await _ficha_base(db, patient_id)
+
+    # Sin la fecha de hoy el modelo la deducia del ultimo dato que veia y
+    # llamaba "hoy" a un dia de la semana pasada.
+    dia = hoy()
+    _DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado",
+             "domingo"]
+    fecha_hoy = f"Fecha de hoy: {_DIAS[dia.weekday()]} {dia.strftime('%d-%m-%Y')}."
+    base = f"{fecha_hoy}\n{base}" if base else fecha_hoy
+
+    consulta = interpretar_pregunta(pregunta, dia)
+    consulta = heredar_tema(consulta, pregunta, pregunta_anterior, dia)
+    # "Puedo subirle el losartan?" no nombra la presion, pero la respuesta
+    # honesta necesita mostrarla ("la ultima presion registrada fue...").
+    # Si la pregunta pide criterio clinico y no trae mediciones, se agregan
+    # todas las del periodo.
+    if pide_criterio_clinico(pregunta) and not consulta.vitales:
+        from dataclasses import replace
+        consulta = replace(consulta, general=True)
+    historico, fuentes_hist = await contexto_historico(db, patient_id, consulta)
+    fuentes.extend(fuentes_hist)
+
+    partes = [p for p in (base, historico) if p]
+
+    # La pregunta que ve el modelo lleva el periodo resuelto y, si es un
+    # seguimiento ("y la semana pasada?"), la pregunta anterior: con la
+    # frase suelta el modelo contestaba "no hay datos" teniendolos delante.
+    # Se dice que el periodo YA esta resuelto: con "periodo consultado: X" el
+    # modelo leia "la semana pasada" como la semana anterior a X.
+    aclaracion = (f"Nota del sistema: el periodo de esta pregunta ya fue "
+                  f"calculado y es {consulta.etiqueta}; los datos del bloque "
+                  f"'Datos del periodo consultado' son exactamente los que "
+                  f"pide. Respondela con ellos")
+    if pregunta_anterior and len(pregunta.split()) <= 6:
+        aclaracion += (f". Es continuacion de la pregunta anterior "
+                       f"\"{limpiar_texto_libre(pregunta_anterior, 150)}\": "
+                       f"responde lo mismo, pero para este periodo")
+    pregunta_modelo = f"{pregunta}\n({aclaracion}.)"
+    return "\n\n".join(partes), fuentes, pregunta_modelo
 
 
 @router.post("/patients/{patient_id}/assistant/messages",
@@ -490,15 +456,13 @@ async def ask(
 
     await _cobrar_consulta(db, ctx.user.user_id)
 
-    contexto, fuentes = await _contexto(db, ctx.patient_id)
-
-    historial = []
+    previas = []
     if conv is not None:
         previas = (
             await db.execute(
                 text(
                     """
-                    SELECT query_text, response_text
+                    SELECT query_text
                     FROM assistant_queries
                     WHERE conversation_id = :conv
                     ORDER BY created_at DESC
@@ -508,14 +472,49 @@ async def ask(
                 {"conv": str(conv["id"])},
             )
         ).mappings().all()
-        for p in reversed(previas):
-            historial.append({"role": "user", "content": p["query_text"]})
-            historial.append({"role": "assistant", "content": p["response_text"]})
+
+    contexto, fuentes, pregunta_modelo = await _contexto(
+        db, ctx.patient_id, payload.text,
+        previas[0]["query_text"] if previas else None,
+    )
+
+    # Si la pregunta pide diagnosticar, interpretar un valor o indicar un
+    # tratamiento, se le recuerda al modelo el limite antes de responder.
+    # Es un aviso, no un bloqueo: igual presenta los datos registrados y
+    # deriva al medico. El filtro de salida es la red que no depende de que
+    # el modelo haga caso.
+    if pide_criterio_clinico(payload.text):
+        contexto += (
+            "\n\n[Nota: la pregunta pide una interpretacion clinica, un "
+            "diagnostico o una indicacion de tratamiento. No califiques los "
+            "valores ni indiques dosis, pero SI entrega los datos registrados "
+            "que correspondan (fecha, promedio, minimo y maximo). Despues "
+            "recuerda que interpretarlos le corresponde al medico tratante.]"
+        )
+
+    # Solo las preguntas anteriores, no las respuestas. Con las respuestas el
+    # modelo copiaba lo que habia contestado antes (con cifras y fechas de
+    # ese dia) en vez de leer el expediente de ahora, y un error viejo se
+    # repetia para siempre. Las preguntas bastan para entender un
+    # seguimiento como "y ayer?".
+    historial = []
+    if previas:
+        preguntas = [limpiar_texto_libre(p["query_text"], 200)
+                     for p in reversed(previas)]
+        historial.append({
+            "role": "system",
+            "content": (
+                "Preguntas anteriores de esta conversacion (solo para "
+                "entender a que se refiere la pregunta nueva; los datos "
+                "salen unicamente del expediente de arriba): "
+                + " | ".join(preguntas)
+            ),
+        })
 
     inicio = time.monotonic()
     try:
         respuesta = await proveedor.responder(
-            pregunta=payload.text, contexto=contexto,
+            pregunta=pregunta_modelo, contexto=contexto,
             rol=ctx.role, historial=historial,
         )
     except AssistantNotConfigured:
@@ -531,6 +530,41 @@ async def ask(
             message="El asistente no pudo responder. Intenta de nuevo en un momento.",
         )
     latencia = int((time.monotonic() - inicio) * 1000)
+
+    # Ultima barrera: aunque el prompt lo prohibe, si el modelo deslizo un
+    # diagnostico o una indicacion de dosis, aqui se quita y se deja la
+    # derivacion al medico. No depende de que el modelo haya obedecido.
+    # Con el expediente al lado se comprueba ademas que cada cifra y fecha
+    # de la respuesta este en el, y se respetan las citas textuales.
+    seguro = sanitizar_respuesta(respuesta.texto, contexto)
+    texto_final = seguro.texto
+
+    # Ante "es normal su oxigenacion?" el modelo a veces solo se niega y no
+    # entrega los datos que tiene delante. La negativa es correcta, pero la
+    # familia se queda sin nada: se anexan las mediciones del expediente tal
+    # cual, sin pasar por el modelo.
+    # Se mira si la respuesta trae algun valor medido (no basta una fecha:
+    # "no hay datos para el 02-11 al 08-11" tiene cifras y ningun dato).
+    if pide_criterio_clinico(payload.text):
+        registradas = _lineas_mediciones(contexto)
+        valores = {v for ln in registradas
+                   for v in re.findall(r"\d+(?:\.\d+)?", ln.split(":", 1)[-1])
+                   if len(v) >= 2}
+        trae_valor = any(re.search(rf"(?<![\d.]){re.escape(v)}(?![\d])",
+                                   texto_final.replace(",", "."))
+                         for v in valores)
+        if registradas and not trae_valor:
+            # "No hay datos de X" junto a los datos de X se contradice: esa
+            # frase era falsa y se quita.
+            texto_final = re.sub(
+                r"[^.\n]*\b(?:no hay|sin)\s+(?:datos|mediciones|registros|"
+                r"informaci[oó]n)\b[^.\n]*\.?\s*", "", texto_final,
+                flags=re.IGNORECASE).strip()
+            texto_final = (
+                (f"{texto_final}\n\n" if texto_final else
+                 "No puedo decir si estos valores son normales; eso lo "
+                 "evalúa el médico tratante.\n\n")
+                + "Lo registrado en el expediente:\n" + "\n".join(registradas))
 
     if conv is None:
         conv_id = (
@@ -579,7 +613,7 @@ async def ask(
                 """
             ),
             {"conv": str(conv_id), "uid": ctx.user.user_id, "rol": ctx.role,
-             "pregunta": payload.text, "respuesta": respuesta.texto,
+             "pregunta": payload.text, "respuesta": texto_final,
              "ms": latencia},
         )
     ).mappings().first()
@@ -605,12 +639,29 @@ async def ask(
         message=AssistantMessageOut(
             id=consulta["id"],
             role="assistant",
-            text=respuesta.texto,
+            text=texto_final,
             created_at=consulta["created_at"],
             citations=[CitationOut(label=f.label, reference=f.tabla)
                        for f in _unicas(fuentes)],
         ),
     )
+
+
+def _lineas_mediciones(contexto: str) -> list[str]:
+    """Las lineas de resumen del bloque 'Mediciones del período', sin la
+    viñeta ni las series diarias, para mostrarlas tal cual."""
+    lineas, dentro = [], False
+    for ln in contexto.split("\n"):
+        if ln.startswith("Mediciones del período"):
+            dentro = True
+            continue
+        if dentro:
+            if ln.startswith("- "):
+                if "sin mediciones registradas" not in ln:
+                    lineas.append(ln[2:].strip())
+            elif not ln.startswith("  "):
+                break
+    return lineas[:8]
 
 
 def _unicas(fuentes: list) -> list:
@@ -639,6 +690,8 @@ _ETIQUETA = {
     "care_observations":  "Bitacora",
     "alerts":             "Alertas",
     "medical_documents":  "Documentos",
+    "shift_notes":        "Relevos",
+    "incidents":          "Incidentes",
 }
 
 

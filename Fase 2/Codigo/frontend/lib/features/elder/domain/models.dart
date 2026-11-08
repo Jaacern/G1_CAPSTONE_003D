@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_theme.dart';
+
 /// Modelos del módulo Adulto Mayor (vista accesible): fotos familiares y
 /// contenido de entretenimiento ("Para ti").
 
@@ -53,13 +55,13 @@ class FamilyPhoto {
 
 /// Tipo de tarjeta de contenido del feed de entretenimiento.
 enum ContentType {
-  news('news', 'Noticia', Icons.newspaper_rounded, Color(0xFF1F6F8B)),
+  news('news', 'Noticia', Icons.newspaper_rounded, AgeColors.info600),
   joke('joke', 'Chiste', Icons.sentiment_very_satisfied_rounded,
-      Color(0xFFE8A13A)),
-  memory('memory', 'Recuerdo', Icons.photo_album_rounded, Color(0xFF7FB685)),
+      AgeColors.gold500),
+  memory('memory', 'Recuerdo', Icons.photo_album_rounded, AgeColors.coral500),
   exercise('exercise', 'Ejercicio suave', Icons.self_improvement_rounded,
-      Color(0xFF2E9E5B)),
-  tip('tip', 'Consejo', Icons.lightbulb_rounded, Color(0xFF14505F));
+      AgeColors.ok600),
+  tip('tip', 'Consejo', Icons.lightbulb_rounded, AgeColors.teal700);
 
   const ContentType(this.apiValue, this.label, this.icon, this.color);
 

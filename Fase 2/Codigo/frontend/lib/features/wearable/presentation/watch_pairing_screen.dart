@@ -209,9 +209,9 @@ class _WatchPairingScreenState extends ConsumerState<WatchPairingScreen> {
             Column(
               children: [
                 // Indicador de que la app está esperando al reloj.
-                Row(
+                const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
+                  children: [
                     SizedBox(
                       width: 14,
                       height: 14,
@@ -315,10 +315,10 @@ class _DigitBox extends StatelessWidget {
       height: 56,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: (dim ? AppColors.textSecondary : AppColors.primary).withOpacity(.08),
+        color: (dim ? AppColors.textSecondary : AppColors.primary).withValues(alpha: .08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: (dim ? AppColors.textSecondary : AppColors.primary).withOpacity(.25),
+          color: (dim ? AppColors.textSecondary : AppColors.primary).withValues(alpha: .25),
         ),
       ),
       child: Text(
@@ -344,8 +344,8 @@ class _IntroCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: const [
+          const Row(
+            children: [
               Text('⌚', style: TextStyle(fontSize: 22)),
               SizedBox(width: 10),
               Expanded(
@@ -376,12 +376,12 @@ class _StepsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(.06),
+        color: AppColors.primary.withValues(alpha: .06),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
+        children: [
           Text('Cómo vincular',
               style: TextStyle(fontWeight: FontWeight.w700)),
           SizedBox(height: 10),
@@ -435,7 +435,7 @@ class _ErrorBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.statusAttention.withOpacity(.08),
+        color: AppColors.statusAttention.withValues(alpha: .08),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(

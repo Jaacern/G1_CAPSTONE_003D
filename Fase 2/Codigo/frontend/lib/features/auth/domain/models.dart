@@ -1,4 +1,9 @@
 /// Modelos de autenticación (alineados con la Especificación de Endpoints v1).
+library;
+
+import 'dart:ui' show Color;
+
+import '../../../core/theme/app_theme.dart';
 
 enum RoleType {
   family('family', 'Familiar'),
@@ -9,6 +14,22 @@ enum RoleType {
   const RoleType(this.apiValue, this.label);
   final String apiValue;
   final String label;
+
+  /// Acento de rol (guía AgeCare, sección 4.5). Para avatares, etiquetas de
+  /// nombre y tarjetas de rol. Nunca para estados ni acciones.
+  Color get accentFg => switch (this) {
+        RoleType.family => AgeRoleAccent.familyFg,
+        RoleType.caregiver => AgeRoleAccent.caregiverFg,
+        RoleType.doctor => AgeRoleAccent.doctorFg,
+        RoleType.elder => AgeRoleAccent.elderFg,
+      };
+
+  Color get accentBg => switch (this) {
+        RoleType.family => AgeRoleAccent.familyBg,
+        RoleType.caregiver => AgeRoleAccent.caregiverBg,
+        RoleType.doctor => AgeRoleAccent.doctorBg,
+        RoleType.elder => AgeRoleAccent.elderBg,
+      };
 
   static RoleType fromApi(String v) =>
       RoleType.values.firstWhere((r) => r.apiValue == v, orElse: () => RoleType.family);

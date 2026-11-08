@@ -14,9 +14,26 @@ final latestVitalsProvider = FutureProvider<List<LatestVital>>((ref) async {
   return ref.watch(vitalsRepositoryProvider).getLatest(patient.patientId);
 });
 
+/// Ultimos valores de UN paciente concreto, sin pasar por el seleccionado.
+///
+/// Lo necesita la lista de pacientes del medico, que muestra varios a la vez
+/// y por lo tanto no puede depender de cual esta seleccionado.
+///
+/// Es una peticion por paciente. Se mantiene vivo un rato despues de que la
+/// lista deja de mirarlo para que volver atras desde una ficha no las repita
+/// todas.
+final vitalesDePacienteProvider =
+    FutureProvider.family<List<LatestVital>, String>((ref, patientId) async {
+  final link = ref.keepAlive();
+  Timer? expira;
+  ref.onCancel(() => expira = Timer(const Duration(minutes: 2), link.close));
+  ref.onResume(() => expira?.cancel());
+  ref.onDispose(() => expira?.cancel());
+  return ref.watch(vitalsRepositoryProvider).getLatest(patientId);
+});
+
 /// Umbrales (rangos normales) del paciente seleccionado (GET 5.5).
-final thresholdsProvider =
-    FutureProvider<List<Threshold>>((ref) async {
+final thresholdsProvider = FutureProvider<List<Threshold>>((ref) async {
   final patient = ref.watch(selectedPatientProvider);
   if (patient == null) return [];
   return ref.watch(vitalsRepositoryProvider).getThresholds(patient.patientId);
@@ -150,5 +167,5 @@ class LiveController extends StateNotifier<LiveState> {
   }
 }
 
-final liveControllerProvider =
-    StateNotifierProvider<LiveController, LiveState>((ref) => LiveController(ref));
+final liveControllerProvider = StateNotifierProvider<LiveController, LiveState>(
+    (ref) => LiveController(ref));

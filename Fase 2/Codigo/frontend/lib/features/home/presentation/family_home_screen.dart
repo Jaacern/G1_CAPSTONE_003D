@@ -61,8 +61,6 @@ class FamilyHomeScreen extends ConsumerWidget {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 96),
                 children: [
-                  const _ScreenTitle('Hoy'),
-                  const SizedBox(height: 14),
                   const _AlertBand(),
                   const _SectionLabel('Tus pacientes'),
                   for (final p in patients) _PatientSemCard(patient: p),
@@ -94,22 +92,6 @@ class FamilyHomeScreen extends ConsumerWidget {
     if (full == null || full.trim().isEmpty) return 'tu paciente';
     return full.trim().split(RegExp(r'\s+')).first;
   }
-}
-
-class _ScreenTitle extends StatelessWidget {
-  const _ScreenTitle(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Text(
-        text,
-        style: const TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.w800,
-          color: AppColors.textPrimary,
-          letterSpacing: -.5,
-        ),
-      );
 }
 
 class _SectionLabel extends StatelessWidget {
@@ -146,11 +128,11 @@ class _AlertBand extends ConsumerWidget {
         final alert = summary.activeAlerts.first;
         final critical = alert.isCritical;
         final bg = critical
-            ? AppColors.statusAttention.withOpacity(.10)
-            : AppColors.statusWarning.withOpacity(.12);
+            ? AppColors.statusAttention.withValues(alpha: .10)
+            : AppColors.statusWarning.withValues(alpha: .12);
         final border = critical
-            ? AppColors.statusAttention.withOpacity(.35)
-            : AppColors.statusWarning.withOpacity(.4);
+            ? AppColors.statusAttention.withValues(alpha: .35)
+            : AppColors.statusWarning.withValues(alpha: .4);
         return Padding(
           padding: const EdgeInsets.only(bottom: 4),
           child: InkWell(
@@ -287,17 +269,17 @@ class _VitalsSummaryCard extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              const Row(
                 children: [
                   // El título cede ancho antes que "Ver todo": sin Expanded,
                   // en una fila de 256 dp empujaba el enlace fuera de pantalla.
-                  const Expanded(
+                  Expanded(
                     child: Text('Vitals del wearable',
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                             fontSize: 14, fontWeight: FontWeight.w700)),
                   ),
-                  const Text('Ver todo ›',
+                  Text('Ver todo ›',
                       style: TextStyle(
                           fontSize: 12, color: AppColors.textSecondary)),
                 ],
@@ -432,7 +414,7 @@ class _Pill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(.12),
+        color: color.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(text,
@@ -579,9 +561,9 @@ class _AiCta extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(.08),
+          color: AppColors.primary.withValues(alpha: .08),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.primary.withOpacity(.20)),
+          border: Border.all(color: AppColors.primary.withValues(alpha: .20)),
         ),
         child: Row(
           children: [

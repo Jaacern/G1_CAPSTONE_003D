@@ -4,11 +4,6 @@ import '../../patients/application/patients_providers.dart';
 import '../data/alerts_repository.dart';
 import '../domain/models.dart';
 
-/// Filtro del centro de alertas: todas mis alertas, o solo las del paciente
-/// seleccionado. Antes el centro mezclaba a todos los pacientes sin forma de
-/// acotar (DEF-016). false = todos; true = solo el paciente seleccionado.
-final alertsOnlySelectedPatientProvider = StateProvider<bool>((ref) => false);
-
 /// Lo que necesita la pantalla para pintar el centro de alertas.
 class AlertsState {
   const AlertsState({
@@ -50,24 +45,17 @@ class AlertsController extends AsyncNotifier<AlertsState> {
 
   @override
   Future<AlertsState> build() {
-    // Al cambiar el filtro (todos / solo el paciente seleccionado) o el
-    // paciente activo, el centro se reconstruye con la consulta correcta.
-    ref.watch(alertsOnlySelectedPatientProvider);
-    ref.watch(selectedPatientProvider);
-    return _cargarPrimeraPagina();
+    // Al cambiar el paciente seleccionado el notifier se reconstruye y el
+    // centro pasa a mostrar solo las alertas de ese paciente (el backend
+    // filtra y pagina por patient_id, no se filtra en el cliente).
+    final patientId = ref.watch(selectedPatientProvider)?.patientId;
+    return _cargarPrimeraPagina(patientId);
   }
 
-  /// patient_id a enviar según el filtro activo. null = todos mis pacientes.
-  String? get _patientFilter {
-    final soloSeleccionado = ref.read(alertsOnlySelectedPatientProvider);
-    if (!soloSeleccionado) return null;
-    return ref.read(selectedPatientProvider)?.patientId;
-  }
-
-  Future<AlertsState> _cargarPrimeraPagina() async {
-    final pagina = await ref.read(alertsRepositoryProvider).listAlerts(
+  Future<AlertsState> _cargarPrimeraPagina(String? patientId) async {
+    final pagina = await ref.watch(alertsRepositoryProvider).listAlerts(
+          patientId: patientId,
           activeOnly: true,
-          patientId: _patientFilter,
           page: 1,
           pageSize: pageSize,
         );
@@ -88,8 +76,8 @@ class AlertsController extends AsyncNotifier<AlertsState> {
 
     state = AsyncData(actual.copyWith(cargandoMas: true));
     final pagina = await ref.read(alertsRepositoryProvider).listAlerts(
+          patientId: ref.read(selectedPatientProvider)?.patientId,
           activeOnly: true,
-          patientId: _patientFilter,
           page: actual.items.length ~/ pageSize + 1,
           pageSize: pageSize,
         );
@@ -101,7 +89,8 @@ class AlertsController extends AsyncNotifier<AlertsState> {
   /// hacía state = AsyncLoading, que dejaba el centro en blanco al refrescar).
   Future<void> recargar() async {
     try {
-      final nuevo = await _cargarPrimeraPagina();
+      final nuevo = await _cargarPrimeraPagina(
+          ref.read(selectedPatientProvider)?.patientId);
       state = AsyncData(nuevo);
     } catch (e, st) {
       // Si no hay datos previos, propaga el error; si los hay, los conserva.

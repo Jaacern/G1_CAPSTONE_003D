@@ -100,27 +100,29 @@ class AuthRepositoryMock implements AuthRepository {
   static const demoEmail = 'demo@agecare.app';
   static const demoDoctorEmail = 'doctor@agecare.app';
   static const demoCaregiverEmail = 'cuidadora@agecare.app';
-  // No hay persona demo de adulto mayor: esa cuenta no admite contraseña
-  // (911_elder_account.sql), autentica el dispositivo vinculado.
+  // En producción el adulto mayor no usa contraseña (911_elder_account.sql):
+  // autentica el dispositivo vinculado. Solo en modo demo se expone esta
+  // cuenta para poder revisar su vista desde el navegador.
+  static const demoElderEmail = 'adultomayor@agecare.app';
   static const demoPassword = 'agecare123';
 
   User? _currentUser;
 
-  static final _demoUser = User(
+  static const _demoUser = User(
     userId: 'u-demo-1',
     fullName: 'María González',
     email: demoEmail,
-    memberships: const [
+    memberships: [
       Membership(patientId: 'p-elena', patientName: 'Elena', role: RoleType.family),
       Membership(patientId: 'p-jose', patientName: 'José', role: RoleType.family),
     ],
   );
 
-  static final _demoDoctor = User(
+  static const _demoDoctor = User(
     userId: 'u-demo-doctor',
     fullName: 'Dra. Carolina Soto',
     email: demoDoctorEmail,
-    memberships: const [
+    memberships: [
       Membership(patientId: 'p-elena', patientName: 'Elena Ramírez', role: RoleType.doctor),
       Membership(patientId: 'p-jose', patientName: 'José Ramírez', role: RoleType.doctor),
     ],
@@ -142,6 +144,20 @@ class AuthRepositoryMock implements AuthRepository {
     ],
   );
 
+  // Solo demo: el adulto mayor es paciente de sí mismo. Permite revisar la
+  // vista del rol elder sin un dispositivo vinculado.
+  static const _demoElder = User(
+    userId: 'u-demo-elder',
+    fullName: 'Elena Ramírez',
+    email: demoElderEmail,
+    memberships: [
+      Membership(
+          patientId: 'p-elena',
+          patientName: 'Elena Ramírez',
+          role: RoleType.elder),
+    ],
+  );
+
   @override
   Future<AuthSession> login({required String email, required String password}) async {
     await Future.delayed(const Duration(milliseconds: 400));
@@ -156,6 +172,7 @@ class AuthRepositoryMock implements AuthRepository {
       demoEmail => _demoUser,
       demoDoctorEmail => _demoDoctor,
       demoCaregiverEmail => _demoCaregiver,
+      demoElderEmail => _demoElder,
       _ => null,
     };
     if (user == null) {

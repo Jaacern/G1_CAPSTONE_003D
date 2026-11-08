@@ -1,6 +1,8 @@
 import 'package:agecare_app/core/theme/app_theme.dart';
 import 'package:agecare_app/features/alerts/data/alerts_repository.dart';
 import 'package:agecare_app/features/alerts/presentation/alerts_screen.dart';
+import 'package:agecare_app/features/auth/application/auth_controller.dart';
+import 'package:agecare_app/features/auth/domain/models.dart';
 import 'package:agecare_app/features/patients/data/patients_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +21,20 @@ void main() {
         patientsRepositoryProvider
             .overrideWithValue(PatientsRepositoryMock()),
         alertsRepositoryProvider.overrideWithValue(AlertsRepositoryMock()),
+        // Sesión fija de cuidadora: evita el timer de restauración y mantiene
+        // los botones de gestión que esta prueba mide (el familiar no los ve).
+        currentUserProvider.overrideWith((ref) => const User(
+              userId: 'u-care',
+              fullName: 'Rosa Millán',
+              email: 'cuidadora@agecare.app',
+              memberships: [
+                Membership(
+                  patientId: 'p-elena',
+                  patientName: 'Elena Ramírez',
+                  role: RoleType.caregiver,
+                ),
+              ],
+            )),
       ],
       child: MaterialApp(
           theme: AppTheme.light(), home: const AlertsScreen()),

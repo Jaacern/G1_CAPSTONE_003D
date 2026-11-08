@@ -208,7 +208,7 @@ class _DocumentTileState extends ConsumerState<_DocumentTile> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(.1),
+              color: AppColors.primary.withValues(alpha: .1),
               borderRadius: BorderRadius.circular(12),
             ),
             alignment: Alignment.center,
@@ -379,7 +379,7 @@ class _UploadSheetState extends ConsumerState<_UploadSheet> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            value: _category,
+            initialValue: _category,
             decoration: const InputDecoration(labelText: 'Categoría'),
             items: [
               for (final e in _categories.entries)

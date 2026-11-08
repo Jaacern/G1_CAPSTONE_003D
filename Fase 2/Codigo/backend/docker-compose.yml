@@ -25,7 +25,7 @@ services:
   api:
     build: ./api
     container_name: agecare-api
-    environment:
+    environment: &entorno_api
       # La API se conecta a la BD por el nombre de servicio de la red interna.
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
@@ -33,6 +33,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET:-dev-secret-cambiar-en-produccion}
+
+      # Donde estan los .sql que la api aplica al arrancar. La imagen copia
+      # solo la carpeta app, asi que los .sql entran montados desde el host
+      # (el volumen de mas abajo) y esta variable dice en que ruta quedaron.
+      AGECARE_SQL_DIR: /sql
 
       # Zona horaria de la operacion. Decide a que DIA pertenece cada
       # instante guardado: "las dosis de hoy", "las tareas completadas
@@ -79,6 +84,39 @@ services:
     volumes:
       # Sin esto los archivos que la gente sube viven dentro del contenedor
       # y se pierden en cada reinicio.
+      - archivos:/var/agecare/files
+      # Los mismos .sql que la base ejecuta la primera vez. La api los
+      # necesita para poner al dia una base que ya existia: el volumen de
+      # la base solo los corre cuando se crea, asi que los archivos
+      # agregados despues nunca llegaron a quien ya la tenia levantada.
+      - ./sql:/sql:ro,Z
+    restart: unless-stopped
+    networks: [agecare-net]
+
+  # Las tareas del dia: generar las dosis, marcar las vencidas, crear las
+  # alertas y calcular el semaforo. Sin esto la pantalla de medicamentos
+  # sale vacia, la adherencia da cero y el semaforo se queda pegado en el
+  # ultimo dia que alguien calculo a mano.
+  #
+  # Va en su propio contenedor y no dentro de la api por dos razones. Si
+  # viviera en la api, correria una vez por cada replica el dia que se
+  # levante mas de una. Y un proceso de fondo que se cuelga dentro del
+  # servicio web se lleva al servicio web con el.
+  mantenimiento:
+    build: ./api
+    container_name: agecare-mantenimiento
+    command: /usr/local/bin/mantenimiento.sh
+    environment:
+      <<: *entorno_api
+      # Cada hora. Marcar una dosis vencida a tiempo y avisar de una
+      # medicion fuera de rango no pueden esperar hasta manana.
+      MANTENIMIENTO_INTERVALO_SEG: ${MANTENIMIENTO_INTERVALO_SEG:-3600}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Necesita el mismo volumen que la api: una de sus tareas es borrar
+      # los binarios de las subidas que nunca llegaron.
       - archivos:/var/agecare/files
     restart: unless-stopped
     networks: [agecare-net]

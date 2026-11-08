@@ -48,7 +48,7 @@ class CaregiverProfileScreen extends ConsumerWidget {
               _Header(caregiver: c),
               const SizedBox(height: 16),
               if (c.bio.isNotEmpty) ...[
-                _SectionTitle('Sobre mí'),
+                const _SectionTitle('Sobre mí'),
                 const SizedBox(height: 6),
                 Text(c.bio,
                     style: const TextStyle(color: AppColors.textPrimary)),
@@ -75,7 +75,7 @@ class CaregiverProfileScreen extends ConsumerWidget {
                 ),
               const SizedBox(height: 16),
               if (c.specialties.isNotEmpty) ...[
-                _SectionTitle('Especialidades'),
+                const _SectionTitle('Especialidades'),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 6,
@@ -87,7 +87,7 @@ class CaregiverProfileScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
               ],
               if (c.certifications.isNotEmpty) ...[
-                _SectionTitle('Certificaciones'),
+                const _SectionTitle('Certificaciones'),
                 const SizedBox(height: 8),
                 for (final cert in c.certifications)
                   Padding(
@@ -464,7 +464,7 @@ class _Pill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(.08),
+        color: AppColors.primary.withValues(alpha: .08),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(label,

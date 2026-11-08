@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
-import '../../auth/application/auth_controller.dart';
 import '../../home/application/home_providers.dart';
 import '../../medications/presentation/medications_screen.dart';
 import '../../patients/application/patients_providers.dart';
@@ -19,10 +18,8 @@ class CaregiverHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
     final patient = ref.watch(selectedPatientProvider);
     final summary = ref.watch(todaySummaryProvider);
-    final firstName = (user?.fullName ?? '').trim().split(RegExp(r'\s+')).first;
 
     if (patient == null) {
       return const EmptyView(
@@ -33,9 +30,6 @@ class CaregiverHomeScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(firstName.isEmpty ? 'Hoy' : 'Hola, $firstName'),
-      ),
       body: Column(
         children: [
           // Tarjeta de estado del paciente (semáforo + motivo), de summary/today.

@@ -155,7 +155,7 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: _category,
+                    initialValue: _category,
                     decoration: const InputDecoration(labelText: 'Categoría'),
                     items: [
                       for (final c in _options)

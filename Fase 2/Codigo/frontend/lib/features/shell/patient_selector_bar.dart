@@ -5,11 +5,11 @@ import '../../core/theme/app_theme.dart';
 import '../patients/application/patients_providers.dart';
 import '../patients/domain/models.dart';
 
-/// Barra superior persistente de [MainShell] (AGE-206 / DAC05-55).
+/// Desplegable de paciente activo de [MainShell] (AGE-206 / DAC05-55).
 ///
-/// Vive por encima de las 5 pestañas de navegación, así que el contexto de
-/// paciente activo se mantiene al cambiar de pestaña. Cuando el usuario
-/// tiene 2 o más pacientes vinculados, al tocarla despliega la lista
+/// Va debajo de la barra de título y solo se muestra en las pestañas Hoy y
+/// Salud, que son donde se lee información del paciente. Cuando el usuario
+/// tiene 2 o más pacientes vinculados, al tocarlo despliega la lista
 /// completa y permite cambiar el paciente activo en 1 toque; con 0 o 1
 /// paciente solo muestra el contexto, sin acción.
 ///
@@ -26,14 +26,10 @@ class PatientSelectorBar extends ConsumerWidget {
     final selected = ref.watch(selectedPatientProvider);
 
     return Material(
-      color: AppColors.surface,
+      color: AppColors.background,
       child: Container(
-        height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         alignment: Alignment.centerLeft,
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: AppColors.divider)),
-        ),
         child: patientsAsync.when(
           loading: () => const _BarLabel('Cargando…'),
           error: (_, __) => const _BarLabel('AgeCare'),
@@ -48,25 +44,45 @@ class PatientSelectorBar extends ConsumerWidget {
               onTap: canSwitch
                   ? () => _openSelector(context, ref, patients, current)
                   : null,
-              borderRadius: BorderRadius.circular(10),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.divider),
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(current.wellbeingStatus.icon,
                         size: 20, color: current.wellbeingStatus.color),
                     const SizedBox(width: 8),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 220),
-                      child: Text(
-                        current.fullName,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                          color: AppColors.textPrimary,
-                        ),
+                    Flexible(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Paciente: ',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          Flexible(
+                            child: Text(
+                              current.fullName,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     if (canSwitch) ...[

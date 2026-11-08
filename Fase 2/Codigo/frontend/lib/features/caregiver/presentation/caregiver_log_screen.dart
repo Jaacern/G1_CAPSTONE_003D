@@ -121,7 +121,7 @@ class _ObservationCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(.08),
+                      color: AppColors.primary.withValues(alpha: .08),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(categoryLabel(obs.category),

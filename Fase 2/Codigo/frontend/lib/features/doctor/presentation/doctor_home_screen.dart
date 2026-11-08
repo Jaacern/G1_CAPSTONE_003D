@@ -4,7 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
-import '../../auth/application/auth_controller.dart';
+import '../../health/application/health_providers.dart';
+import '../../health/domain/models.dart' as health;
 import '../../patients/application/patients_providers.dart';
 import '../../patients/domain/models.dart';
 
@@ -19,15 +20,9 @@ class DoctorHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
-    final firstName =
-        (user?.fullName ?? '').trim().split(RegExp(r'\s+')).first;
     final patientsAsync = ref.watch(myPatientsProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(firstName.isEmpty ? 'Mis pacientes' : 'Hola, $firstName'),
-      ),
       body: patientsAsync.when(
         loading: () => const LoadingView(),
         error: (e, _) => ErrorView(message: e.toString()),
@@ -41,22 +36,9 @@ class DoctorHomeScreen extends ConsumerWidget {
                   'rol médico, verás a tus pacientes aquí.',
             );
           }
-          final requierenAtencion = patients
-              .where((p) => p.wellbeingStatus != WellbeingStatus.ok)
-              .length;
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8, left: 2),
-                child: Text(
-                  requierenAtencion > 0
-                      ? '$requierenAtencion de ${patients.length} requieren atención · ordenados por prioridad'
-                      : '${patients.length} paciente(s) · todo en orden',
-                  style: const TextStyle(
-                      fontSize: 13, color: AppColors.textSecondary),
-                ),
-              ),
               for (final p in patients)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -82,131 +64,139 @@ class _DoctorPatientCard extends ConsumerWidget {
         ref.read(selectedPatientProvider.notifier).select(patient);
         context.push('/doctor/patient?patient=${patient.patientId}');
       },
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          InitialsAvatar(
-            name: patient.fullName,
-            photoUrl: patient.photoUrl,
-            radius: 24,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Nombre completo + edad: el médico interpreta los signos según
-                // la edad (54 lpm no es lo mismo a los 50 que a los 90).
-                Text(
-                  patient.age != null
-                      ? '${patient.fullName}, ${patient.age} años'
-                      : patient.fullName,
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                if ((patient.rut ?? '').isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text('RUT ${patient.rut}',
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary)),
-                ],
-                if (patient.conditions.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: [
-                      for (final c in patient.conditions)
-                        _ConditionChip(label: _bonito(c)),
-                    ],
-                  ),
-                ],
-                if (patient.vitalsSummary.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Icon(Icons.favorite_rounded,
-                          size: 13, color: AppColors.textSecondary),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          patient.vitalsSummary.map((v) => v.display).join('  ·  '),
-                          style: const TextStyle(
-                              fontSize: 12, color: AppColors.textSecondary),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                if ((patient.topReason ?? '').isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Icon(Icons.warning_amber_rounded,
-                          size: 14, color: AppColors.statusAttention),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(patient.topReason!,
-                            style: const TextStyle(
-                                fontSize: 13,
-                                color: AppColors.statusAttention)),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Row(
             children: [
-              WellbeingChip(status: patient.wellbeingStatus),
-              if (patient.activeAlertsCount > 0) ...[
-                const SizedBox(height: 6),
-                Text(
-                  '${patient.activeAlertsCount} alerta(s)',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.statusAttention,
-                  ),
+              InitialsAvatar(
+                name: patient.fullName,
+                photoUrl: patient.photoUrl,
+                radius: 24,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(patient.fullName,
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700)),
+                    if ((patient.topReason ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(patient.topReason!,
+                          style: const TextStyle(
+                              fontSize: 13, color: AppColors.textSecondary)),
+                    ],
+                  ],
                 ),
-              ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  WellbeingChip(status: patient.wellbeingStatus),
+                  if (patient.activeAlertsCount > 0) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '${patient.activeAlertsCount} alerta(s)',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.statusAttention,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.textSecondary),
             ],
           ),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right_rounded,
-              color: AppColors.textSecondary),
+          // Los numeros, en la misma tarjeta. El semaforo dice que algo pasa;
+          // esto dice que. Sin ello hay que entrar a la ficha de cada
+          // paciente, mirar, salir y entrar al siguiente para comparar.
+          _VitalesEnLinea(patientId: patient.patientId),
         ],
       ),
     );
   }
 }
 
-/// Chip compacto de enfermedad para la tarjeta del médico.
-class _ConditionChip extends StatelessWidget {
-  const _ConditionChip({required this.label});
-  final String label;
+/// Los ultimos valores del paciente, en una linea dentro de su tarjeta.
+///
+/// El semaforo de la tarjeta dice que algo pasa, pero no que. Con esto el
+/// medico compara a sus pacientes de un vistazo en vez de entrar a una ficha,
+/// mirar, salir y entrar a la siguiente.
+///
+/// Mientras cargan no se dibuja nada en lugar de un indicador: son varias
+/// tarjetas pidiendo a la vez y la lista entera quedaria parpadeando. Si la
+/// peticion falla tampoco se muestra error, porque el dato de aqui es un
+/// extra y la ficha ya informa el fallo con su propio reintento.
+class _VitalesEnLinea extends ConsumerWidget {
+  const _VitalesEnLinea({required this.patientId});
+
+  final String patientId;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: .10),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-              fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600),
-        ),
-      );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final vitales = ref.watch(vitalesDePacienteProvider(patientId));
+    final conDatos =
+        vitales.valueOrNull?.where((v) => v.hasData).toList() ?? const [];
+    if (conDatos.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Wrap(
+        spacing: 14,
+        runSpacing: 6,
+        children: [
+          for (final v in conDatos) _ValorSuelto(vital: v),
+        ],
+      ),
+    );
+  }
 }
 
-/// Convierte el código de enfermedad del backend ("diabetes_tipo_2") en una
-/// etiqueta legible ("Diabetes tipo 2"). Es presentación: el dato crudo sigue
-/// siendo el del expediente.
-String _bonito(String codigo) {
-  final limpio = codigo.replaceAll('_', ' ').trim();
-  if (limpio.isEmpty) return codigo;
-  return limpio[0].toUpperCase() + limpio.substring(1);
+class _ValorSuelto extends StatelessWidget {
+  const _ValorSuelto({required this.vital});
+
+  final health.LatestVital vital;
+
+  @override
+  Widget build(BuildContext context) {
+    final fuera = !vital.inRange;
+    final color = fuera ? AppColors.statusAttention : AppColors.textPrimary;
+    return Semantics(
+      label: '${vital.type.label}: ${_numero(vital.value)} '
+          '${vital.type.unit}${fuera ? ', fuera de rango' : ''}',
+      excludeSemantics: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(vital.type.icon,
+              size: 15,
+              color: fuera ? AppColors.statusAttention : AppColors.primary),
+          const SizedBox(width: 4),
+          Text(
+            '${_numero(vital.value)} ${vital.type.unit}',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: fuera ? FontWeight.w800 : FontWeight.w600,
+              color: color,
+            ),
+          ),
+          if (fuera) ...[
+            const SizedBox(width: 3),
+            const Icon(Icons.error_rounded,
+                size: 14, color: AppColors.statusAttention),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// La temperatura necesita su decimal; el resto no.
+  static String _numero(double v) =>
+      v == v.roundToDouble() ? v.round().toString() : v.toStringAsFixed(1);
 }

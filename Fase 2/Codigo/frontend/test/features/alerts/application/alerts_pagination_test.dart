@@ -6,6 +6,7 @@ import 'package:agecare_app/features/alerts/application/alerts_providers.dart';
 import 'package:agecare_app/features/alerts/data/alerts_repository.dart';
 import 'package:agecare_app/features/alerts/domain/models.dart';
 import 'package:agecare_app/features/alerts/presentation/alerts_screen.dart';
+import 'package:agecare_app/features/patients/application/patients_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -111,7 +112,13 @@ void main() {
   testWidgets('la lista ofrece cargar las alertas que faltan', (tester) async {
     final repo = _RepoFake(veinticinco);
     await tester.pumpWidget(ProviderScope(
-      overrides: [alertsRepositoryProvider.overrideWithValue(repo)],
+      overrides: [
+        alertsRepositoryProvider.overrideWithValue(repo),
+        // Sin pacientes no hay auto-selección asíncrona que reconstruya el
+        // centro a mitad de la prueba; el contexto queda fijo (null) y el
+        // repo fake pagina igual que antes.
+        myPatientsProvider.overrideWith((ref) async => []),
+      ],
       child: MaterialApp(
           theme: AppTheme.light(), home: const Scaffold(body: AlertsScreen())),
     ));

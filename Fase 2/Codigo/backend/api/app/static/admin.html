@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgeCare · Administración de planes</title>
+<style>
+  :root{
+    --tinta:#10243d; --tinta2:#4a5a6a; --suave:#8a97a4;
+    --linea:#dde3e9; --fondo:#f4f6f8; --papel:#fff;
+    --ok:#1f7a4d; --okf:#e8f5ee; --no:#9aa5b1; --nof:#f1f3f5;
+    --alerta:#b3261e; --alertaf:#fdecea; --aviso:#8a5a00; --avisof:#fff6e0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+       color:var(--tinta);background:var(--fondo)}
+  header{background:var(--tinta);color:#fff;padding:14px 22px;display:flex;
+         align-items:center;gap:14px;flex-wrap:wrap}
+  header h1{font-size:16px;margin:0;font-weight:600;letter-spacing:-.01em}
+  header .marca{font-size:11px;text-transform:uppercase;letter-spacing:.1em;
+                opacity:.65}
+  header .sp{flex:1}
+  header .quien{font-size:12.5px;opacity:.85}
+  main{max-width:1180px;margin:0 auto;padding:22px}
+  .tabs{display:flex;gap:4px;margin-bottom:18px;border-bottom:1px solid var(--linea)}
+  .tabs button{background:none;border:0;padding:9px 16px;font:inherit;font-size:13.5px;
+    color:var(--tinta2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tabs button.on{color:var(--tinta);border-bottom-color:var(--tinta);font-weight:600}
+  .tarjeta{background:var(--papel);border:1px solid var(--linea);border-radius:8px;
+           margin-bottom:16px;overflow:hidden}
+  .tarjeta>h2{margin:0;padding:12px 16px;font-size:13px;text-transform:uppercase;
+    letter-spacing:.07em;color:var(--tinta2);border-bottom:1px solid var(--linea);
+    background:#fbfcfd;font-weight:600}
+  .cuerpo{padding:16px}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:9px 16px;border-bottom:1px solid var(--linea);
+        vertical-align:middle}
+  th{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;
+     color:var(--suave);font-weight:600;background:#fbfcfd}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr.clic{cursor:pointer}
+  tbody tr.clic:hover{background:#f7f9fb}
+  code,.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:12.5px}
+  .et{display:inline-block;padding:2px 8px;border-radius:11px;font-size:11px;
+      font-weight:600;letter-spacing:.02em}
+  .et.active{background:var(--okf);color:var(--ok)}
+  .et.draft{background:var(--avisof);color:var(--aviso)}
+  .et.archived{background:var(--nof);color:var(--no)}
+  .et.nucleo{background:#eaf1fb;color:#1b4b8f}
+  button.b{background:var(--tinta);color:#fff;border:0;border-radius:6px;
+    padding:8px 14px;font:inherit;font-size:13px;cursor:pointer}
+  button.b:hover{background:#1b3category}
+  button.b.sec{background:#fff;color:var(--tinta);border:1px solid var(--linea)}
+  button.b.peli{background:#fff;color:var(--alerta);border:1px solid #f0c8c4}
+  button.b:disabled{opacity:.45;cursor:not-allowed}
+  input,select,textarea{font:inherit;font-size:13.5px;padding:7px 9px;
+    border:1px solid var(--linea);border-radius:6px;background:#fff;color:var(--tinta);
+    width:100%}
+  input:focus,select:focus,textarea:focus{outline:2px solid #bcd3f0;outline-offset:-1px}
+  label{display:block;font-size:12px;color:var(--tinta2);margin-bottom:4px;font-weight:600}
+  .campo{margin-bottom:12px}
+  .fila{display:flex;gap:12px;flex-wrap:wrap}
+  .fila>.campo{flex:1;min-width:150px}
+  .aviso{padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:14px}
+  .aviso.mal{background:var(--alertaf);color:var(--alerta);border:1px solid #f3cdc9}
+  .aviso.bien{background:var(--okf);color:var(--ok);border:1px solid #c6e6d5}
+  .aviso.nota{background:#eef4fb;color:#1b4b8f;border:1px solid #cfe0f3}
+  .sw{position:relative;display:inline-block;width:40px;height:22px;flex:none}
+  .sw input{opacity:0;width:0;height:0;position:absolute}
+  .sw span{position:absolute;inset:0;background:#cfd6dd;border-radius:22px;
+    transition:.15s;cursor:pointer}
+  .sw span:before{content:"";position:absolute;width:16px;height:16px;left:3px;top:3px;
+    background:#fff;border-radius:50%;transition:.15s}
+  .sw input:checked+span{background:var(--ok)}
+  .sw input:checked+span:before{transform:translateX(18px)}
+  .sw input:disabled+span{opacity:.5;cursor:not-allowed}
+  .ayuda{font-size:12px;color:var(--suave);margin-top:3px}
+  .vacio{padding:26px;text-align:center;color:var(--suave);font-size:13.5px}
+  .login{max-width:360px;margin:70px auto}
+  .modulo{font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--suave);font-weight:600}
+  dialog{border:0;border-radius:10px;padding:0;max-width:460px;width:94%;
+    box-shadow:0 14px 48px rgba(16,36,61,.22)}
+  dialog::backdrop{background:rgba(16,36,61,.4)}
+  dialog h3{margin:0;padding:14px 18px;font-size:14.5px;border-bottom:1px solid var(--linea)}
+  dialog .cuerpo{padding:18px}
+  dialog footer{padding:12px 18px;border-top:1px solid var(--linea);display:flex;
+    gap:8px;justify-content:flex-end;background:#fbfcfd}
+  .sinlim{font-style:italic;color:var(--suave)}
+  @media(max-width:620px){th,td{padding:8px 10px}main{padding:14px}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="marca">Alloxentric</div>
+    <h1>AgeCare · Administración de planes</h1>
+  </div>
+  <div class="sp"></div>
+  <div class="quien" id="quien"></div>
+  <button class="b sec" id="salir" style="display:none">Salir</button>
+</header>
+
+<main id="app"></main>
+
+<script>
+// ---------------------------------------------------------------------------
+// Estado y utilidades
+// ---------------------------------------------------------------------------
+const API = '/api/v1';
+let token = sessionStorage.getItem('admin_token') || null;
+let yo = null, vista = 'planes', planAbierto = null;
+
+// El token va en sessionStorage y no en localStorage a proposito: se borra
+// al cerrar la pestana. Es un panel que cambia lo que se le cobra a la
+// gente, y dejarlo abierto para siempre en un computador compartido de la
+// oficina es justo lo que no se quiere.
+function guardarToken(t){ token = t; t ? sessionStorage.setItem('admin_token', t)
+                                      : sessionStorage.removeItem('admin_token'); }
+
+async function api(ruta, opciones = {}){
+  const r = await fetch(API + ruta, {
+    ...opciones,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? {Authorization: 'Bearer ' + token} : {}),
+      ...(opciones.headers || {}),
+    },
+  });
+  if (r.status === 204) return null;
+  const cuerpo = await r.json().catch(() => null);
+  if (!r.ok){
+    // El backend contesta siempre con la misma forma {error:{code,message}}.
+    const e = new Error(cuerpo?.error?.message || 'Algo salió mal.');
+    e.codigo = cuerpo?.error?.code;
+    e.status = r.status;
+    throw e;
+  }
+  return cuerpo;
+}
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const plata = (n, m) => n == null ? '—'
+  : new Intl.NumberFormat('es-CL', {style:'currency', currency: m || 'CLP',
+      maximumFractionDigits:0}).format(n);
+const fecha = s => s ? new Date(s).toLocaleDateString('es-CL') : '—';
+const ETIQUETA = {active:'Activo', draft:'Borrador', archived:'Archivado'};
+const PERIODO = {monthly:'Mensual', yearly:'Anual', once:'Pago único'};
+const UNIDAD = {count:'cantidad', days:'días', months:'meses',
+  megabytes:'MB', per_month:'al mes', per_day:'al día'};
+
+function mensaje(texto, clase = 'mal'){
+  const d = document.getElementById('mensaje');
+  if (!d) return alert(texto);
+  d.className = 'aviso ' + clase;
+  d.textContent = texto;
+  d.style.display = 'block';
+  clearTimeout(d._t);
+  d._t = setTimeout(() => { d.style.display = 'none'; }, 5000);
+}
+
+async function conErrores(fn){
+  try { await fn(); }
+  catch (e){
+    if (e.status === 401){ guardarToken(null); yo = null; return pintar(); }
+    mensaje(e.message);
+  }
+}
+</script>
+
+<script>
+// ---------------------------------------------------------------------------
+// Entrar
+// ---------------------------------------------------------------------------
+function vistaLogin(){
+  return `<div class="login">
+    <div class="tarjeta">
+      <h2>Entrar</h2>
+      <div class="cuerpo">
+        <div id="mensaje" class="aviso mal" style="display:none"></div>
+        <div class="campo"><label for="em">Correo</label>
+          <input id="em" type="email" autocomplete="username"
+                 placeholder="admin@alloxentric.cl"></div>
+        <div class="campo"><label for="cl">Contraseña</label>
+          <input id="cl" type="password" autocomplete="current-password"></div>
+        <button class="b" id="entrar" style="width:100%">Entrar</button>
+        <p class="ayuda" style="margin-top:12px">
+          Solo para personal de Alloxentric. Una cuenta de la aplicación,
+          aunque sea válida, no abre este panel.</p>
+      </div>
+    </div></div>`;
+}
+
+async function entrar(){
+  const email = document.getElementById('em').value.trim();
+  const password = document.getElementById('cl').value;
+  if (!email || !password) return mensaje('Escribe tu correo y tu contraseña.');
+  try {
+    const r = await api('/auth/login', {method:'POST',
+      body: JSON.stringify({email, password})});
+    guardarToken(r.access_token);
+    // Se comprueba de inmediato que sea personal: si no lo es, mejor
+    // decirlo acá que dejarlo entrar a un panel que le va a fallar entero.
+    await api('/admin/plans');
+    yo = {email};
+    pintar();
+  } catch (e){
+    if (e.codigo === 'STAFF_ONLY'){
+      guardarToken(null);
+      return mensaje('Esa cuenta es válida, pero no es de personal de Alloxentric.');
+    }
+    guardarToken(null);
+    mensaje(e.status === 401 ? 'Correo o contraseña incorrectos.' : e.message);
+  }
+}
+</script>
+
+<script>
+// ---------------------------------------------------------------------------
+// Lista de planes
+// ---------------------------------------------------------------------------
+async function vistaPlanes(){
+  const {items} = await api('/admin/plans');
+  const filas = items.map(p => `
+    <tr class="clic" data-plan="${p.id}">
+      <td><strong>${esc(p.name)}</strong><br><code>${esc(p.code)}</code></td>
+      <td><span class="et ${p.status}">${ETIQUETA[p.status] || p.status}</span></td>
+      <td>${p.tier === 0 ? 'Gratuito' : 'Nivel ' + p.tier}</td>
+      <td>${p.features_incluidas}</td>
+      <td>${p.limites_fijados}</td>
+      <td>${p.tier === 0 ? '<span class="sinlim">sin costo</span>'
+                         : plata(p.precio_vigente, p.moneda)}</td>
+      <td>${p.suscripciones_activas}</td>
+    </tr>`).join('');
+
+  return `
+  <div id="mensaje" class="aviso" style="display:none"></div>
+  <div class="tarjeta">
+    <h2>Planes</h2>
+    <table>
+      <thead><tr><th>Plan</th><th>Estado</th><th>Nivel</th>
+        <th>Incluye</th><th>Límites</th><th>Precio mensual</th>
+        <th>Suscritos</th></tr></thead>
+      <tbody>${filas || '<tr><td colspan="7" class="vacio">Todavía no hay planes.</td></tr>'}</tbody>
+    </table>
+    <div class="cuerpo" style="border-top:1px solid var(--linea)">
+      <button class="b" id="nuevoPlan">Crear un plan</button>
+      <span class="ayuda" style="margin-left:10px">
+        Nace en borrador. Nadie lo puede contratar hasta que lo publiques.</span>
+    </div>
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Un plan por dentro: lo que da, cuánto permite, cuánto cuesta
+// ---------------------------------------------------------------------------
+async function vistaPlan(id){
+  const d = await api('/admin/plans/' + id);
+  const p = d.plan;
+
+  let modulo = '';
+  const feats = d.features.map(f => {
+    const cab = f.module !== modulo
+      ? (modulo = f.module, `<tr><td colspan="3" class="modulo"
+           style="padding-top:14px">${esc(f.module)}</td></tr>`) : '';
+    return cab + `
+    <tr>
+      <td style="width:52px">
+        <label class="sw"><input type="checkbox" data-feat="${esc(f.code)}"
+          ${f.is_included ? 'checked' : ''} ${f.is_core ? 'disabled' : ''}><span></span></label>
+      </td>
+      <td><strong>${esc(f.label)}</strong>
+          ${f.is_core ? '<span class="et nucleo" style="margin-left:6px">del núcleo</span>' : ''}
+          <div class="ayuda">${esc(f.description)}</div></td>
+      <td><code>${esc(f.code)}</code></td>
+    </tr>`;
+  }).join('');
+
+  const lims = d.limites.map(l => `
+    <tr>
+      <td><strong>${esc(l.label)}</strong>
+          <div class="ayuda">${esc(l.description)}</div></td>
+      <td style="width:150px">
+        <input type="number" min="0" data-lim="${esc(l.key)}"
+               value="${l.value ?? ''}" placeholder="sin tope"
+               ${l.fijado ? '' : 'data-nuevo="1"'}>
+        <div class="ayuda">${esc(UNIDAD[l.unit] || l.unit)}</div>
+      </td>
+      <td style="width:120px">${l.fijado
+          ? (l.value === null ? '<span class="sinlim">sin tope</span>'
+                              : (l.value === 0 ? 'prohibido' : ''))
+          : '<span class="sinlim">no definido</span>'}</td>
+    </tr>`).join('');
+
+  const precios = d.precios.map(x => `
+    <tr>
+      <td>${esc(PERIODO[x.period] || x.period)}</td>
+      <td class="mono">${plata(x.amount, x.currency)}</td>
+      <td>${fecha(x.valid_from)}</td>
+      <td>${x.valid_to ? fecha(x.valid_to)
+            : '<span class="et active">vigente</span>'}</td>
+    </tr>`).join('');
+
+  const puedePublicar = p.status === 'draft';
+  const puedeArchivar = p.status === 'active';
+
+  return `
+  <div id="mensaje" class="aviso" style="display:none"></div>
+  <p><button class="b sec" id="volver">← Todos los planes</button></p>
+
+  <div class="tarjeta">
+    <h2>${esc(p.name)} <span class="et ${p.status}"
+      style="margin-left:8px">${ETIQUETA[p.status] || p.status}</span></h2>
+    <div class="cuerpo">
+      <div class="fila">
+        <div class="campo"><label>Nombre</label>
+          <input id="pName" value="${esc(p.name)}"></div>
+        <div class="campo"><label>Nivel</label>
+          <input id="pTier" type="number" min="0" max="10" value="${p.tier}">
+          <div class="ayuda">0 es el plan gratuito</div></div>
+        <div class="campo"><label>Código</label>
+          <input value="${esc(p.code)}" disabled>
+          <div class="ayuda">No se puede cambiar</div></div>
+      </div>
+      <div class="campo"><label>Descripción</label>
+        <textarea id="pDesc" rows="2">${esc(p.description || '')}</textarea></div>
+      <div class="fila" style="align-items:center">
+        <button class="b" id="guardarPlan">Guardar cambios</button>
+        ${puedePublicar ? '<button class="b" id="publicar">Publicar</button>' : ''}
+        ${puedeArchivar ? '<button class="b peli" id="archivar">Archivar</button>' : ''}
+        <div class="sp" style="flex:1"></div>
+        <span class="ayuda">${p.suscripciones_activas} suscripción(es) activa(s)</span>
+      </div>
+      ${p.status === 'archived' ? `<div class="aviso nota" style="margin-top:14px">
+        Archivado. No se puede contratar, y quienes ya lo tenían lo conservan.</div>` : ''}
+    </div>
+  </div>
+
+  <div class="tarjeta">
+    <h2>Qué incluye este plan</h2>
+    <table><tbody>${feats}</tbody></table>
+    <div class="cuerpo" style="border-top:1px solid var(--linea)">
+      <span class="ayuda">Los cambios se guardan al momento de tocar el
+        interruptor. Las del núcleo no se pueden quitar de ningún plan.</span>
+    </div>
+  </div>
+
+  <div class="tarjeta">
+    <h2>Cuánto permite</h2>
+    <table>
+      <thead><tr><th>Límite</th><th>Valor</th><th></th></tr></thead>
+      <tbody>${lims}</tbody>
+    </table>
+    <div class="cuerpo" style="border-top:1px solid var(--linea)">
+      <button class="b" id="guardarLimites">Guardar límites</button>
+      <span class="ayuda" style="margin-left:10px">
+        Dejarlo vacío es <strong>sin tope</strong>. Poner 0 es
+        <strong>prohibido</strong>. No son lo mismo.</span>
+    </div>
+  </div>
+
+  <div class="tarjeta">
+    <h2>Precios</h2>
+    <table>
+      <thead><tr><th>Periodo</th><th>Monto</th><th>Desde</th><th>Hasta</th></tr></thead>
+      <tbody>${precios || '<tr><td colspan="4" class="vacio">Sin precios cargados.</td></tr>'}</tbody>
+    </table>
+    <div class="cuerpo" style="border-top:1px solid var(--linea)">
+      <div class="fila" style="align-items:flex-end">
+        <div class="campo" style="max-width:150px"><label>Periodo</label>
+          <select id="nPer"><option value="monthly">Mensual</option>
+            <option value="yearly">Anual</option>
+            <option value="once">Pago único</option></select></div>
+        <div class="campo" style="max-width:150px"><label>Monto</label>
+          <input id="nAmt" type="number" min="0" step="10" placeholder="5990"></div>
+        <div class="campo" style="max-width:110px"><label>Moneda</label>
+          <input id="nCur" value="CLP" maxlength="3"></div>
+        <div class="campo" style="max-width:180px">
+          <button class="b" id="nuevoPrecio">Agregar precio</button></div>
+      </div>
+      <span class="ayuda">Un precio nuevo cierra el anterior hoy. Los precios
+        viejos no se borran, porque los cobros ya emitidos apuntan a ellos.</span>
+    </div>
+  </div>`;
+}
+</script>
+
+<script>
+// ---------------------------------------------------------------------------
+// Catálogos
+// ---------------------------------------------------------------------------
+async function vistaCatalogo(){
+  const [f, l] = await Promise.all([api('/admin/features'), api('/admin/limit-keys')]);
+  const feats = f.items.map(x => `
+    <tr><td><strong>${esc(x.label)}</strong>
+        ${x.is_core ? '<span class="et nucleo" style="margin-left:6px">del núcleo</span>' : ''}
+        <div class="ayuda">${esc(x.description)}</div></td>
+      <td><code>${esc(x.code)}</code></td>
+      <td class="modulo">${esc(x.module)}</td>
+      <td>${x.planes_que_la_incluyen}</td></tr>`).join('');
+  const lims = l.items.map(x => `
+    <tr><td><strong>${esc(x.label)}</strong>
+        <div class="ayuda">${esc(x.description)}</div></td>
+      <td><code>${esc(x.key)}</code></td>
+      <td>${esc(UNIDAD[x.unit] || x.unit)}</td>
+      <td>${x.planes_que_lo_fijan}</td></tr>`).join('');
+
+  return `
+  <div id="mensaje" class="aviso" style="display:none"></div>
+  <div class="aviso nota">Esto es el catálogo de lo que un plan
+    <em>puede</em> dar. Crear algo acá no lo agrega a ningún plan: después
+    se decide plan por plan.</div>
+
+  <div class="tarjeta">
+    <h2>Funcionalidades</h2>
+    <table><thead><tr><th>Funcionalidad</th><th>Código</th><th>Módulo</th>
+      <th>En planes</th></tr></thead><tbody>${feats}</tbody></table>
+    <div class="cuerpo" style="border-top:1px solid var(--linea)">
+      <button class="b" id="nuevaFeature">Agregar funcionalidad</button></div>
+  </div>
+
+  <div class="tarjeta">
+    <h2>Límites</h2>
+    <table><thead><tr><th>Límite</th><th>Clave</th><th>Unidad</th>
+      <th>En planes</th></tr></thead><tbody>${lims}</tbody></table>
+    <div class="cuerpo" style="border-top:1px solid var(--linea)">
+      <button class="b" id="nuevoLimite">Agregar límite</button></div>
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Diálogos
+// ---------------------------------------------------------------------------
+function dialogo(titulo, campos, alGuardar){
+  const d = document.createElement('dialog');
+  d.innerHTML = `<h3>${esc(titulo)}</h3><div class="cuerpo">
+    ${campos.map(c => `<div class="campo"><label for="d_${c.id}">${esc(c.label)}</label>
+      ${c.tipo === 'select'
+        ? `<select id="d_${c.id}">${c.opciones.map(o =>
+             `<option value="${esc(o)}">${esc(o)}</option>`).join('')}</select>`
+        : c.tipo === 'check'
+        ? `<label class="sw"><input type="checkbox" id="d_${c.id}"><span></span></label>`
+        : `<input id="d_${c.id}" type="${c.tipo || 'text'}"
+             placeholder="${esc(c.ph || '')}">`}
+      ${c.ayuda ? `<div class="ayuda">${esc(c.ayuda)}</div>` : ''}</div>`).join('')}
+    <div id="dlgError" class="aviso mal" style="display:none"></div>
+    </div>
+    <footer><button class="b sec" value="cancel">Cancelar</button>
+      <button class="b" id="dlgOk">Guardar</button></footer>`;
+  document.body.appendChild(d);
+  d.querySelector('[value=cancel]').onclick = () => { d.close(); d.remove(); };
+  d.querySelector('#dlgOk').onclick = async () => {
+    const datos = {};
+    for (const c of campos){
+      const el = d.querySelector('#d_' + c.id);
+      datos[c.id] = c.tipo === 'check' ? el.checked
+                  : c.tipo === 'number' ? (el.value === '' ? null : Number(el.value))
+                  : el.value.trim();
+    }
+    try { await alGuardar(datos); d.close(); d.remove(); }
+    catch (e){
+      const err = d.querySelector('#dlgError');
+      err.textContent = e.message; err.style.display = 'block';
+    }
+  };
+  d.showModal();
+}
+</script>
+
+<script>
+// ---------------------------------------------------------------------------
+// Pintar y conectar
+// ---------------------------------------------------------------------------
+const MODULOS = ['health','medication','alerts','logbook','documents','chat',
+                 'assistant','elder','marketplace','reports'];
+const UNIDADES = ['count','days','months','megabytes','per_month','per_day'];
+
+async function pintar(){
+  const app = document.getElementById('app');
+  document.getElementById('quien').textContent = yo ? yo.email : '';
+  document.getElementById('salir').style.display = yo ? '' : 'none';
+
+  if (!token || !yo){
+    app.innerHTML = vistaLogin();
+    document.getElementById('entrar').onclick = entrar;
+    document.getElementById('cl').onkeydown = e => { if (e.key === 'Enter') entrar(); };
+    return;
+  }
+
+  const tabs = `<div class="tabs">
+    <button data-v="planes" class="${vista==='planes'?'on':''}">Planes</button>
+    <button data-v="catalogo" class="${vista==='catalogo'?'on':''}">Catálogo</button>
+  </div>`;
+
+  try {
+    const contenido = vista === 'catalogo' ? await vistaCatalogo()
+                    : planAbierto ? await vistaPlan(planAbierto)
+                    : await vistaPlanes();
+    // Las pestañas se muestran siempre, también dentro de un plan. Antes se
+    // escondían ahí, y para ir al catálogo había que volver a la lista
+    // primero, que es justo lo que uno quiere hacer cuando se da cuenta de
+    // que a este plan le falta una funcionalidad que todavía no existe.
+    app.innerHTML = tabs + contenido;
+  } catch (e){
+    if (e.status === 401){ guardarToken(null); yo = null; return pintar(); }
+    app.innerHTML = tabs + `<div class="aviso mal">${esc(e.message)}</div>`;
+    return;
+  }
+
+  app.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+    vista = b.dataset.v; planAbierto = null; pintar();
+  });
+  app.querySelectorAll('tr[data-plan]').forEach(tr => tr.onclick = () => {
+    planAbierto = tr.dataset.plan; pintar();
+  });
+  const volver = document.getElementById('volver');
+  if (volver) volver.onclick = () => { planAbierto = null; pintar(); };
+
+  conectarPlanes(app);
+  conectarPlan(app);
+  conectarCatalogo(app);
+}
+
+function conectarPlanes(app){
+  const b = app.querySelector('#nuevoPlan');
+  if (!b) return;
+  b.onclick = () => dialogo('Crear un plan', [
+    {id:'code', label:'Código', ph:'familiar',
+     ayuda:'Minúsculas, números y guion bajo. No se puede cambiar después.'},
+    {id:'name', label:'Nombre', ph:'AgeCare Familiar'},
+    {id:'description', label:'Descripción'},
+    {id:'tier', label:'Nivel', tipo:'number', ayuda:'0 es el plan gratuito.'},
+  ], async datos => {
+    const r = await api('/admin/plans', {method:'POST', body: JSON.stringify({
+      code: datos.code, name: datos.name,
+      description: datos.description || null, tier: datos.tier ?? 1})});
+    planAbierto = r.id; await pintar();
+  });
+}
+
+function conectarPlan(app){
+  if (!planAbierto) return;
+
+  app.querySelectorAll('input[data-feat]').forEach(ch => ch.onchange = () =>
+    conErrores(async () => {
+      try {
+        await api(`/admin/plans/${planAbierto}/features/${ch.dataset.feat}`,
+          {method:'PUT', body: JSON.stringify({is_included: ch.checked})});
+        mensaje(ch.checked ? 'Se agregó al plan.' : 'Se quitó del plan.', 'bien');
+      } catch (e){ ch.checked = !ch.checked; throw e; }
+    }));
+
+  const gl = app.querySelector('#guardarLimites');
+  if (gl) gl.onclick = () => conErrores(async () => {
+    for (const inp of app.querySelectorAll('input[data-lim]')){
+      const valor = inp.value === '' ? null : Number(inp.value);
+      // Los que nunca se definieron y siguen vacíos se dejan como estaban:
+      // "no definido" y "sin tope" son estados distintos y escribir uno
+      // encima del otro borraría esa diferencia sin que nadie lo pida.
+      if (inp.dataset.nuevo === '1' && valor === null) continue;
+      await api(`/admin/plans/${planAbierto}/limits/${inp.dataset.lim}`,
+        {method:'PUT', body: JSON.stringify({value: valor})});
+    }
+    mensaje('Límites guardados.', 'bien');
+    await pintar();
+  });
+
+  const gp = app.querySelector('#guardarPlan');
+  if (gp) gp.onclick = () => conErrores(async () => {
+    await api('/admin/plans/' + planAbierto, {method:'PATCH', body: JSON.stringify({
+      name: app.querySelector('#pName').value.trim(),
+      description: app.querySelector('#pDesc').value.trim() || null,
+      tier: Number(app.querySelector('#pTier').value)})});
+    mensaje('Plan guardado.', 'bien');
+    await pintar();
+  });
+
+  const pub = app.querySelector('#publicar');
+  if (pub) pub.onclick = () => conErrores(async () => {
+    await api(`/admin/plans/${planAbierto}/publish`, {method:'POST'});
+    mensaje('Plan publicado. Ya se puede contratar.', 'bien');
+    await pintar();
+  });
+
+  const arc = app.querySelector('#archivar');
+  if (arc) arc.onclick = () => conErrores(async () => {
+    if (!confirm('Archivar deja de ofrecer el plan. Quienes ya lo tienen lo conservan. ¿Seguir?')) return;
+    await api(`/admin/plans/${planAbierto}/archive`, {method:'POST'});
+    mensaje('Plan archivado.', 'bien');
+    await pintar();
+  });
+
+  const np = app.querySelector('#nuevoPrecio');
+  if (np) np.onclick = () => conErrores(async () => {
+    const amt = app.querySelector('#nAmt').value;
+    if (amt === '') return mensaje('Escribe el monto.');
+    await api(`/admin/plans/${planAbierto}/prices`, {method:'POST',
+      body: JSON.stringify({period: app.querySelector('#nPer').value,
+        amount: Number(amt),
+        currency: app.querySelector('#nCur').value.trim().toUpperCase()})});
+    mensaje('Precio agregado. El anterior quedó cerrado.', 'bien');
+    await pintar();
+  });
+}
+
+function conectarCatalogo(app){
+  const nf = app.querySelector('#nuevaFeature');
+  if (nf) nf.onclick = () => dialogo('Agregar funcionalidad', [
+    {id:'code', label:'Código', ph:'video_llamada'},
+    {id:'label', label:'Nombre visible', ph:'Videollamada con la familia'},
+    {id:'description', label:'Descripción',
+     ayuda:'Es el texto que ve el cliente al comparar planes.'},
+    {id:'module', label:'Módulo', tipo:'select', opciones: MODULOS},
+    {id:'is_core', label:'Del núcleo (ningún plan puede quitarla)', tipo:'check'},
+  ], async d => { await api('/admin/features', {method:'POST',
+      body: JSON.stringify(d)}); await pintar(); });
+
+  const nl = app.querySelector('#nuevoLimite');
+  if (nl) nl.onclick = () => dialogo('Agregar límite', [
+    {id:'key', label:'Clave', ph:'videollamadas_mes'},
+    {id:'label', label:'Nombre visible', ph:'Videollamadas al mes'},
+    {id:'description', label:'Qué limita'},
+    {id:'unit', label:'Unidad', tipo:'select', opciones: UNIDADES},
+  ], async d => { await api('/admin/limit-keys', {method:'POST',
+      body: JSON.stringify(d)}); await pintar(); });
+}
+
+document.getElementById('salir').onclick = () => {
+  guardarToken(null); yo = null; planAbierto = null; vista = 'planes'; pintar();
+};
+
+// Al abrir, si quedaba un token en la pestaña se comprueba que siga sirviendo
+// antes de mostrar el panel.
+(async () => {
+  if (token){
+    try {
+      // Se pregunta quién es y además que siga siendo personal: lo primero
+      // para poder mostrar su correo arriba en vez de un guion, y lo
+      // segundo porque a alguien le pueden haber quitado el permiso
+      // mientras tenía la pestaña abierta.
+      const [u] = await Promise.all([api('/users/me'), api('/admin/plans')]);
+      yo = {email: u.email};
+    } catch { guardarToken(null); }
+  }
+  pintar();
+})();
+</script>
+</body>
+</html>

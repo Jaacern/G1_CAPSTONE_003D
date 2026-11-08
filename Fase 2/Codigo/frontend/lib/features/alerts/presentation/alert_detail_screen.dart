@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../auth/application/auth_controller.dart';
+import '../../auth/domain/models.dart';
 import '../../health/domain/models.dart' show VitalType;
 import '../application/alerts_providers.dart';
 import '../data/alerts_repository.dart';
@@ -68,6 +70,8 @@ class _AlertDetailScreenState extends ConsumerState<AlertDetailScreen> {
           return _AlertDetailBody(
             alert: alert,
             busy: _busy,
+            readOnly:
+                ref.watch(currentUserProvider)?.primaryRole == RoleType.family,
             onCall: () => showAppSnackBar(
                 context,
                 'Llamando a ${alert.patientName.isEmpty ? 'el adulto mayor' : alert.patientName}... '
@@ -92,6 +96,7 @@ class _AlertDetailBody extends StatelessWidget {
     required this.onCall,
     required this.onAcknowledge,
     required this.onResolve,
+    this.readOnly = false,
   });
 
   final Alert alert;
@@ -99,6 +104,9 @@ class _AlertDetailBody extends StatelessWidget {
   final VoidCallback onCall;
   final VoidCallback onAcknowledge;
   final VoidCallback onResolve;
+
+  /// true para el familiar: ficha de solo lectura, sin reconocer ni resolver.
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -113,9 +121,9 @@ class _AlertDetailBody extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: color.withOpacity(.10),
+            color: color.withValues(alpha: .10),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withOpacity(.4)),
+            border: Border.all(color: color.withValues(alpha: .4)),
           ),
           child: Row(
             children: [
@@ -149,8 +157,8 @@ class _AlertDetailBody extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: const [
+                const Row(
+                  children: [
                     Icon(Icons.priority_high_rounded,
                         color: AppColors.critical),
                     SizedBox(width: 8),
@@ -186,7 +194,7 @@ class _AlertDetailBody extends StatelessWidget {
         ],
 
         // Mensaje / contexto
-        _SectionTitle('¿Qué ocurrió?'),
+        const _SectionTitle('¿Qué ocurrió?'),
         const SizedBox(height: 6),
         AppCard(
           child: Text(alert.message,
@@ -195,7 +203,7 @@ class _AlertDetailBody extends StatelessWidget {
         const SizedBox(height: 16),
 
         // Detalles
-        _SectionTitle('Detalles'),
+        const _SectionTitle('Detalles'),
         const SizedBox(height: 6),
         AppCard(
           child: Column(
@@ -221,8 +229,8 @@ class _AlertDetailBody extends StatelessWidget {
         ),
         const SizedBox(height: 24),
 
-        // Acciones
-        if (!resolved) ...[
+        // Acciones (solo roles que gestionan; el familiar únicamente lee).
+        if (!resolved && !readOnly) ...[
           if (alert.status == AlertStatus.active)
             OutlinedButton.icon(
               onPressed: busy ? null : onAcknowledge,
@@ -243,11 +251,12 @@ class _AlertDetailBody extends StatelessWidget {
                 : const Icon(Icons.task_alt_rounded),
             label: Text(isFall ? 'Marcar atendida' : 'Resolver alerta'),
           ),
-        ] else
+        ],
+        if (resolved)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.statusOk.withOpacity(.10),
+              color: AppColors.statusOk.withValues(alpha: .10),
               borderRadius: BorderRadius.circular(14),
             ),
             child: const Row(

@@ -130,7 +130,7 @@ class _AlertSwitchTile extends StatelessWidget {
           style:
               const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
       value: setting.pushEnabled,
-      activeColor: AppColors.primary,
+      activeThumbColor: AppColors.primary,
       // Bloqueadas o guardando → deshabilitadas.
       onChanged: (setting.isLocked || saving) ? null : onChanged,
     );

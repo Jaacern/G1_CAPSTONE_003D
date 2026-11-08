@@ -95,10 +95,10 @@ class _ThresholdRow extends ConsumerWidget {
         t != null && (t.minValue != null || t.maxValue != null);
     final rangeText = !hasRange
         ? 'Sin rango definido'
-        : [
+        : '${[
             if (t.minValue != null) 'mín ${_n(t.minValue!)}',
             if (t.maxValue != null) 'máx ${_n(t.maxValue!)}',
-          ].join(' · ') + ' ${type.unit}';
+          ].join(' · ')} ${type.unit}';
 
     return AppCard(
       child: Row(
@@ -129,13 +129,18 @@ class _ThresholdRow extends ConsumerWidget {
   }
 
   Future<void> _edit(BuildContext context, WidgetRef ref) async {
+    // Se toma el messenger ANTES de abrir el dialogo. Despues del await la
+    // pantalla puede haberse ido, y buscar el ScaffoldMessenger a partir de
+    // un context ya desmontado lanza una excepcion en vez de mostrar el
+    // aviso. Pasa cuando alguien deja el dialogo abierto y vuelve atras.
+    final messenger = ScaffoldMessenger.of(context);
+
     final result = await showDialog<_ThresholdValues>(
       context: context,
       builder: (_) => _ThresholdDialog(type: type, current: threshold),
     );
     if (result == null) return;
 
-    final messenger = ScaffoldMessenger.of(context);
     try {
       await ref.read(vitalsRepositoryProvider).setThreshold(
             patientId,

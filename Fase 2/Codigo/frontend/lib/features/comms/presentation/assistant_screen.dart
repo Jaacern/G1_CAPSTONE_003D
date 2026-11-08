@@ -154,7 +154,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
           width: 72,
           height: 72,
           decoration: BoxDecoration(
-            color: AppColors.secondary.withOpacity(.15),
+            color: AppColors.secondary.withValues(alpha: .15),
             borderRadius: BorderRadius.circular(20),
           ),
           child: const Icon(Icons.smart_toy_rounded,
@@ -183,7 +183,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
               ActionChip(
                 label: Text(s),
                 onPressed: _sending ? null : () => _ask(s),
-                backgroundColor: AppColors.primary.withOpacity(.08),
+                backgroundColor: AppColors.primary.withValues(alpha: .08),
                 side: const BorderSide(color: AppColors.divider),
               ),
           ],
@@ -280,7 +280,7 @@ class _AssistantBubble extends StatelessWidget {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: AppColors.secondary.withOpacity(.18),
+                color: AppColors.secondary.withValues(alpha: .18),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(Icons.smart_toy_rounded,
@@ -343,9 +343,9 @@ class _CitationChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(.08),
+        color: AppColors.primary.withValues(alpha: .08),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.primary.withOpacity(.2)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: .2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -381,7 +381,7 @@ class _TypingIndicator extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: AppColors.secondary.withOpacity(.18),
+              color: AppColors.secondary.withValues(alpha: .18),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(Icons.smart_toy_rounded,

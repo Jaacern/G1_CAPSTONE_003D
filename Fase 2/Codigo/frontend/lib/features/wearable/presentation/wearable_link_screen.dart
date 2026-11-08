@@ -75,10 +75,10 @@ class _WearableLinkScreenState extends ConsumerState<WearableLinkScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final providers = spike.Provider.values;
+    const providers = spike.Provider.values;
     final mode = ref.watch(dataSourceModeProvider);
     // Spike (SaaS de pago) solo se muestra si hay un Application ID configurado.
-    final spikeEnabled = AppConfig.spikeAppId != 0;
+    const spikeEnabled = AppConfig.spikeAppId != 0;
     return Scaffold(
       appBar: AppBar(title: const Text('Dispositivos y datos')),
       body: ListView(
@@ -124,8 +124,8 @@ class _WearableLinkScreenState extends ConsumerState<WearableLinkScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: const [
+                const Row(
+                  children: [
                     Icon(Icons.favorite_rounded, color: AppColors.primary),
                     SizedBox(width: 10),
                     Expanded(
@@ -216,12 +216,12 @@ class _WearableLinkScreenState extends ConsumerState<WearableLinkScreen> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(.06),
+              color: AppColors.primary.withValues(alpha: .06),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Row(
+            child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Icon(Icons.info_outline_rounded,
                     size: 20, color: AppColors.primary),
                 SizedBox(width: 10),
@@ -426,7 +426,7 @@ class _SourceRow extends StatelessWidget {
           if (isWatch)
             _StatusDot(label: watchLabel, color: watchColor)
           else if (active)
-            _StatusDot(label: 'Activa', color: AppColors.statusOk),
+            const _StatusDot(label: 'Activa', color: AppColors.statusOk),
         ],
       ),
     );
@@ -443,7 +443,7 @@ class _BatteryWarning extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppColors.statusAttention.withOpacity(.10),
+        color: AppColors.statusAttention.withValues(alpha: .10),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -601,11 +601,11 @@ class _WatchLinkedCardState extends ConsumerState<_WatchLinkedCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const Text('⌚', style: TextStyle(fontSize: 20)),
-              const SizedBox(width: 10),
-              const Expanded(
+              Text('⌚', style: TextStyle(fontSize: 20)),
+              SizedBox(width: 10),
+              Expanded(
                 child: Text('Reloj AgeCare',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               ),
@@ -688,8 +688,8 @@ class _WatchAgeCareCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: const [
+          const Row(
+            children: [
               Text('⌚', style: TextStyle(fontSize: 20)),
               SizedBox(width: 10),
               Expanded(
@@ -727,7 +727,7 @@ class _Badge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.statusOk.withOpacity(.12),
+        color: AppColors.statusOk.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(text,
@@ -760,8 +760,8 @@ class _SimulatorCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: const [
+          const Row(
+            children: [
               Text('🧪', style: TextStyle(fontSize: 20)),
               SizedBox(width: 10),
               Expanded(
@@ -889,8 +889,8 @@ class _HealthConnectCardState extends ConsumerState<_HealthConnectCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: const [
+          const Row(
+            children: [
               Text('⌚', style: TextStyle(fontSize: 20)),
               SizedBox(width: 10),
               Expanded(
@@ -931,7 +931,7 @@ class _HealthConnectCardState extends ConsumerState<_HealthConnectCard> {
           // ---- Modo Live (sondeo automático) ----
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
             title: Row(
               children: [
                 if (live.active) ...[
@@ -966,7 +966,7 @@ class _HealthConnectCardState extends ConsumerState<_HealthConnectCard> {
                 color: (live.error
                         ? AppColors.statusAttention
                         : AppColors.primary)
-                    .withOpacity(.06),
+                    .withValues(alpha: .06),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(

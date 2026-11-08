@@ -7,7 +7,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
-import '../../patients/application/patients_providers.dart';
+import '../../auth/application/auth_controller.dart';
+import '../../auth/domain/models.dart';
 import '../application/alerts_providers.dart';
 import '../data/alerts_repository.dart';
 import '../domain/models.dart';
@@ -16,7 +17,11 @@ import '../domain/models.dart';
 /// Se auto-refresca cada pocos segundos (sin parpadeo) para que las alertas
 /// nuevas —en especial las caídas— aparezcan solas sin arrastrar a refrescar.
 class AlertsScreen extends ConsumerStatefulWidget {
-  const AlertsScreen({super.key});
+  /// [embedded] cuando vive como pestaña del shell: el título y el desplegable
+  /// de paciente los pone el shell, así que no duplica su propio AppBar.
+  const AlertsScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   ConsumerState<AlertsScreen> createState() => _AlertsScreenState();
@@ -44,26 +49,18 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
   @override
   Widget build(BuildContext context) {
     final alertsAsync = ref.watch(alertsControllerProvider);
-
-    final soloSeleccionado = ref.watch(alertsOnlySelectedPatientProvider);
-    final paciente = ref.watch(selectedPatientProvider);
+    // El familiar observa el centro de alertas pero no las gestiona: reconocer
+    // y resolver quedan para cuidadora y médico.
+    final readOnly =
+        ref.watch(currentUserProvider)?.primaryRole == RoleType.family;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Centro de alertas')),
-      body: Column(
-        children: [
-          _FiltroPaciente(
-            soloSeleccionado: soloSeleccionado,
-            nombrePaciente: paciente?.fullName,
-            onChanged: (valor) => ref
-                .read(alertsOnlySelectedPatientProvider.notifier)
-                .state = valor,
-          ),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () =>
-                  ref.read(alertsControllerProvider.notifier).recargar(),
-              child: alertsAsync.when(
+      appBar: widget.embedded
+          ? null
+          : AppBar(title: const Text('Centro de alertas')),
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(alertsControllerProvider.notifier).recargar(),
+        child: alertsAsync.when(
           loading: () => const LoadingView(),
           error: (e, _) => ErrorView(
             message: e is ApiException
@@ -106,7 +103,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                     const SizedBox(height: 8),
                     ...groups[sev]!.map((a) => Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: _AlertCard(alert: a),
+                          child: _AlertCard(alert: a, readOnly: readOnly),
                         )),
                     const SizedBox(height: 8),
                   ],
@@ -120,56 +117,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
               ],
             );
           },
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Selector del alcance del centro de alertas: todas mis alertas o solo las del
-/// paciente seleccionado (DEF-016). Si no hay paciente seleccionado, la opción
-/// de filtrar queda deshabilitada.
-class _FiltroPaciente extends StatelessWidget {
-  const _FiltroPaciente({
-    required this.soloSeleccionado,
-    required this.nombrePaciente,
-    required this.onChanged,
-  });
-
-  final bool soloSeleccionado;
-  final String? nombrePaciente;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final hayPaciente = (nombrePaciente ?? '').isNotEmpty;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
-      child: Row(
-        children: [
-          Expanded(
-            child: SegmentedButton<bool>(
-              segments: [
-                const ButtonSegment(value: false, label: Text('Todos')),
-                ButtonSegment(
-                  value: true,
-                  label: Text(
-                    hayPaciente ? 'Solo $nombrePaciente' : 'Solo este paciente',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-              selected: {hayPaciente ? soloSeleccionado : false},
-              onSelectionChanged: hayPaciente
-                  ? (s) => onChanged(s.first)
-                  : null,
-              showSelectedIcon: false,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -239,9 +187,12 @@ class _SeverityHeader extends StatelessWidget {
 }
 
 class _AlertCard extends ConsumerStatefulWidget {
-  const _AlertCard({required this.alert});
+  const _AlertCard({required this.alert, this.readOnly = false});
 
   final Alert alert;
+
+  /// true para el familiar: muestra la alerta sin botones de gestión.
+  final bool readOnly;
 
   @override
   ConsumerState<_AlertCard> createState() => _AlertCardState();
@@ -286,7 +237,7 @@ class _AlertCardState extends ConsumerState<_AlertCard> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(.12),
+                  color: color.withValues(alpha: .12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(a.type.icon, color: color, size: 24),
@@ -332,7 +283,8 @@ class _AlertCardState extends ConsumerState<_AlertCard> {
               ],
             ),
           ],
-          const SizedBox(height: 12),
+          if (!widget.readOnly) const SizedBox(height: 12),
+          if (!widget.readOnly)
           Row(
             children: [
               if (!acknowledged)

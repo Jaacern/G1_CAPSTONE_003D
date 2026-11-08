@@ -380,7 +380,7 @@ class _DoseTileState extends ConsumerState<_DoseTile> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(.1),
+                  color: AppColors.primary.withValues(alpha: .1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
@@ -455,7 +455,7 @@ class _StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: status.color.withOpacity(.12),
+        color: status.color.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(status.label,

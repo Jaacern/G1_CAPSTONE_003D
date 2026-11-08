@@ -9,6 +9,12 @@ import 'package:agecare_app/features/patients/presentation/create_patient_screen
 
 /// Repositorio que sólo cuenta los altos que le piden.
 class _RepoEspia implements PatientsRepository {
+
+  // Los metodos de la ficha clinica (alergias, vacunas, contactos,
+  // tratamientos...) no se usan en esta prueba: si alguno se llamara,
+  // falla con NoSuchMethodError en vez de devolver datos inventados.
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
   int altos = 0;
 
   @override

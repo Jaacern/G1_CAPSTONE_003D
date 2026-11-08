@@ -109,7 +109,7 @@ class _HubCard extends StatelessWidget {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(.12),
+                color: iconColor.withValues(alpha: .12),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(icon, size: 30, color: iconColor),

@@ -52,6 +52,8 @@ dependencies:
   intl: ^0.20.3
   cupertino_icons: ^1.0.8
 
+  meta: any
+  web: any
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -74,3 +76,12 @@ flutter:
 
   assets:
     - assets/images/
+
+  # Tipografía de marca AgeCare (guía v1.0). Nunito Sans, licencia SIL OFL.
+  # Archivo variable (eje wght): desde Flutter 3.x, fijar fontWeight en el
+  # TextStyle ajusta automáticamente el eje wght de la fuente, así que basta
+  # con declarar el archivo una sola vez. Pesos usados: 400/600/700/800.
+  fonts:
+    - family: Nunito Sans
+      fonts:
+        - asset: assets/fonts/NunitoSans-Variable.ttf

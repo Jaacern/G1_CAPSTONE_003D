@@ -29,13 +29,85 @@ enum DoseStatus {
 }
 
 /// Medicamento del plan del paciente.
+// ---------------------------------------------------------------------------
+// Unidades de dosis
+//
+// Son exactamente las diez que acepta el backend (ck_medications_dose_unit en
+// 301_medications.sql). Si se agrega una aca sin agregarla alla, el guardado
+// falla con un error de restriccion que no le dice nada util al usuario.
+//
+// Se separan por como se leen. Las de medida no cambian con la cantidad; las
+// que se cuentan se pluralizan, porque "2 comprimido" no lo dice nadie.
+// ---------------------------------------------------------------------------
+
+/// Unidades de medida: la cantidad no las modifica.
+const unidadesDeMedida = <String>['mg', 'g', 'mcg', 'ml', 'UI'];
+
+/// Unidades que se cuentan: la cantidad las pluraliza.
+const unidadesDeCantidad = <String>[
+  'comprimido',
+  'cápsula',
+  'gotas',
+  'puff',
+  'parche',
+];
+
+/// Todas las unidades validas, en el orden en que se ofrecen.
+const unidadesDeDosis = <String>[...unidadesDeMedida, ...unidadesDeCantidad];
+
+/// Singular y plural de las unidades que se cuentan. 'gotas' llega en plural
+/// desde el backend porque ese es el valor que admite la restriccion, pero
+/// una sola gota se lee "1 gota".
+const _singularPlural = <String, List<String>>{
+  'comprimido': ['comprimido', 'comprimidos'],
+  'cápsula': ['cápsula', 'cápsulas'],
+  'gotas': ['gota', 'gotas'],
+  'puff': ['puff', 'puff'],
+  'parche': ['parche', 'parches'],
+};
+
+/// La dosis como la leeria una persona: "2 comprimidos", "10 gotas", "50 mg".
+///
+/// El backend devuelve dose_amount como decimal, asi que sin esto la pantalla
+/// mostraba "50.0 mg". Se saca el decimal cuando no aporta y se concuerda el
+/// numero con la unidad.
+String etiquetaDeDosis(String cantidad, String unidad) {
+  final limpia = cantidad.trim();
+  if (limpia.isEmpty) return unidad;
+  final n = double.tryParse(limpia.replaceAll(',', '.'));
+  final numero = n == null
+      ? limpia
+      : (n == n.roundToDouble()
+          ? n.round().toString()
+          : n.toString().replaceAll('.', ','));
+  final par = _singularPlural[unidad];
+  if (par == null) return '$numero $unidad';
+  return '$numero ${n == 1 ? par.first : par.last}';
+}
+
+/// Quita el prefijo "Forma: X." que una version anterior escribia dentro de
+/// las instrucciones para guardar un dato que la tabla no tenia. Los
+/// medicamentos creados en esa epoca lo siguen trayendo, y sin esto aparece
+/// en pantalla como si el usuario lo hubiera escrito, y se vuelve a duplicar
+/// cada vez que alguien edita y guarda.
+String? sinPrefijoDeForma(String? instrucciones) {
+  if (instrucciones == null) return null;
+  var s = instrucciones.trim();
+  final conPunto = RegExp(r'^Forma:\s*[^.]*\.\s*', caseSensitive: false);
+  while (conPunto.hasMatch(s)) {
+    s = s.replaceFirst(conPunto, '').trim();
+  }
+  // Un "Forma: jarabe" sin nada detras deja el campo vacio, no un resto.
+  if (RegExp(r'^Forma:\s*\S*$', caseSensitive: false).hasMatch(s)) return null;
+  return s.isEmpty ? null : s;
+}
+
 class Medication {
   const Medication({
     required this.id,
     required this.name,
     required this.dose,
     required this.unit,
-    required this.form,
     this.schedule = const [],
     this.instructions,
     this.active = true,
@@ -52,9 +124,6 @@ class Medication {
   /// Unidad de la dosis (p. ej. "mg", "ml", "comprimido").
   final String unit;
 
-  /// Forma farmacéutica (p. ej. "comprimido", "cápsula", "jarabe").
-  final String form;
-
   /// Horarios de toma en formato 'HH:mm' (o descripciones de frecuencia).
   final List<String> schedule;
 
@@ -67,14 +136,13 @@ class Medication {
   String get scheduleLabel =>
       schedule.isEmpty ? 'Sin horario definido' : schedule.join(' · ');
 
-  /// Texto legible de la dosis (p. ej. "50 mg · comprimido").
-  String get doseLabel => '$dose $unit · $form';
+  /// Texto legible de la dosis (p. ej. "50 mg", "2 comprimidos").
+  String get doseLabel => etiquetaDeDosis(dose, unit);
 
   Medication copyWith({
     String? name,
     String? dose,
     String? unit,
-    String? form,
     List<String>? schedule,
     String? instructions,
     bool? active,
@@ -86,7 +154,6 @@ class Medication {
         name: name ?? this.name,
         dose: dose ?? this.dose,
         unit: unit ?? this.unit,
-        form: form ?? this.form,
         schedule: schedule ?? this.schedule,
         instructions: instructions ?? this.instructions,
         active: active ?? this.active,
@@ -100,13 +167,11 @@ class Medication {
         // Backend: dose_amount (num) + dose_unit. Fallback a dose/unit (mock).
         dose: (json['dose_amount'] ?? json['dose'] ?? '').toString(),
         unit: (json['dose_unit'] ?? json['unit'] ?? '').toString(),
-        // Backend no tiene 'form'; se mantiene por compat con el mock.
-        form: (json['form'] ?? '').toString(),
         // Backend: times (["HH:MM"]). Fallback a schedule (mock).
         schedule: ((json['times'] ?? json['schedule'] ?? []) as List)
             .map((e) => e.toString())
             .toList(),
-        instructions: json['instructions'] as String?,
+        instructions: sinPrefijoDeForma(json['instructions'] as String?),
         // Backend: is_active. Fallback a active (mock).
         active: (json['is_active'] ?? json['active'] ?? true) as bool,
         startDate: json['start_date'] != null
@@ -122,7 +187,6 @@ class Medication {
         'name': name,
         'dose': dose,
         'unit': unit,
-        'form': form,
         'schedule': schedule,
         if (instructions != null) 'instructions': instructions,
         'active': active,
@@ -189,7 +253,6 @@ class NewMedication {
     required this.name,
     required this.dose,
     required this.unit,
-    required this.form,
     this.schedule = const [],
     this.instructions,
     required this.startDate,
@@ -199,7 +262,6 @@ class NewMedication {
   final String name;
   final String dose;
   final String unit;
-  final String form;
   final List<String> schedule;
   final String? instructions;
   final DateTime startDate;
@@ -211,15 +273,14 @@ class NewMedication {
   /// - `days_of_week`: todos los días (el backend asume todos si se omite,
   ///   pero lo enviamos explícito para que el plan sea claro)
   /// - `grace_window_min`: ventana de gracia por defecto (60 min)
-  /// - `form` no existe en el backend: se preserva al inicio de las
-  ///   instrucciones para no perder el dato clínico.
+  ///
+  /// La unidad ya dice la presentación, asi que no hay un campo de forma
+  /// aparte. Antes habia uno que la tabla no tenia y que se guardaba como
+  /// prefijo de las instrucciones, de donde se perdia del formulario y se
+  /// duplicaba en cada edicion.
   Map<String, dynamic> toJson() {
     final doseAmount = double.tryParse(dose.replaceAll(',', '.')) ?? 0;
-    final mergedInstructions = [
-      if (form.isNotEmpty) 'Forma: $form',
-      if (instructions != null && instructions!.trim().isNotEmpty)
-        instructions!.trim(),
-    ].join('. ');
+    final limpias = instructions?.trim() ?? '';
     return {
       'name': name,
       'dose_amount': doseAmount,
@@ -227,7 +288,7 @@ class NewMedication {
       'times': schedule,
       'days_of_week': const [1, 2, 3, 4, 5, 6, 7],
       'grace_window_min': 60,
-      if (mergedInstructions.isNotEmpty) 'instructions': mergedInstructions,
+      if (limpias.isNotEmpty) 'instructions': limpias,
       'start_date': _dateOnly(startDate),
       if (endDate != null) 'end_date': _dateOnly(endDate!),
     };
@@ -332,7 +393,6 @@ NewMedication _newMedFromJson(Map<String, dynamic> json) => NewMedication(
       name: (json['name'] ?? '') as String,
       dose: (json['dose'] ?? '').toString(),
       unit: (json['unit'] ?? '').toString(),
-      form: (json['form'] ?? '').toString(),
       schedule:
           ((json['schedule'] ?? []) as List).map((e) => e.toString()).toList(),
       instructions: json['instructions'] as String?,

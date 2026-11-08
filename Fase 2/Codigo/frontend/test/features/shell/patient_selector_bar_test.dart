@@ -20,6 +20,12 @@ import 'package:flutter_test/flutter_test.dart';
 /// Repositorio de prueba con un único paciente vinculado (sin usar
 /// PatientsRepositoryMock, que trae 2 de fábrica).
 class _SinglePatientRepo implements PatientsRepository {
+
+  // Los metodos de la ficha clinica (alergias, vacunas, contactos,
+  // tratamientos...) no se usan en esta prueba: si alguno se llamara,
+  // falla con NoSuchMethodError en vez de devolver datos inventados.
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
   static const _only = PatientCard(
     patientId: 'p-unico',
     fullName: 'Mario Soto',

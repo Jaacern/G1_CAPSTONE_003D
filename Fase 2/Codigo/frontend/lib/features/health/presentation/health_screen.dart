@@ -119,6 +119,10 @@ class _VitalsTab extends ConsumerStatefulWidget {
 }
 
 class _VitalsTabState extends ConsumerState<_VitalsTab> {
+  // Se guarda el controlador, y no se vuelve a pedir en dispose, porque ahi
+  // "ref" ya no se puede usar.
+  LiveController? _live;
+
   @override
   void initState() {
     super.initState();
@@ -127,9 +131,20 @@ class _VitalsTabState extends ConsumerState<_VitalsTab> {
     // Se enciende tras el primer frame para no modificar providers en build.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final live = ref.read(liveControllerProvider);
-      if (!live.enabled) ref.read(liveControllerProvider.notifier).start();
+      _live = ref.read(liveControllerProvider.notifier);
+      if (!ref.read(liveControllerProvider).enabled) _live!.start();
     });
+  }
+
+  @override
+  void dispose() {
+    // El sondeo lo enciende esta pantalla, asi que es esta la que tiene que
+    // apagarlo. El provider no es autoDispose, de modo que sin esto el
+    // temporizador le sobrevive a la pantalla y la aplicacion sigue pidiendo
+    // a la API cada diez segundos por el resto de la sesion, con el usuario
+    // en cualquier otra parte.
+    _live?.stop();
+    super.dispose();
   }
 
   @override
@@ -249,7 +264,7 @@ class _LiveToggleState extends ConsumerState<_LiveToggle>
     _pulse = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
+    );
   }
 
   @override
@@ -262,6 +277,19 @@ class _LiveToggleState extends ConsumerState<_LiveToggle>
   Widget build(BuildContext context) {
     final live = ref.watch(liveControllerProvider);
     final on = live.enabled;
+
+    // El punto late solo mientras esta en vivo. Antes el controlador hacia
+    // repeat() desde initState y no paraba nunca, asi que incluso con el
+    // punto dibujado fijo y gris se pintaba un cuadro cada vez, gastando
+    // bateria en una animacion que nadie estaba viendo.
+    if (on && !_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+    } else if (!on && _pulse.isAnimating) {
+      _pulse
+        ..stop()
+        ..value = 1.0;
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Row(
@@ -342,7 +370,9 @@ class _VitalCard extends ConsumerWidget {
     // Tarjeta "sin datos aún": no navega ni muestra sparkline (transparencia).
     if (!vital.hasData) return _EmptyVitalCard(type: vital.type);
 
-    final color = vital.inRange ? AppColors.primary : AppColors.statusAttention;
+    // Número en estado (verde/rojo); la tendencia usa el color fijo del vital.
+    final color = vital.inRange ? AppColors.textPrimary : AppColors.statusAttention;
+    final sparkColor = vital.type.seriesColor;
     final spark = ref.watch(sparkSeriesProvider(vital.type));
     return AppCard(
       onTap: () => context.push('/health/vital/${vital.type.apiValue}'),
@@ -404,7 +434,7 @@ class _VitalCard extends ConsumerWidget {
                   height: 34,
                   child: _Sparkline(
                     values: pts.map((p) => p.value).toList(),
-                    color: color,
+                    color: sparkColor,
                   ),
                 ),
               );
@@ -515,7 +545,7 @@ class _SourceChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(.12),
+        color: color.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -559,7 +589,7 @@ class _Sparkline extends StatelessWidget {
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
-              color: color.withOpacity(.12),
+              color: color.withValues(alpha: .12),
             ),
           ),
         ],
@@ -670,7 +700,7 @@ class _WatchStatusBanner extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.critical.withOpacity(.10),
+              color: AppColors.critical.withValues(alpha: .10),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(

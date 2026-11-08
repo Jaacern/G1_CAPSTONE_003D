@@ -119,6 +119,10 @@ class _VitalsTab extends ConsumerStatefulWidget {
 }
 
 class _VitalsTabState extends ConsumerState<_VitalsTab> {
+  // Se guarda el controlador, y no se vuelve a pedir en dispose, porque ahi
+  // "ref" ya no se puede usar.
+  LiveController? _live;
+
   @override
   void initState() {
     super.initState();
@@ -127,9 +131,20 @@ class _VitalsTabState extends ConsumerState<_VitalsTab> {
     // Se enciende tras el primer frame para no modificar providers en build.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final live = ref.read(liveControllerProvider);
-      if (!live.enabled) ref.read(liveControllerProvider.notifier).start();
+      _live = ref.read(liveControllerProvider.notifier);
+      if (!ref.read(liveControllerProvider).enabled) _live!.start();
     });
+  }
+
+  @override
+  void dispose() {
+    // El sondeo lo enciende esta pantalla, asi que es esta la que tiene que
+    // apagarlo. El provider no es autoDispose, de modo que sin esto el
+    // temporizador le sobrevive a la pantalla y la aplicacion sigue pidiendo
+    // a la API cada diez segundos por el resto de la sesion, con el usuario
+    // en cualquier otra parte.
+    _live?.stop();
+    super.dispose();
   }
 
   @override

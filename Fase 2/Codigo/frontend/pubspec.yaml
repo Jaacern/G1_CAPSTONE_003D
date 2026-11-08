@@ -52,6 +52,8 @@ dependencies:
   intl: ^0.20.3
   cupertino_icons: ^1.0.8
 
+  meta: any
+  web: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 
 from app.errors import register_error_handlers
 from app.routers import (
+    admin,
     alerts,
     assistant,
     auth,
@@ -135,6 +136,9 @@ app.include_router(health.router)
 
 # Módulos de negocio (todos cuelgan de /api/v1).
 app.include_router(auth.router)
+# Administracion del catalogo comercial. Va aparte del resto porque su
+# permiso no es una membresia en un paciente sino ser personal de la empresa.
+app.include_router(admin.router)
 app.include_router(patients.router)
 app.include_router(vitals.router)
 app.include_router(medications.router)
@@ -163,6 +167,21 @@ async def root():
 @app.get("/docs", include_in_schema=False)
 async def custom_swagger_ui():
     return HTMLResponse(_custom_swagger_html())
+
+
+# ── Panel de administracion de planes (personal de Alloxentric) ──
+@app.get("/admin", include_in_schema=False)
+async def admin_web():
+    """Panel de administracion de planes, para el personal de Alloxentric.
+
+    Se sirve desde la misma API y no como aplicacion aparte: no agrega
+    infraestructura, se despliega con el backend y no puede quedar
+    apuntando a una version del API distinta de la que esta corriendo.
+    """
+    path = os.path.join(_FRONT_DIR, "admin.html")
+    if os.path.exists(path):
+        return FileResponse(path, media_type="text/html")
+    return HTMLResponse("<h1>admin.html no encontrado</h1>", status_code=404)
 
 
 # ── Cliente de prueba: sirve el HTML y los assets desde /front ───

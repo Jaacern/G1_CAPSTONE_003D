@@ -4,6 +4,8 @@
 - get_patient_member(roles): factory que exige que el usuario tenga una
   membresía viva en el paciente (patient_members) con uno de los roles dados.
   Es el control de acceso por recurso que pide la sección 16.2.
+- get_staff_user: exige que el usuario sea personal de Alloxentric. Es un
+  permiso sobre el catálogo comercial, no sobre expedientes.
 """
 from collections.abc import Awaitable, Callable
 from uuid import UUID
@@ -155,3 +157,52 @@ def get_patient_member(
         )
 
     return _dependency
+
+
+class StaffUser(CurrentUser):
+    """Usuario autenticado que además es personal de Alloxentric."""
+
+
+async def get_staff_user(
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> StaffUser:
+    """Exige que quien llama sea personal de la empresa.
+
+    Es un permiso de otra naturaleza que get_patient_member. Ese pregunta
+    por una relación con UN paciente; este pregunta por una condición de la
+    persona, porque administrar los planes no es algo que se haga sobre un
+    paciente sino sobre el catálogo que se le vende a todos.
+
+    Responde 403 y no 404. Es a propósito, y la diferencia con el resto de
+    la API vale explicarla: en los expedientes se responde 404 para no
+    confirmarle a un extraño que cierto paciente existe. Acá no hay nada
+    que ocultar, la existencia de una administración de planes no es un
+    secreto, y un 404 solo confundiría a quien de verdad es del equipo y
+    entró con la cuenta equivocada.
+    """
+    es_staff = (
+        await db.execute(
+            text(
+                """
+                SELECT is_staff FROM users
+                WHERE id = :uid AND is_active = true AND deleted_at IS NULL
+                """
+            ),
+            {"uid": user.user_id},
+        )
+    ).scalar()
+
+    if not es_staff:
+        raise ApiError(
+            status_code=403,
+            code="STAFF_ONLY",
+            message="Esta sección es solo para el personal de Alloxentric.",
+        )
+
+    return StaffUser(
+        user_id=user.user_id,
+        email=user.email,
+        full_name=user.full_name,
+        locale=user.locale,
+    )

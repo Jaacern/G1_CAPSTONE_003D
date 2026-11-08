@@ -264,7 +264,7 @@ class _LiveToggleState extends ConsumerState<_LiveToggle>
     _pulse = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
+    );
   }
 
   @override
@@ -277,6 +277,19 @@ class _LiveToggleState extends ConsumerState<_LiveToggle>
   Widget build(BuildContext context) {
     final live = ref.watch(liveControllerProvider);
     final on = live.enabled;
+
+    // El punto late solo mientras esta en vivo. Antes el controlador hacia
+    // repeat() desde initState y no paraba nunca, asi que incluso con el
+    // punto dibujado fijo y gris se pintaba un cuadro cada vez, gastando
+    // bateria en una animacion que nadie estaba viendo.
+    if (on && !_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+    } else if (!on && _pulse.isAnimating) {
+      _pulse
+        ..stop()
+        ..value = 1.0;
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Row(

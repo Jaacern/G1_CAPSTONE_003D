@@ -15,7 +15,15 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copiar el código de la aplicación
 COPY app ./app
 
+# Guiones de arranque: uno pone la base al día y sirve la API, el otro
+# corre las tareas del día en bucle. Van en la misma imagen porque usan el
+# mismo código; el docker-compose decide cuál ejecuta cada servicio.
+COPY entrypoint.sh mantenimiento.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/mantenimiento.sh
+
 EXPOSE 8000
 
-# Uvicorn sirviendo la app FastAPI
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Migra y después sirve. El orden importa: una API que acepta peticiones
+# contra un esquema viejo falla en endpoints sueltos, y eso cuesta mucho
+# más de diagnosticar que un contenedor que no parte.
+CMD ["/usr/local/bin/entrypoint.sh"]

@@ -17,6 +17,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// La pantalla de Salud enciende el modo "En vivo" al entrar: un punto que
+/// late y un refresco automatico cada diez segundos. Con eso el arbol nunca
+/// queda quieto, y pumpAndSettle espera justamente a que quede quieto, asi
+/// que se cuelga hasta su tiempo limite y la prueba falla sin que nada este
+/// roto. Se avanza el reloj a mano: lo suficiente para que resuelvan los
+/// mocks (el mas lento tarda 400 ms) y sin llegar a los diez segundos del
+/// refresco, que volveria a dejar todo cargando.
+Future<void> asentar(WidgetTester tester) async {
+  for (var i = 0; i < 8; i++) {
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+}
+
 void main() {
   List<Override> overrides() => [
         patientsRepositoryProvider.overrideWithValue(PatientsRepositoryMock()),
@@ -36,7 +49,7 @@ void main() {
       child: MaterialApp(
           theme: AppTheme.light(), home: const Scaffold(body: HealthScreen())),
     ));
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
+    await asentar(tester);
 
     expect(find.text('Vitales'), findsOneWidget);
     expect(find.text('Actividad'), findsOneWidget);
@@ -65,7 +78,7 @@ void main() {
       child: MaterialApp(
           theme: AppTheme.light(), home: const Scaffold(body: HealthScreen())),
     ));
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
+    await asentar(tester);
 
     // Elena (auto-seleccionada, 1era de la lista) no simula valores fuera
     // de rango.
@@ -102,10 +115,10 @@ void main() {
         }),
       ),
     ));
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
+    await asentar(tester);
 
     await tester.tap(find.byKey(const Key('switchPatient')));
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
+    await asentar(tester);
 
     // 'p-jose' simula SpO2 91 (bajo el mínimo normal de 92): debe verse el
     // ícono de alerta en su tarjeta, sin refrescar nada a mano (el provider

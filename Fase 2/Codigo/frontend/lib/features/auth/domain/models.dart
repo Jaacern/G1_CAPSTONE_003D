@@ -1,4 +1,5 @@
 /// Modelos de autenticación (alineados con la Especificación de Endpoints v1).
+library;
 
 import 'dart:ui' show Color;
 

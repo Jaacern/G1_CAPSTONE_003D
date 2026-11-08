@@ -1,6 +1,7 @@
 /// Modelos del módulo de comunicación: chat humano (familiar-cuidadora) y
 /// asistente IA sobre el expediente del paciente.
 /// Alineados con la Especificación de Endpoints v1 (JSON snake_case, ISO8601).
+library;
 
 /// Tipo de mensaje del chat.
 enum MessageType {

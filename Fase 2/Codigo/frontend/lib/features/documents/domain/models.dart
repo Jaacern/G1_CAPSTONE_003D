@@ -1,4 +1,5 @@
 /// Modelos del expediente de documentos del paciente.
+library;
 
 class PatientDocument {
   const PatientDocument({

@@ -95,10 +95,10 @@ class _ThresholdRow extends ConsumerWidget {
         t != null && (t.minValue != null || t.maxValue != null);
     final rangeText = !hasRange
         ? 'Sin rango definido'
-        : [
+        : '${[
             if (t.minValue != null) 'mín ${_n(t.minValue!)}',
             if (t.maxValue != null) 'máx ${_n(t.maxValue!)}',
-          ].join(' · ') + ' ${type.unit}';
+          ].join(' · ')} ${type.unit}';
 
     return AppCard(
       child: Row(

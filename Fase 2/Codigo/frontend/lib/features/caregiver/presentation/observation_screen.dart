@@ -103,7 +103,7 @@ class _ObservationScreenState extends ConsumerState<ObservationScreen> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
           children: [
             DropdownButtonFormField<String>(
-              value: _category,
+              initialValue: _category,
               decoration: const InputDecoration(labelText: 'Categoría'),
               items: [
                 for (final c in _options)

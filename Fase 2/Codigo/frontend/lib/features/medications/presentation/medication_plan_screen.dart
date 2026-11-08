@@ -234,7 +234,7 @@ class _MedicationPlanScreenState extends ConsumerState<MedicationPlanScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: _unit,
+                          initialValue: _unit,
                           decoration:
                               const InputDecoration(labelText: 'Unidad'),
                           items: [
@@ -248,7 +248,7 @@ class _MedicationPlanScreenState extends ConsumerState<MedicationPlanScreen> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: _form,
+                    initialValue: _form,
                     decoration: const InputDecoration(labelText: 'Forma'),
                     items: [
                       for (final f in _forms)

@@ -259,7 +259,7 @@ class _TrendChart extends StatelessWidget {
           show: true,
           drawVerticalLine: false,
           getDrawingHorizontalLine: (v) =>
-              FlLine(color: AppColors.divider.withOpacity(.6), strokeWidth: 1),
+              FlLine(color: AppColors.divider.withValues(alpha: .6), strokeWidth: 1),
         ),
         titlesData: FlTitlesData(
           topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -295,7 +295,7 @@ class _TrendChart extends StatelessWidget {
               HorizontalRangeAnnotation(
                 y1: t?.minValue ?? (minY - pad),
                 y2: t?.maxValue ?? (maxY + pad),
-                color: AppColors.statusOk.withOpacity(.08),
+                color: AppColors.statusOk.withValues(alpha: .08),
               ),
           ],
         ),
@@ -305,7 +305,7 @@ class _TrendChart extends StatelessWidget {
           if (t?.minValue != null)
             HorizontalLine(
                 y: t!.minValue!,
-                color: AgeChart.threshold.withOpacity(.75),
+                color: AgeChart.threshold.withValues(alpha: .75),
                 strokeWidth: 1,
                 dashArray: [6, 6],
                 label: HorizontalLineLabel(
@@ -317,7 +317,7 @@ class _TrendChart extends StatelessWidget {
           if (t?.maxValue != null)
             HorizontalLine(
                 y: t!.maxValue!,
-                color: AgeChart.threshold.withOpacity(.75),
+                color: AgeChart.threshold.withValues(alpha: .75),
                 strokeWidth: 1,
                 dashArray: [6, 6],
                 label: HorizontalLineLabel(
@@ -339,7 +339,7 @@ class _TrendChart extends StatelessWidget {
               dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
-                color: lineColor.withOpacity(.10),
+                color: lineColor.withValues(alpha: .10),
                 // Recorta el relleno a la línea del mínimo → queda la banda.
                 cutOffY: 0,
                 applyCutOffY: false,
@@ -354,7 +354,7 @@ class _TrendChart extends StatelessWidget {
               dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
-                color: Colors.white.withOpacity(0),
+                color: Colors.white.withValues(alpha: 0),
               ),
             ),
           ],
@@ -381,7 +381,7 @@ class _TrendChart extends StatelessWidget {
             ),
             belowBarData: BarAreaData(
               show: true,
-              color: lineColor.withOpacity(.06),
+              color: lineColor.withValues(alpha: .06),
             ),
           ),
         ],

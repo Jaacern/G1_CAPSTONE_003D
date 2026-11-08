@@ -138,7 +138,7 @@ class _PrescriptionScanScreenState
                   Container(
                     height: 140,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(.06),
+                      color: AppColors.primary.withValues(alpha: .06),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     alignment: Alignment.center,

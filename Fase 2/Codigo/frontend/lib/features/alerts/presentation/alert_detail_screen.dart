@@ -121,9 +121,9 @@ class _AlertDetailBody extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: color.withOpacity(.10),
+            color: color.withValues(alpha: .10),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withOpacity(.4)),
+            border: Border.all(color: color.withValues(alpha: .4)),
           ),
           child: Row(
             children: [
@@ -256,7 +256,7 @@ class _AlertDetailBody extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.statusOk.withOpacity(.10),
+              color: AppColors.statusOk.withValues(alpha: .10),
               borderRadius: BorderRadius.circular(14),
             ),
             child: const Row(

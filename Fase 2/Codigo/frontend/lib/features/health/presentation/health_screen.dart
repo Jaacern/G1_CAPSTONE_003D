@@ -545,7 +545,7 @@ class _SourceChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(.12),
+        color: color.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -589,7 +589,7 @@ class _Sparkline extends StatelessWidget {
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
-              color: color.withOpacity(.12),
+              color: color.withValues(alpha: .12),
             ),
           ),
         ],
@@ -700,7 +700,7 @@ class _WatchStatusBanner extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.critical.withOpacity(.10),
+              color: AppColors.critical.withValues(alpha: .10),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(

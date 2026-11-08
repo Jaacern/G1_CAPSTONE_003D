@@ -128,11 +128,11 @@ class _AlertBand extends ConsumerWidget {
         final alert = summary.activeAlerts.first;
         final critical = alert.isCritical;
         final bg = critical
-            ? AppColors.statusAttention.withOpacity(.10)
-            : AppColors.statusWarning.withOpacity(.12);
+            ? AppColors.statusAttention.withValues(alpha: .10)
+            : AppColors.statusWarning.withValues(alpha: .12);
         final border = critical
-            ? AppColors.statusAttention.withOpacity(.35)
-            : AppColors.statusWarning.withOpacity(.4);
+            ? AppColors.statusAttention.withValues(alpha: .35)
+            : AppColors.statusWarning.withValues(alpha: .4);
         return Padding(
           padding: const EdgeInsets.only(bottom: 4),
           child: InkWell(
@@ -414,7 +414,7 @@ class _Pill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(.12),
+        color: color.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(text,
@@ -561,9 +561,9 @@ class _AiCta extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(.08),
+          color: AppColors.primary.withValues(alpha: .08),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.primary.withOpacity(.20)),
+          border: Border.all(color: AppColors.primary.withValues(alpha: .20)),
         ),
         child: Row(
           children: [

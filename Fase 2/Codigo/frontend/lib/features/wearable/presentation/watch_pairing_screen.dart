@@ -315,10 +315,10 @@ class _DigitBox extends StatelessWidget {
       height: 56,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: (dim ? AppColors.textSecondary : AppColors.primary).withOpacity(.08),
+        color: (dim ? AppColors.textSecondary : AppColors.primary).withValues(alpha: .08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: (dim ? AppColors.textSecondary : AppColors.primary).withOpacity(.25),
+          color: (dim ? AppColors.textSecondary : AppColors.primary).withValues(alpha: .25),
         ),
       ),
       child: Text(
@@ -376,7 +376,7 @@ class _StepsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(.06),
+        color: AppColors.primary.withValues(alpha: .06),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -435,7 +435,7 @@ class _ErrorBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.statusAttention.withOpacity(.08),
+        color: AppColors.statusAttention.withValues(alpha: .08),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(

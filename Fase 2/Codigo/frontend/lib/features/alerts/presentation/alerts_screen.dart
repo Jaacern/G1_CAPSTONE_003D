@@ -237,7 +237,7 @@ class _AlertCardState extends ConsumerState<_AlertCard> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(.12),
+                  color: color.withValues(alpha: .12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(a.type.icon, color: color, size: 24),

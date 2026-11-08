@@ -325,7 +325,7 @@ class _Benefit extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: AppColors.secondary.withOpacity(.18),
+              color: AppColors.secondary.withValues(alpha: .18),
               borderRadius: BorderRadius.circular(12),
             ),
             alignment: Alignment.center,

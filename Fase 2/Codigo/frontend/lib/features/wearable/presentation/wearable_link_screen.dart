@@ -216,7 +216,7 @@ class _WearableLinkScreenState extends ConsumerState<WearableLinkScreen> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(.06),
+              color: AppColors.primary.withValues(alpha: .06),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
@@ -443,7 +443,7 @@ class _BatteryWarning extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppColors.statusAttention.withOpacity(.10),
+        color: AppColors.statusAttention.withValues(alpha: .10),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -727,7 +727,7 @@ class _Badge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.statusOk.withOpacity(.12),
+        color: AppColors.statusOk.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(text,
@@ -931,7 +931,7 @@ class _HealthConnectCardState extends ConsumerState<_HealthConnectCard> {
           // ---- Modo Live (sondeo automático) ----
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
             title: Row(
               children: [
                 if (live.active) ...[
@@ -966,7 +966,7 @@ class _HealthConnectCardState extends ConsumerState<_HealthConnectCard> {
                 color: (live.error
                         ? AppColors.statusAttention
                         : AppColors.primary)
-                    .withOpacity(.06),
+                    .withValues(alpha: .06),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(

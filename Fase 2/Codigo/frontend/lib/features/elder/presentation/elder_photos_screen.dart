@@ -268,7 +268,7 @@ class _ReactionButton extends StatelessWidget {
       button: true,
       label: label,
       child: Material(
-        color: color.withOpacity(.12),
+        color: color.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),

@@ -126,7 +126,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
           children: [
             DropdownButtonFormField<String>(
-              value: _type,
+              initialValue: _type,
               decoration: const InputDecoration(labelText: 'Tipo de incidente'),
               items: [
                 for (final t in _types)
@@ -146,7 +146,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                   ChoiceChip(
                     label: Text(s.label),
                     selected: _severity == s,
-                    selectedColor: s.color.withOpacity(.18),
+                    selectedColor: s.color.withValues(alpha: .18),
                     labelStyle: TextStyle(
                         color: _severity == s ? s.color : AppColors.textPrimary,
                         fontWeight: FontWeight.w600),

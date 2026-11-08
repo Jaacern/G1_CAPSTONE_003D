@@ -218,7 +218,7 @@ class _PremiumUpsell extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.statusWarning.withOpacity(.15),
+                  color: AppColors.statusWarning.withValues(alpha: .15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.workspace_premium_rounded,

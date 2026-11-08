@@ -532,9 +532,9 @@ class _SystemBubble extends StatelessWidget {
           ),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: AppColors.secondary.withOpacity(.12),
+            color: AppColors.secondary.withValues(alpha: .12),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.secondary.withOpacity(.4)),
+            border: Border.all(color: AppColors.secondary.withValues(alpha: .4)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

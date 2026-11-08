@@ -90,7 +90,7 @@ class _DoseConfirmBodyState extends ConsumerState<_DoseConfirmBody> {
               width: 96,
               height: 96,
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(.1),
+                color: AppColors.primary.withValues(alpha: .1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.medication_rounded,

@@ -266,7 +266,7 @@ class _ActionButton extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 16),
           decoration: BoxDecoration(
-            color: color.withOpacity(.10),
+            color: color.withValues(alpha: .10),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(

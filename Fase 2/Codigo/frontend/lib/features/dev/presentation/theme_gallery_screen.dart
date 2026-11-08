@@ -97,7 +97,7 @@ class _ColorSwatches extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 12)),
                 Text(
-                  '#${color.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}',
+                  '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}',
                   style: const TextStyle(
                       fontSize: 11, color: AppColors.textSecondary),
                 ),

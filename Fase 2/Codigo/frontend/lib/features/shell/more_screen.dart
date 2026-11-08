@@ -158,7 +158,7 @@ class MoreScreen extends ConsumerWidget {
                         style: const TextStyle(
                             fontSize: 12, color: AppColors.textSecondary)),
                     value: isDark,
-                    activeColor: AppColors.primary,
+                    activeThumbColor: AppColors.primary,
                     onChanged: (_) =>
                         ref.read(themeControllerProvider.notifier).toggle(),
                   );

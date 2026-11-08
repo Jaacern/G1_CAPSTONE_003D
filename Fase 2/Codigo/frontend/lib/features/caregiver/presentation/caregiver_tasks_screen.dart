@@ -160,7 +160,7 @@ class _TaskCardState extends ConsumerState<_TaskCard> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(.08),
+                      color: AppColors.primary.withValues(alpha: .08),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(categoryLabel(task.category),
@@ -212,7 +212,7 @@ class _StatusMenu extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: current.color.withOpacity(.12),
+          color: current.color.withValues(alpha: .12),
           borderRadius: BorderRadius.circular(999),
         ),
         child: Row(

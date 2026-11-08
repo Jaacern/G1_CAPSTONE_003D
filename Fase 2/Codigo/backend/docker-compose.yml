@@ -34,6 +34,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET:-dev-secret-cambiar-en-produccion}
 
+      # Donde estan los .sql que la api aplica al arrancar. La imagen copia
+      # solo la carpeta app, asi que los .sql entran montados desde el host
+      # (el volumen de mas abajo) y esta variable dice en que ruta quedaron.
+      AGECARE_SQL_DIR: /sql
+
       # Zona horaria de la operacion. Decide a que DIA pertenece cada
       # instante guardado: "las dosis de hoy", "las tareas completadas
       # hoy". Dejarla sin poner significaba calcular los dias en UTC.
@@ -80,6 +85,11 @@ services:
       # Sin esto los archivos que la gente sube viven dentro del contenedor
       # y se pierden en cada reinicio.
       - archivos:/var/agecare/files
+      # Los mismos .sql que la base ejecuta la primera vez. La api los
+      # necesita para poner al dia una base que ya existia: el volumen de
+      # la base solo los corre cuando se crea, asi que los archivos
+      # agregados despues nunca llegaron a quien ya la tenia levantada.
+      - ./sql:/sql:ro,Z
     restart: unless-stopped
     networks: [agecare-net]
 

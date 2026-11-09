@@ -104,3 +104,91 @@ async def list_prn(
     """SOS vigentes del paciente con ultimo uso, lo usado en 24 h y desde cuando
     corresponde el siguiente. Cualquier miembro del circulo puede verlos."""
     return [_item_out(r) for r in await _estado(db, ctx.patient_id)]
+
+
+class PrnUseIn(BaseModel):
+    reason:           str = Field(min_length=3, max_length=200)
+    administered_at:  datetime | None = None   # None = ahora
+    confirm_interval: bool = False
+
+
+class PrnUseOut(BaseModel):
+    use_id:            str
+    item_id:           str
+    name:              str
+    dose:              str
+    administered_at:   datetime
+    reason:            str
+    logged_by_name:    str | None = None
+    overrode_interval: bool = False
+
+
+_USOS_SQL = """
+SELECT u.id, u.treatment_item_id, ti.name, ti.dose_text, u.administered_at,
+       u.reason, u.overrode_interval,
+       usr.first_name || ' ' || usr.last_name AS logged_by_name
+FROM treatment_item_prn_uses u
+JOIN treatment_items ti ON ti.id = u.treatment_item_id
+JOIN treatments t ON t.id = ti.treatment_id
+LEFT JOIN users usr ON usr.id = u.logged_by
+WHERE t.patient_id = :pid
+"""
+
+
+def _uso_out(r) -> PrnUseOut:
+    return PrnUseOut(
+        use_id=str(r["id"]), item_id=str(r["treatment_item_id"]), name=r["name"],
+        dose=r["dose_text"], administered_at=r["administered_at"],
+        reason=r["reason"], logged_by_name=r["logged_by_name"],
+        overrode_interval=r["overrode_interval"],
+    )
+
+
+@router.post("/patients/{patient_id}/prn/{item_id}/uses",
+             response_model=PrnUseOut, status_code=201)
+async def register_prn_use(
+    item_id: UUID,
+    payload: PrnUseIn,
+    ctx: PatientContext = Depends(
+        get_patient_member(roles=["caregiver", "family", "doctor"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Registra que se dio una dosis SOS: cuando, por que y quien lo anota."""
+    filas = await _estado(db, ctx.patient_id, str(item_id))
+    if not filas:
+        raise ApiError(status_code=404, code="NOT_FOUND",
+                       message="Esa indicación SOS no está vigente para este paciente.")
+    it = filas[0]
+    reason = payload.reason.strip()
+    if len(reason) < 3:
+        raise ApiError(status_code=422, code="VALIDATION_ERROR",
+                       message="Indica el motivo del uso (por ejemplo, crisis de disnea).")
+
+    ahora = datetime.now(timezone.utc)
+    adm = payload.administered_at or ahora
+    if adm.tzinfo is None:
+        adm = adm.replace(tzinfo=timezone.utc)
+    if adm > ahora + timedelta(minutes=5):
+        raise ApiError(status_code=422, code="VALIDATION_ERROR",
+                       message="La hora del uso no puede estar en el futuro.")
+    if adm < ahora - timedelta(hours=12):
+        raise ApiError(status_code=422, code="VALIDATION_ERROR",
+                       message="Solo se registran usos de las últimas 12 horas.")
+
+    overrode = False
+
+    row = (
+        await db.execute(
+            text("INSERT INTO treatment_item_prn_uses "
+                 "(treatment_item_id, administered_at, reason, overrode_interval, logged_by) "
+                 "VALUES (:iid, :adm, :reason, :ovr, :uid) RETURNING id"),
+            {"iid": str(item_id), "adm": adm, "reason": reason,
+             "ovr": overrode, "uid": ctx.user.user_id},
+        )
+    ).mappings().first()
+    await db.commit()
+    uso = (
+        await db.execute(text(_USOS_SQL + " AND u.id = :uid2"),
+                         {"pid": ctx.patient_id, "uid2": str(row["id"])})
+    ).mappings().first()
+    return _uso_out(uso)

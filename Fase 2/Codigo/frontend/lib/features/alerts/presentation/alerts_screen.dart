@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/models.dart';
+import '../../patients/application/patients_providers.dart';
 import '../application/alerts_providers.dart';
 import '../data/alerts_repository.dart';
 import '../domain/models.dart';
@@ -58,9 +59,14 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
       appBar: widget.embedded
           ? null
           : AppBar(title: const Text('Centro de alertas')),
-      body: RefreshIndicator(
-        onRefresh: () => ref.read(alertsControllerProvider.notifier).recargar(),
-        child: alertsAsync.when(
+      body: Column(
+        children: [
+          const _FiltroDePaciente(),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () =>
+                  ref.read(alertsControllerProvider.notifier).recargar(),
+              child: alertsAsync.when(
           loading: () => const LoadingView(),
           error: (e, _) => ErrorView(
             message: e is ApiException
@@ -116,8 +122,11 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                   ),
               ],
             );
-          },
-        ),
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -322,6 +331,103 @@ class _AlertCardState extends ConsumerState<_AlertCard> {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Filtro del centro de alertas. Arranca en "Todos".
+///
+/// Antes el centro miraba el paciente seleccionado de la aplicacion, que
+/// nunca es nulo, asi que solo se podian ver las alertas de uno a la vez y no
+/// habia manera de mirarlas todas juntas. Con dos pacientes en el circulo,
+/// las de uno tapaban las del otro.
+///
+/// Con un solo paciente no se dibuja: una fila de un boton que no cambia nada
+/// solo ocupa pantalla.
+class _FiltroDePaciente extends ConsumerWidget {
+  const _FiltroDePaciente();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pacientes = ref.watch(myPatientsProvider).valueOrNull ?? const [];
+    if (pacientes.length < 2) return const SizedBox.shrink();
+
+    final elegido = ref.watch(filtroPacienteAlertasProvider);
+
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(bottom: BorderSide(color: AppColors.divider)),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            _Chip(
+              texto: 'Todos',
+              activo: elegido == null,
+              onTap: () =>
+                  ref.read(filtroPacienteAlertasProvider.notifier).state = null,
+            ),
+            for (final p in pacientes) ...[
+              const SizedBox(width: 8),
+              _Chip(
+                texto: _primerNombre(p.fullName),
+                activo: elegido == p.patientId,
+                // Volver a tocar el que ya esta activo vuelve a Todos, que es
+                // lo que uno intenta hacer sin pensarlo.
+                onTap: () =>
+                    ref.read(filtroPacienteAlertasProvider.notifier).state =
+                        elegido == p.patientId ? null : p.patientId,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _primerNombre(String completo) {
+    final partes = completo.trim().split(RegExp(r'\s+'));
+    return partes.isEmpty ? completo : partes.first;
+  }
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip({required this.texto, required this.activo, required this.onTap});
+
+  final String texto;
+  final bool activo;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      selected: activo,
+      button: true,
+      label: 'Ver alertas de $texto',
+      excludeSemantics: true,
+      child: Material(
+        color: activo ? AppColors.primary : AppColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(AgeRadius.full),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AgeRadius.full),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Text(
+              texto,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: activo ? Colors.white : AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

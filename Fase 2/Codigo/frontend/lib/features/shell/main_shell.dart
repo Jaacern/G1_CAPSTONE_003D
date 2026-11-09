@@ -47,11 +47,13 @@ class MainShell extends ConsumerWidget {
     // paciente concreto. El médico elige paciente desde su lista de "Hoy",
     // así que allí no necesita desplegable; la cuidadora además lo usa en
     // Alertas para ver solo los avisos del paciente seleccionado.
+    // Alertas queda fuera a proposito. El centro trae su propio filtro, que
+    // ademas ofrece "Todos", cosa que este desplegable no puede hacer porque
+    // el paciente seleccionado no admite nulo. Dejar los dos significaba dos
+    // selectores en la misma pantalla diciendo cosas distintas.
     final showPatientSelector = role == RoleType.doctor
         ? tab.label == 'Salud'
-        : (tab.label == 'Hoy' ||
-            tab.label == 'Salud' ||
-            tab.label == 'Alertas');
+        : (tab.label == 'Hoy' || tab.label == 'Salud');
 
     return Scaffold(
       body: SafeArea(

@@ -344,8 +344,9 @@ class _MedicationTile extends StatelessWidget {
       leading: const Icon(Icons.medication_rounded, color: AppColors.primary),
       title: Text(medication.name),
       subtitle: Text(
-        '${medication.dose} ${medication.unit} · '
-        '${medication.schedule.join(', ')}',
+        // doseLabel ya concuerda el numero con la unidad ("2 comprimidos")
+        // y no deja el punto colgando cuando falta un dato.
+        '${medication.doseLabel} · ${medication.schedule.join(', ')}',
         style: const TextStyle(
             fontSize: 12, color: AppColors.textSecondary),
       ),

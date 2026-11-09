@@ -133,8 +133,8 @@ class Medication {
   String get scheduleLabel =>
       schedule.isEmpty ? 'Sin horario definido' : schedule.join(' · ');
 
-  /// Texto legible de la dosis (p. ej. "50 mg").
-  String get doseLabel => '$dose $unit';
+  /// Texto legible de la dosis (p. ej. "50 mg", "2 comprimidos").
+  String get doseLabel => etiquetaDeDosis(dose, unit);
 
   Medication copyWith({
     String? name,

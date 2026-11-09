@@ -77,22 +77,24 @@ class _Saludo extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
     final nombre = _nombreCorto(user?.fullName);
+    // Va sobre el fondo de pantalla (no una tarjeta): colorScheme para que no
+    // quede texto oscuro sobre fondo oscuro.
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           nombre.isEmpty ? '${_saludoHora()}.' : '${_saludoHora()}, $nombre',
-          style: const TextStyle(
+          style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.3,
-              color: AppColors.textPrimary),
+              color: cs.onSurface),
         ),
         const SizedBox(height: 2),
         Text(
           _resumen(total, porRevisar),
-          style:
-              const TextStyle(fontSize: 13.5, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 13.5, color: cs.onSurfaceVariant),
         ),
       ],
     );
@@ -185,8 +187,11 @@ class _DoctorPatientCard extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Expanded(flex: 5, child: antecedentes),
-                            const VerticalDivider(
-                                width: 28, color: AppColors.divider),
+                            VerticalDivider(
+                                width: 28,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outlineVariant),
                             Expanded(flex: 4, child: vitales),
                           ],
                         ),
@@ -227,6 +232,7 @@ class _Cabecera extends StatelessWidget {
   Widget build(BuildContext context) {
     final identidad = _identidad(patient);
     final domicilio = (patient.address ?? '').trim();
+    final cs = Theme.of(context).colorScheme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -252,25 +258,25 @@ class _Cabecera extends StatelessWidget {
                 Text(identidad,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary)),
+                        color: cs.onSurfaceVariant)),
               ],
               // Domicilio: el otro desempate práctico, y útil si hay que ir.
               if (domicilio.isNotEmpty) ...[
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    const Icon(Icons.home_outlined,
-                        size: 13, color: AppColors.textFaint),
+                    Icon(Icons.home_outlined,
+                        size: 13, color: cs.onSurfaceVariant),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(domicilio,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 12, color: AppColors.textFaint)),
+                          style: TextStyle(
+                              fontSize: 12, color: cs.onSurfaceVariant)),
                     ),
                   ],
                 ),
@@ -280,7 +286,7 @@ class _Cabecera extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         WellbeingChip(status: patient.wellbeingStatus),
-        const Icon(Icons.chevron_right_rounded, color: AppColors.textFaint),
+        Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
       ],
     );
   }
@@ -368,6 +374,7 @@ class _Antecedentes extends StatelessWidget {
     if (patient.allergies.isEmpty && cronicas.isEmpty && !hayEtiquetas) {
       return const SizedBox.shrink();
     }
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -387,7 +394,7 @@ class _Antecedentes extends StatelessWidget {
           _LineaDato(
             icon: Icons.monitor_heart_outlined,
             texto: 'Crónico: ${cronicas.join(' · ')}',
-            color: AppColors.textPrimary,
+            color: cs.onSurface,
           ),
         if (hayEtiquetas)
           Padding(
@@ -439,11 +446,11 @@ class _Rotulo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       texto.toUpperCase(),
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 10.5,
         fontWeight: FontWeight.w700,
         letterSpacing: .6,
-        color: AppColors.textFaint,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
       ),
     );
   }
@@ -571,7 +578,9 @@ class _VitalesEnLinea extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: antigua ? FontWeight.w700 : FontWeight.w500,
-                    color: antigua ? AgeColors.warn700 : AppColors.textFaint,
+                    color: antigua
+                        ? AgeColors.warn700
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -620,10 +629,11 @@ class _ValorSuelto extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final fuera = !vital.inRange;
     final color = fuera
         ? AppColors.statusAttention
-        : (tenue ? AppColors.textSecondary : AppColors.textPrimary);
+        : (tenue ? cs.onSurfaceVariant : cs.onSurface);
     final texto = '${_numero(vital)} ${vital.type.unit}';
     return Semantics(
       label: '${vital.type.label}: $texto${fuera ? ', fuera de rango' : ''}',
@@ -635,7 +645,7 @@ class _ValorSuelto extends StatelessWidget {
               size: tenue ? 13 : 15,
               color: fuera
                   ? AppColors.statusAttention
-                  : (tenue ? AppColors.textFaint : AppColors.primary)),
+                  : (tenue ? cs.onSurfaceVariant : AppColors.primary)),
           const SizedBox(width: 4),
           Text(
             texto,

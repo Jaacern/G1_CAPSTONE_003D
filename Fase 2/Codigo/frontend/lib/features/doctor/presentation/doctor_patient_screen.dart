@@ -645,38 +645,41 @@ class _Contexto extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final edadYSexo = <String>[
       if (detalle != null) '${detalle!.age} años',
       if (detalle?.sex != null) _sexo(detalle!.sex!),
     ].join(' · ');
 
     return Material(
-      color: AppColors.surface,
+      // colorScheme resuelve claro/oscuro; los AppColors fijos dejaban esta
+      // barra blanca en modo oscuro.
+      color: cs.surface,
       child: InkWell(
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             border:
-                Border(bottom: BorderSide(color: AppColors.divider, width: 1)),
+                Border(bottom: BorderSide(color: cs.outlineVariant, width: 1)),
           ),
           child: Row(
             children: [
               Expanded(
                 child: Text(
                   edadYSexo.isEmpty ? 'Ficha clínica' : edadYSexo,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary),
+                      color: cs.onSurface),
                 ),
               ),
               WellbeingChip(status: patient.wellbeingStatus),
               if (onTap != null)
-                const Padding(
-                  padding: EdgeInsets.only(left: 2),
+                Padding(
+                  padding: const EdgeInsets.only(left: 2),
                   child: Icon(Icons.chevron_right_rounded,
-                      color: AppColors.textSecondary),
+                      color: cs.onSurfaceVariant),
                 ),
             ],
           ),
@@ -738,19 +741,18 @@ class _Antecedente extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
+        color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AgeRadius.full),
-        border: Border.all(color: AppColors.divider),
+        border: Border.all(color: cs.outlineVariant),
       ),
       child: Text(
         texto,
-        style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary),
+        style: TextStyle(
+            fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurface),
       ),
     );
   }

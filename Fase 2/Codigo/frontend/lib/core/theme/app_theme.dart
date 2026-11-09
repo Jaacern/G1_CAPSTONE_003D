@@ -133,7 +133,10 @@ class AgeText {
   AgeText._();
 
   static const display = TextStyle(
-      fontSize: 34, height: 40 / 34, fontWeight: FontWeight.w800, letterSpacing: -0.34);
+      fontSize: 34,
+      height: 40 / 34,
+      fontWeight: FontWeight.w800,
+      letterSpacing: -0.34);
   static const h1 =
       TextStyle(fontSize: 28, height: 34 / 28, fontWeight: FontWeight.w800);
   static const h2 =
@@ -149,7 +152,10 @@ class AgeText {
   static const small =
       TextStyle(fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w400);
   static const caption = TextStyle(
-      fontSize: 12, height: 16 / 12, fontWeight: FontWeight.w600, letterSpacing: 0.8);
+      fontSize: 12,
+      height: 16 / 12,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.8);
 }
 
 /// Radios de forma (sección 6.2).
@@ -358,15 +364,18 @@ class AppTheme {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AgeRadius.l),
-          borderSide: const BorderSide(color: AgeColors.attention600, width: 1.6),
+          borderSide:
+              const BorderSide(color: AgeColors.attention600, width: 1.6),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AgeRadius.l),
-          borderSide: const BorderSide(color: AgeColors.attention600, width: 1.6),
+          borderSide:
+              const BorderSide(color: AgeColors.attention600, width: 1.6),
         ),
         errorStyle: const TextStyle(
             fontFamily: _fontFamily, color: AgeColors.attention700),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AgeColors.surfaceCard,
@@ -397,7 +406,8 @@ class AppTheme {
           const DividerThemeData(color: AgeColors.border, thickness: 1),
       snackBarTheme: const SnackBarThemeData(
         backgroundColor: AgeColors.navy800,
-        contentTextStyle: TextStyle(fontFamily: _fontFamily, color: Colors.white),
+        contentTextStyle:
+            TextStyle(fontFamily: _fontFamily, color: Colors.white),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -423,6 +433,9 @@ class AppTheme {
         surface: AgeColors.darkSurfaceCard,
         onSurface: AgeColors.darkTextPrimary,
         onSurfaceVariant: AgeColors.darkTextSecondary,
+        // Superficie hundida (chips, campos): el fondo de pantalla, un paso
+        // mas oscuro que la tarjeta. En claro es surfaceSunken (arena).
+        surfaceContainerHighest: AgeColors.darkSurfaceBg,
         outline: AgeColors.darkBorder,
         outlineVariant: AgeColors.darkBorder,
       ),

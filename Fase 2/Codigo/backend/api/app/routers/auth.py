@@ -13,7 +13,7 @@ import re
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.deps import CurrentUser, get_current_user
 from app.errors import ApiError
+from app.ratelimit import LIMIT_LOGIN, LIMIT_REFRESH, limiter
 from app.security import (
     create_access_token,
     generate_refresh_token,
@@ -298,7 +299,8 @@ async def register(payload: RegisterIn, db: AsyncSession = Depends(get_db)):
 # 3.2 Iniciar sesión
 # --------------------------------------------------------------------------
 @router.post("/auth/login", response_model=LoginOut)
-async def login(payload: LoginIn, db: AsyncSession = Depends(get_db)):
+@limiter.limit(LIMIT_LOGIN)
+async def login(request: Request, payload: LoginIn, db: AsyncSession = Depends(get_db)):
     user = (
         await db.execute(
             text(
@@ -348,7 +350,8 @@ async def login(payload: LoginIn, db: AsyncSession = Depends(get_db)):
 # 3.3 Refrescar token (rotación + detección de reuso)
 # --------------------------------------------------------------------------
 @router.post("/auth/refresh", response_model=TokenPairOut)
-async def refresh_token(payload: RefreshIn, db: AsyncSession = Depends(get_db)):
+@limiter.limit(LIMIT_REFRESH)
+async def refresh_token(request: Request, payload: RefreshIn, db: AsyncSession = Depends(get_db)):
     invalid = ApiError(
         status_code=401,
         code="INVALID_REFRESH_TOKEN",

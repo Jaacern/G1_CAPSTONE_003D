@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
 from app.deps import CurrentUser, bearer_scheme, get_current_user
+from app.ocr_provider import OcrFallo, OcrNotConfigured, get_ocr
 from app.errors import ApiError
 from app.storage import (
     ALLOWED_CONTENT_TYPES,
@@ -579,3 +580,169 @@ async def download_link(
         ),
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=DOWNLOAD_TTL_MINUTES),
     )
+
+
+# ---------------------------------------------------------------------------
+# Texto de un archivo (OCR)
+#
+# Una foto de una receta o de un examen es, para el resto de la aplicacion, un
+# monton de bytes: no se puede buscar dentro, el asistente no la puede citar
+# y el formulario de medicamentos hay que llenarlo mirando la imagen.
+#
+# El texto se guarda en file_ocr y no se recalcula en cada consulta. Leer una
+# imagen cuesta segundos de CPU y el resultado no cambia solo.
+# ---------------------------------------------------------------------------
+class TextoDeArchivoOut(BaseModel):
+    file_id:    UUID
+    texto:      str
+    motor:      str
+    idioma:     str
+    confianza:  float | None = None
+    caracteres: int
+    # Cuando el archivo no tenia texto legible. No es un error: pasa con una
+    # foto borrosa, un manuscrito o una imagen que simplemente no tiene
+    # letras, y la pantalla necesita poder decirlo sin asustar.
+    vacio:      bool
+    extraido_at: datetime
+
+
+async def _texto_guardado(db: AsyncSession, file_id: UUID):
+    return (
+        await db.execute(
+            text(
+                """
+                SELECT file_id, texto, motor, idioma, confianza, caracteres,
+                       extraido_at
+                FROM file_ocr
+                WHERE file_id = :fid
+                """
+            ),
+            {"fid": str(file_id)},
+        )
+    ).mappings().first()
+
+
+def _respuesta(fila) -> TextoDeArchivoOut:
+    return TextoDeArchivoOut(
+        file_id=fila["file_id"],
+        texto=fila["texto"],
+        motor=fila["motor"],
+        idioma=fila["idioma"],
+        confianza=float(fila["confianza"]) if fila["confianza"] is not None else None,
+        caracteres=fila["caracteres"],
+        vacio=len(fila["texto"].strip()) < 3,
+        extraido_at=fila["extraido_at"],
+    )
+
+
+@router.post("/files/{file_id}/ocr", response_model=TextoDeArchivoOut)
+async def extraer_texto(
+    file_id: UUID,
+    request: Request,
+    rehacer: bool = False,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lee el texto de un archivo y lo guarda.
+
+    El control de acceso es el mismo del resto de files: quien no puede
+    descargar el archivo tampoco puede leer su texto, y recibe el mismo 404
+    que si no existiera. Sin esto, el OCR seria una puerta lateral para sacar
+    el contenido de un documento medico sin permiso de descarga.
+
+    Con [rehacer] se vuelve a procesar aunque ya hubiera texto. Sirve el dia
+    que se cambie de motor.
+    """
+    row = await _cargar_archivo(db, file_id)
+    role = await _exigir_acceso(db, row, user.user_id)
+
+    if not rehacer:
+        ya = await _texto_guardado(db, file_id)
+        if ya is not None:
+            return _respuesta(ya)
+
+    ocr = get_ocr()
+    if not ocr.disponible:
+        raise ApiError(
+            status_code=503, code="OCR_NOT_CONFIGURED",
+            message="La lectura de imagenes no esta habilitada en este servidor.",
+        )
+
+    try:
+        contenido = await get_storage().load(storage_key=row["storage_key"])
+    except Exception as e:
+        raise ApiError(
+            status_code=502, code="STORAGE_ERROR",
+            message="No se pudo leer el archivo almacenado.",
+        ) from e
+
+    try:
+        extraido = await ocr.extraer(contenido=contenido, mime_type=row["mime_type"])
+    except OcrNotConfigured as e:
+        raise ApiError(status_code=503, code="OCR_NOT_CONFIGURED",
+                       message=str(e)) from e
+    except OcrFallo as e:
+        # El motor corrio y no pudo. Es un 422 y no un 500: el problema esta
+        # en el archivo que se mando, no en el servidor.
+        raise ApiError(status_code=422, code="OCR_FAILED",
+                       message=str(e)) from e
+
+    fila = (
+        await db.execute(
+            text(
+                """
+                INSERT INTO file_ocr
+                    (file_id, texto, motor, idioma, confianza, caracteres)
+                VALUES (:fid, :txt, :motor, :idioma, :conf, :chars)
+                ON CONFLICT (file_id) DO UPDATE SET
+                    texto       = EXCLUDED.texto,
+                    motor       = EXCLUDED.motor,
+                    idioma      = EXCLUDED.idioma,
+                    confianza   = EXCLUDED.confianza,
+                    caracteres  = EXCLUDED.caracteres,
+                    extraido_at = now()
+                RETURNING file_id, texto, motor, idioma, confianza, caracteres,
+                          extraido_at
+                """
+            ),
+            {"fid": str(file_id), "txt": extraido.texto, "motor": extraido.motor,
+             "idioma": extraido.idioma, "conf": extraido.confianza,
+             "chars": extraido.caracteres},
+        )
+    ).mappings().first()
+
+    # Leer el contenido de un documento medico queda registrado igual que una
+    # descarga, porque es lo mismo: el texto ES el contenido.
+    #
+    # Va antes del commit a proposito: _registrar_acceso cierra la
+    # transaccion, asi que el texto y su registro de acceso entran juntos o
+    # no entra ninguno.
+    await _registrar_acceso(db, row, user_id=user.user_id, role=role,
+                            request=request)
+    await db.commit()
+
+    return _respuesta(fila)
+
+
+@router.get("/files/{file_id}/ocr", response_model=TextoDeArchivoOut)
+async def texto_de_archivo(
+    file_id: UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """El texto ya extraido de un archivo.
+
+    No extrae: si nadie lo proceso todavia responde 404 con un codigo propio,
+    para que la pantalla sepa que tiene que pedir la extraccion y no que el
+    archivo no existe.
+    """
+    row = await _cargar_archivo(db, file_id)
+    await _exigir_acceso(db, row, user.user_id)
+
+    fila = await _texto_guardado(db, file_id)
+    if fila is None:
+        raise ApiError(
+            status_code=404, code="OCR_NOT_YET",
+            message="Este archivo todavia no tiene texto extraido.",
+        )
+    return _respuesta(fila)

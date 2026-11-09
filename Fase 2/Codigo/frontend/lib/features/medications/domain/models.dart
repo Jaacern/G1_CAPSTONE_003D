@@ -105,7 +105,6 @@ class Medication {
     required this.name,
     required this.dose,
     required this.unit,
-    required this.form,
     this.schedule = const [],
     this.instructions,
     this.active = true,
@@ -122,9 +121,6 @@ class Medication {
   /// Unidad de la dosis (p. ej. "mg", "ml", "comprimido").
   final String unit;
 
-  /// Forma farmacéutica (p. ej. "comprimido", "cápsula", "jarabe").
-  final String form;
-
   /// Horarios de toma en formato 'HH:mm' (o descripciones de frecuencia).
   final List<String> schedule;
 
@@ -137,14 +133,13 @@ class Medication {
   String get scheduleLabel =>
       schedule.isEmpty ? 'Sin horario definido' : schedule.join(' · ');
 
-  /// Texto legible de la dosis (p. ej. "50 mg · comprimido").
-  String get doseLabel => '$dose $unit · $form';
+  /// Texto legible de la dosis (p. ej. "50 mg").
+  String get doseLabel => '$dose $unit';
 
   Medication copyWith({
     String? name,
     String? dose,
     String? unit,
-    String? form,
     List<String>? schedule,
     String? instructions,
     bool? active,
@@ -156,7 +151,6 @@ class Medication {
         name: name ?? this.name,
         dose: dose ?? this.dose,
         unit: unit ?? this.unit,
-        form: form ?? this.form,
         schedule: schedule ?? this.schedule,
         instructions: instructions ?? this.instructions,
         active: active ?? this.active,
@@ -170,8 +164,6 @@ class Medication {
         // Backend: dose_amount (num) + dose_unit. Fallback a dose/unit (mock).
         dose: (json['dose_amount'] ?? json['dose'] ?? '').toString(),
         unit: (json['dose_unit'] ?? json['unit'] ?? '').toString(),
-        // Backend no tiene 'form'; se mantiene por compat con el mock.
-        form: (json['form'] ?? '').toString(),
         // Backend: times (["HH:MM"]). Fallback a schedule (mock).
         schedule: ((json['times'] ?? json['schedule'] ?? []) as List)
             .map((e) => e.toString())
@@ -192,7 +184,6 @@ class Medication {
         'name': name,
         'dose': dose,
         'unit': unit,
-        'form': form,
         'schedule': schedule,
         if (instructions != null) 'instructions': instructions,
         'active': active,
@@ -259,7 +250,6 @@ class NewMedication {
     required this.name,
     required this.dose,
     required this.unit,
-    required this.form,
     this.schedule = const [],
     this.instructions,
     required this.startDate,
@@ -269,7 +259,6 @@ class NewMedication {
   final String name;
   final String dose;
   final String unit;
-  final String form;
   final List<String> schedule;
   final String? instructions;
   final DateTime startDate;
@@ -281,15 +270,14 @@ class NewMedication {
   /// - `days_of_week`: todos los días (el backend asume todos si se omite,
   ///   pero lo enviamos explícito para que el plan sea claro)
   /// - `grace_window_min`: ventana de gracia por defecto (60 min)
-  /// - `form` no existe en el backend: se preserva al inicio de las
-  ///   instrucciones para no perder el dato clínico.
+  ///
+  /// La unidad ya dice la presentación, asi que no hay un campo de forma
+  /// aparte. Antes habia uno que la tabla no tenia y que se guardaba como
+  /// prefijo de las instrucciones, de donde se perdia del formulario y se
+  /// duplicaba en cada edicion.
   Map<String, dynamic> toJson() {
     final doseAmount = double.tryParse(dose.replaceAll(',', '.')) ?? 0;
-    final mergedInstructions = [
-      if (form.isNotEmpty) 'Forma: $form',
-      if (instructions != null && instructions!.trim().isNotEmpty)
-        instructions!.trim(),
-    ].join('. ');
+    final limpias = instructions?.trim() ?? '';
     return {
       'name': name,
       'dose_amount': doseAmount,
@@ -297,7 +285,7 @@ class NewMedication {
       'times': schedule,
       'days_of_week': const [1, 2, 3, 4, 5, 6, 7],
       'grace_window_min': 60,
-      if (mergedInstructions.isNotEmpty) 'instructions': mergedInstructions,
+      if (limpias.isNotEmpty) 'instructions': limpias,
       'start_date': _dateOnly(startDate),
       if (endDate != null) 'end_date': _dateOnly(endDate!),
     };
@@ -402,7 +390,6 @@ NewMedication _newMedFromJson(Map<String, dynamic> json) => NewMedication(
       name: (json['name'] ?? '') as String,
       dose: (json['dose'] ?? '').toString(),
       unit: (json['unit'] ?? '').toString(),
-      form: (json['form'] ?? '').toString(),
       schedule:
           ((json['schedule'] ?? []) as List).map((e) => e.toString()).toList(),
       instructions: json['instructions'] as String?,

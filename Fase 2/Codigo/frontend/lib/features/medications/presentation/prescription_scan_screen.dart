@@ -237,7 +237,6 @@ class _DraftEntry {
     required this.name,
     required this.dose,
     required this.unit,
-    required this.form,
     required this.schedule,
     required this.instructions,
     required this.startDate,
@@ -247,7 +246,6 @@ class _DraftEntry {
   final TextEditingController name;
   final TextEditingController dose;
   final TextEditingController unit;
-  final TextEditingController form;
   final TextEditingController schedule; // 'HH:mm, HH:mm'
   final TextEditingController instructions;
   DateTime startDate;
@@ -257,7 +255,6 @@ class _DraftEntry {
         name: TextEditingController(text: m.name),
         dose: TextEditingController(text: m.dose),
         unit: TextEditingController(text: m.unit),
-        form: TextEditingController(text: m.form),
         schedule: TextEditingController(text: m.schedule.join(', ')),
         instructions: TextEditingController(text: m.instructions ?? ''),
         startDate: m.startDate,
@@ -268,7 +265,6 @@ class _DraftEntry {
         name: name.text.trim(),
         dose: dose.text.trim(),
         unit: unit.text.trim(),
-        form: form.text.trim(),
         schedule: schedule.text
             .split(',')
             .map((e) => e.trim())
@@ -283,7 +279,6 @@ class _DraftEntry {
     name.dispose();
     dose.dispose();
     unit.dispose();
-    form.dispose();
     schedule.dispose();
     instructions.dispose();
   }
@@ -338,11 +333,6 @@ class _DraftCard extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: entry.form,
-            decoration: const InputDecoration(labelText: 'Forma'),
           ),
           const SizedBox(height: 12),
           TextField(

@@ -31,20 +31,11 @@ class _MedicationPlanScreenState extends ConsumerState<MedicationPlanScreen> {
   final _instructions = TextEditingController();
 
   String _unit = 'mg';
-  String _form = 'comprimido';
   final List<TimeOfDay> _schedule = [const TimeOfDay(hour: 8, minute: 0)];
   DateTime _startDate = DateTime.now();
   DateTime? _endDate;
 
   static const _units = ['mg', 'ml', 'g', 'mcg', 'UI', 'gotas'];
-  static const _forms = [
-    'comprimido',
-    'cápsula',
-    'jarabe',
-    'gotas',
-    'inyección',
-    'parche',
-  ];
 
   bool _loading = false;
   bool _saving = false;
@@ -76,7 +67,6 @@ class _MedicationPlanScreenState extends ConsumerState<MedicationPlanScreen> {
       _dose.text = med.dose;
       _instructions.text = med.instructions ?? '';
       _unit = _units.contains(med.unit) ? med.unit : _units.first;
-      _form = _forms.contains(med.form) ? med.form : _forms.first;
       _startDate = med.startDate;
       _endDate = med.endDate;
       _schedule
@@ -144,7 +134,6 @@ class _MedicationPlanScreenState extends ConsumerState<MedicationPlanScreen> {
       name: _name.text.trim(),
       dose: _dose.text.trim(),
       unit: _unit,
-      form: _form,
       schedule: _schedule.map(_fmt).toList()..sort(),
       instructions: _instructions.text.trim(),
       startDate: _startDate,
@@ -245,16 +234,6 @@ class _MedicationPlanScreenState extends ConsumerState<MedicationPlanScreen> {
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    initialValue: _form,
-                    decoration: const InputDecoration(labelText: 'Forma'),
-                    items: [
-                      for (final f in _forms)
-                        DropdownMenuItem(value: f, child: Text(f)),
-                    ],
-                    onChanged: (v) => setState(() => _form = v ?? _form),
                   ),
                   const SizedBox(height: 20),
                   Text('Horarios',

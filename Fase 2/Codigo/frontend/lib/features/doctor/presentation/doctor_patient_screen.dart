@@ -344,7 +344,7 @@ class _MedicationTile extends StatelessWidget {
       leading: const Icon(Icons.medication_rounded, color: AppColors.primary),
       title: Text(medication.name),
       subtitle: Text(
-        '${medication.dose} ${medication.unit} · ${medication.form} · '
+        '${medication.dose} ${medication.unit} · '
         '${medication.schedule.join(', ')}',
         style: const TextStyle(
             fontSize: 12, color: AppColors.textSecondary),

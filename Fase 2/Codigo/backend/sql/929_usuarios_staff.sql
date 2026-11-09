@@ -1,5 +1,13 @@
 -- AgeCare — Administracion
 -- 929_usuarios_staff.sql — Marcar quien trabaja en Alloxentric
+-- MIGRACION IDEMPOTENTE
+--
+-- Lleva la marca porque faltaba y eso rompia el panel de administracion
+-- en toda base que ya existia: el volumen de Postgres solo corre los .sql
+-- al crearse, asi que quien tenia la base levantada nunca recibio
+-- is_staff, y sin esa columna el login del administrador falla. Todo lo
+-- que hace este archivo se puede repetir sin dano: ADD COLUMN IF NOT
+-- EXISTS, CREATE INDEX IF NOT EXISTS y un INSERT con ON CONFLICT.
 --
 -- EL PROBLEMA
 --     El modelo no tenia forma de decir "esta persona es de la empresa".

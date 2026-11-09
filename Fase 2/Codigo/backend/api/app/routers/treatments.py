@@ -137,6 +137,8 @@ class ItemIn(BaseModel):
     continues_item_id: str | None = None   # item del tratamiento vigente que continúa
     is_prn:           bool = False          # SOS/condicional: no genera agenda
     schedule_label:   str | None = Field(default=None, max_length=40)
+    # Solo SOS: intervalo mínimo entre usos, en minutos (360 = cada 6 h).
+    prn_min_interval_min: int | None = Field(default=None, ge=15, le=1440)
 
 
 class TreatmentCreateIn(BaseModel):
@@ -165,6 +167,7 @@ class ItemOut(BaseModel):
     is_prn:        bool = False
     schedule_label: str | None = None
     drug_code:     str | None = None   # fármaco del catálogo, si vino de ahí
+    prn_min_interval_min: int | None = None
 
 
 class TreatmentOut(BaseModel):
@@ -235,7 +238,7 @@ async def _load_treatment(db: AsyncSession, row) -> TreatmentOut:
         await db.execute(
             text("SELECT id, name, dose_text, dose_amount, dose_unit, instructions, "
                  "grace_window_min, action, continues_item_id, is_prn, schedule_label, "
-                 "drug_code "
+                 "drug_code, prn_min_interval_min "
                  "FROM treatment_items WHERE treatment_id = :tid ORDER BY is_prn, name"),
             {"tid": str(row["id"])},
         )
@@ -258,6 +261,7 @@ async def _load_treatment(db: AsyncSession, row) -> TreatmentOut:
             is_prn=it["is_prn"],
             schedule_label=it["schedule_label"],
             drug_code=it["drug_code"],
+            prn_min_interval_min=it["prn_min_interval_min"],
         ))
     return TreatmentOut(
         treatment_id=str(row["id"]),
@@ -434,6 +438,11 @@ async def create_treatment(
             raise ApiError(status_code=422, code="VALIDATION_ERROR",
                            message=f"La indicación de {it.name} necesita al menos un horario "
                                    "(o márcala como 'solo si se necesita').")
+        # El intervalo mínimo entre usos solo existe para un SOS.
+        if it.prn_min_interval_min is not None and not it.is_prn:
+            raise ApiError(status_code=422, code="VALIDATION_ERROR",
+                           message=f"El intervalo entre usos de {it.name} solo "
+                                   "aplica a una indicación SOS.")
         action = "added"
         if it.continues_item_id:
             # ¿cambió algo respecto del anterior? dosis u horarios.
@@ -454,15 +463,15 @@ async def create_treatment(
                 text("INSERT INTO treatment_items "
                      "(treatment_id, name, dose_amount, dose_unit, instructions, "
                      " grace_window_min, continues_item_id, action, is_prn, schedule_label, "
-                     " drug_code) "
+                     " drug_code, prn_min_interval_min) "
                      "VALUES (:tid, :name, :da, :du, :ins, :grace, :cont, :action, :prn, :lbl, "
-                     " :drug) "
+                     " :drug, :intv) "
                      "RETURNING id"),
                 {"tid": tid, "name": it.name, "da": it.dose_amount, "du": it.dose_unit,
                  "ins": it.instructions, "grace": it.grace_window_min,
                  "cont": it.continues_item_id, "action": action,
                  "prn": it.is_prn, "lbl": it.schedule_label,
-                 "drug": it.drug_code},
+                 "drug": it.drug_code, "intv": it.prn_min_interval_min},
             )
         ).mappings().first()
         iid = str(item["id"])

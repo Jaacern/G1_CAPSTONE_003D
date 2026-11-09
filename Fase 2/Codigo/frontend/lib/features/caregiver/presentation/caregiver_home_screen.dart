@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../../home/application/home_providers.dart';
 import '../../medications/presentation/medications_screen.dart';
+import '../../medications/presentation/prn_banner.dart';
 import '../../patients/application/patients_providers.dart';
 
 /// "Hoy" de la cuidadora, construido solo con endpoints que el backend soporta:
@@ -78,6 +79,9 @@ class CaregiverHomeScreen extends ConsumerWidget {
           // incidente, hacer el relevo ni ver sus reportes. Solo registrar
           // dosis, que es lo que esta pantalla ya mostraba.
           const _AccesosDeTurno(),
+          // Los SOS no estan en la agenda: si no se avisan aqui, la cuidadora
+          // no sabe que existen hasta la crisis.
+          PrnBanner(patientId: patient.patientId),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
             child: Align(

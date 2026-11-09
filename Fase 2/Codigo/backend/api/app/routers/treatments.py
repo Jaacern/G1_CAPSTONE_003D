@@ -164,6 +164,7 @@ class ItemOut(BaseModel):
     continues_item_id: str | None = None
     is_prn:        bool = False
     schedule_label: str | None = None
+    drug_code:     str | None = None   # fármaco del catálogo, si vino de ahí
 
 
 class TreatmentOut(BaseModel):
@@ -233,7 +234,8 @@ async def _load_treatment(db: AsyncSession, row) -> TreatmentOut:
     items_rows = (
         await db.execute(
             text("SELECT id, name, dose_text, dose_amount, dose_unit, instructions, "
-                 "grace_window_min, action, continues_item_id, is_prn, schedule_label "
+                 "grace_window_min, action, continues_item_id, is_prn, schedule_label, "
+                 "drug_code "
                  "FROM treatment_items WHERE treatment_id = :tid ORDER BY is_prn, name"),
             {"tid": str(row["id"])},
         )
@@ -255,6 +257,7 @@ async def _load_treatment(db: AsyncSession, row) -> TreatmentOut:
             continues_item_id=str(it["continues_item_id"]) if it["continues_item_id"] else None,
             is_prn=it["is_prn"],
             schedule_label=it["schedule_label"],
+            drug_code=it["drug_code"],
         ))
     return TreatmentOut(
         treatment_id=str(row["id"]),
@@ -450,13 +453,16 @@ async def create_treatment(
             await db.execute(
                 text("INSERT INTO treatment_items "
                      "(treatment_id, name, dose_amount, dose_unit, instructions, "
-                     " grace_window_min, continues_item_id, action, is_prn, schedule_label) "
-                     "VALUES (:tid, :name, :da, :du, :ins, :grace, :cont, :action, :prn, :lbl) "
+                     " grace_window_min, continues_item_id, action, is_prn, schedule_label, "
+                     " drug_code) "
+                     "VALUES (:tid, :name, :da, :du, :ins, :grace, :cont, :action, :prn, :lbl, "
+                     " :drug) "
                      "RETURNING id"),
                 {"tid": tid, "name": it.name, "da": it.dose_amount, "du": it.dose_unit,
                  "ins": it.instructions, "grace": it.grace_window_min,
                  "cont": it.continues_item_id, "action": action,
-                 "prn": it.is_prn, "lbl": it.schedule_label},
+                 "prn": it.is_prn, "lbl": it.schedule_label,
+                 "drug": it.drug_code},
             )
         ).mappings().first()
         iid = str(item["id"])

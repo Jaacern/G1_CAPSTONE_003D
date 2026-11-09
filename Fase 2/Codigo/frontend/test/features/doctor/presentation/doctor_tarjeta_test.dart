@@ -70,4 +70,11 @@ void main() {
     expect(find.text('Los Aromos 1234, La Florida'), findsOneWidget);
     expect(find.text('Pasaje Los Olmos 55, Maipú'), findsOneWidget);
   });
+
+  testWidgets('una alergia grave se ve en rojo', (tester) async {
+    await montar(tester);
+
+    final texto = tester.widget<Text>(find.text('Alergias: Penicilina'));
+    expect(texto.style?.color, AppColors.critical);
+  });
 }

@@ -554,6 +554,20 @@ class VitalMini {
       );
 }
 
+/// Alergia resumida para la tarjeta de la lista (etiqueta + severidad).
+class AllergyMini {
+  const AllergyMini({required this.label, required this.severity});
+  final String label;
+  final String severity; // leve|moderada|severa|anafilaxia
+
+  bool get esGrave => severity == 'severa' || severity == 'anafilaxia';
+
+  factory AllergyMini.fromJson(Map<String, dynamic> j) => AllergyMini(
+        label: (j['label'] ?? '') as String,
+        severity: (j['severity'] ?? 'moderada') as String,
+      );
+}
+
 /// Solicitud de creación de paciente.
 ///
 /// La UI captura un único campo "Nombre completo", pero el backend exige

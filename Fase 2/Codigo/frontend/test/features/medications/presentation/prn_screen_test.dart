@@ -79,4 +79,19 @@ void main() {
     expect(find.textContaining('Le falta el aire'), findsOneWidget);
     expect(find.byTooltip('Antes del intervalo'), findsOneWidget);
   });
+
+  testWidgets('al llegar al maximo del dia no deja registrar otro',
+      (tester) async {
+    // Seis usos de 2 puff en 24 h = 12, el maximo del ipratropio.
+    await montar(tester, usos: [
+    for (final h in [7, 10, 13, 16, 19, 22])
+      DateTime.now().subtract(Duration(hours: h)),
+  ]);
+
+    expect(find.textContaining('consulta al médico'), findsOneWidget);
+    final boton = tester.widget<ButtonStyleButton>(find.ancestor(
+        of: find.text('Registrar uso'),
+        matching: find.byWidgetPredicate((w) => w is ButtonStyleButton)));
+    expect(boton.onPressed, isNull);
+  });
 }

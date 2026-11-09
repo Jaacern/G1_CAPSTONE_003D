@@ -106,4 +106,11 @@ void main() {
 
     expect(find.textContaining('Última lectura'), findsNWidgets(2));
   });
+
+  testWidgets('con todos los datos la tarjeta cabe en 320 dp', (tester) async {
+    await montar(tester, ancho: 320);
+
+    expect(find.text('Elena Ramírez'), findsOneWidget);
+    expect(find.text('Alergias: Penicilina'), findsOneWidget);
+  });
 }

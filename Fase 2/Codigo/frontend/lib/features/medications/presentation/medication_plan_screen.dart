@@ -233,6 +233,27 @@ class _MedicationPlanScreenState extends ConsumerState<MedicationPlanScreen> {
                       ),
                     ],
                   ),
+                  // Como queda la dosis escrita, mientras se escribe. Sin esto
+                  // hay que guardar para descubrir que decia "2 gotas" cuando
+                  // se queria decir "2 comprimidos".
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _dose,
+                    builder: (context, value, _) {
+                      if (value.text.trim().isEmpty) {
+                        return const SizedBox(height: 8);
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Cada toma: ${etiquetaDeDosis(value.text, _unit)}',
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary),
+                        ),
+                      );
+                    },
+                  ),
                   const SizedBox(height: 20),
                   Text('Horarios',
                       style: Theme.of(context).textTheme.titleMedium),

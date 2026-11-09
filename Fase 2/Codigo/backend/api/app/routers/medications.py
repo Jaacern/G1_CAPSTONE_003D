@@ -16,6 +16,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.deps import CurrentUser, PatientContext, get_current_user, get_patient_member
 from app.errors import ApiError
+from app.ocr_provider import OcrFallo, OcrNotConfigured, get_ocr
+from app.receta_lector import leer_receta
+from app.routers.logbook import _archivo_del_paciente
+from app.storage import get_storage
 
 router = APIRouter(prefix="/api/v1", tags=["medications"])
 
@@ -646,4 +650,136 @@ async def adherence(
                        for mid, d in per_med.items()],
         daily=[AdherenceDaily(date=day, taken=d["taken"], missed=d["missed"], pending=d["pending"])
                for day, d in sorted(per_day.items())],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Leer una receta fotografiada
+#
+# La pantalla sube la foto como kind 'prescription' y despues llama aqui. Lo
+# que devuelve son BORRADORES: el OCR se equivoca, y de estos campos salen
+# las dosis que se le dan a un adulto mayor. Un 50 mg borroso se puede leer
+# 500, asi que nada de lo que sale de aqui se guarda solo. El medico revisa
+# campo por campo en el formulario y confirma.
+#
+# No crea medicamentos. Para eso esta 6.1, que exige rol medico.
+# ---------------------------------------------------------------------------
+class EscaneoIn(BaseModel):
+    # La aplicacion guarda la URL que recibio al subir, no el id, igual que
+    # en la bitacora y el chat.
+    media_url: str = Field(min_length=1)
+
+
+class BorradorOut(BaseModel):
+    name:         str
+    dose:         str
+    unit:         str
+    schedule:     list[str]
+    instructions: str
+    # La linea tal como la leyo el OCR. La pantalla la muestra junto al campo
+    # para que el medico compare sin volver a abrir la foto.
+    origen:       str
+
+
+class EscaneoOut(BaseModel):
+    medications: list[BorradorOut]
+    # El texto completo, para cuando el lector no encontro nada y la persona
+    # necesita ver que si leyo algo, aunque no lo supiera interpretar.
+    texto:       str
+    confianza:   float | None = None
+    # True cuando se leyo pero no salio ninguna indicacion reconocible. La
+    # pantalla lo distingue de un error: la foto puede estar bien y la receta
+    # ser manuscrita.
+    sin_indicaciones: bool
+
+
+@router.post("/patients/{patient_id}/medications/scan", response_model=EscaneoOut)
+async def escanear_receta(
+    payload: EscaneoIn,
+    ctx: PatientContext = Depends(get_patient_member()),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lee una receta ya subida y propone indicaciones para revisar.
+
+    Cualquier miembro del circulo puede escanear, no solo el medico: el
+    familiar que llega de la consulta con el papel en la mano es quien le
+    saca la foto. Lo que ninguno de ellos puede hacer es guardar la
+    indicacion, y eso lo sigue cuidando 6.1.
+    """
+    file_id = await _archivo_del_paciente(db, payload.media_url, ctx.patient_id)
+    if file_id is None:
+        raise ApiError(
+            status_code=422, code="VALIDATION_ERROR",
+            message="Hay que indicar la foto de la receta.",
+            details=[{"field": "media_url", "message": "No puede venir vacio."}],
+        )
+
+    row = (
+        await db.execute(
+            text("SELECT id, storage_key, mime_type, status FROM files "
+                 "WHERE id = :fid"),
+            {"fid": file_id},
+        )
+    ).mappings().first()
+    if row is None or row["status"] != "stored":
+        raise ApiError(
+            status_code=404, code="NOT_FOUND",
+            message="La foto de la receta no esta disponible.",
+        )
+
+    ocr = get_ocr()
+    if not ocr.disponible:
+        raise ApiError(
+            status_code=503, code="OCR_NOT_CONFIGURED",
+            message="La lectura de recetas no esta habilitada en este servidor.",
+        )
+
+    try:
+        contenido = await get_storage().load(storage_key=row["storage_key"])
+    except Exception as e:
+        raise ApiError(
+            status_code=502, code="STORAGE_ERROR",
+            message="No se pudo leer la foto almacenada.",
+        ) from e
+
+    try:
+        extraido = await ocr.extraer(contenido=contenido,
+                                     mime_type=row["mime_type"])
+    except OcrNotConfigured as e:
+        raise ApiError(status_code=503, code="OCR_NOT_CONFIGURED",
+                       message=str(e)) from e
+    except OcrFallo as e:
+        raise ApiError(status_code=422, code="OCR_FAILED",
+                       message=str(e)) from e
+
+    # El texto se guarda igual que con cualquier otro archivo, asi que la
+    # receta queda buscable y el asistente la puede citar sin volver a
+    # procesar la imagen.
+    await db.execute(
+        text(
+            """
+            INSERT INTO file_ocr
+                (file_id, texto, motor, idioma, confianza, caracteres)
+            VALUES (:fid, :txt, :motor, :idioma, :conf, :chars)
+            ON CONFLICT (file_id) DO UPDATE SET
+                texto       = EXCLUDED.texto,
+                motor       = EXCLUDED.motor,
+                idioma      = EXCLUDED.idioma,
+                confianza   = EXCLUDED.confianza,
+                caracteres  = EXCLUDED.caracteres,
+                extraido_at = now()
+            """
+        ),
+        {"fid": file_id, "txt": extraido.texto, "motor": extraido.motor,
+         "idioma": extraido.idioma, "conf": extraido.confianza,
+         "chars": extraido.caracteres},
+    )
+    await db.commit()
+
+    borradores = leer_receta(extraido.texto)
+    return EscaneoOut(
+        medications=[BorradorOut(**b.to_json()) for b in borradores],
+        texto=extraido.texto,
+        confianza=extraido.confianza,
+        sin_indicaciones=not borradores,
     )

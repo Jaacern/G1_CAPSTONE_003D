@@ -7,6 +7,8 @@ import '../../../core/speech/speech_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../alerts/presentation/sos_button.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../medications/domain/models.dart' as meds;
+import '../../medications/presentation/dose_actions.dart';
 import '../application/elder_providers.dart';
 import 'elder_music_screen.dart';
 import 'elder_photos_screen.dart';
@@ -38,8 +40,8 @@ class ElderHomeScreen extends ConsumerWidget {
           accentFg: AgeColors.teal600,
           accentBg: AgeColors.teal100,
           speak: 'Familia. Hablar y escuchar mensajes.',
-          onTap: () => context.push(
-              patientId == null ? '/chat' : '/chat?patient=$patientId'),
+          onTap: () => context
+              .push(patientId == null ? '/chat' : '/chat?patient=$patientId'),
         ),
       if (AppConfig.hasElderContent) ...[
         _ElderAction(
@@ -99,16 +101,21 @@ class ElderHomeScreen extends ConsumerWidget {
                 ),
                 _HelpButton(
                   onTap: () => speech.speak(
-                    'Esta es tu pantalla de inicio. Arriba puedes decirnos cómo '
-                    'te sientes hoy. Debajo, toca un botón grande para hablar '
-                    'con tu familia, ver tus fotos o entretenerte con la '
-                    'música. El botón rojo es para pedir ayuda en una '
-                    'emergencia.',
+                    'Esta es tu pantalla de inicio. Arriba están tus remedios '
+                    'de hoy, con un botón para avisar cuando te tomes uno. '
+                    'Después puedes decirnos cómo te sientes hoy. Más abajo, '
+                    'toca un botón grande para hablar con tu familia, ver tus '
+                    'fotos o entretenerte con la música. El botón rojo es '
+                    'para pedir ayuda en una emergencia.',
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 24),
+
+            // Los remedios de hoy, arriba de todo. Es lo unico de esta
+            // pantalla que tiene hora: si se pasa, se pasa.
+            _RemediosDeHoy(speech: speech),
 
             // Check-in de ánimo.
             _MoodCheckIn(speech: speech),
@@ -138,11 +145,27 @@ class ElderHomeScreen extends ConsumerWidget {
   /// Fecha en español sin depender de datos de locale de intl.
   static String _spanishDate(DateTime d) {
     const days = [
-      'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'
+      'lunes',
+      'martes',
+      'miércoles',
+      'jueves',
+      'viernes',
+      'sábado',
+      'domingo'
     ];
     const months = [
-      'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
-      'septiembre', 'octubre', 'noviembre', 'diciembre'
+      'enero',
+      'febrero',
+      'marzo',
+      'abril',
+      'mayo',
+      'junio',
+      'julio',
+      'agosto',
+      'septiembre',
+      'octubre',
+      'noviembre',
+      'diciembre'
     ];
     final day = days[d.weekday - 1];
     final month = months[d.month - 1];
@@ -479,5 +502,142 @@ class _LogoutButton extends ConsumerWidget {
     if (ok == true) {
       await ref.read(authControllerProvider.notifier).logout();
     }
+  }
+}
+
+/// Los remedios de hoy del adulto mayor, en su propia pantalla de inicio.
+///
+/// Esta pantalla no tiene barra de pestanas, asi que hasta ahora la persona
+/// que de hecho se toma las pastillas no tenia donde mirar que le toca. Se
+/// enteraba cuando sonaba la notificacion, y si la perdia no habia a donde
+/// volver.
+///
+/// Muestra la proxima que falta, no la lista entera: la pregunta de alguien
+/// que mira esto es "que me toca ahora", y una lista de seis filas con horas
+/// la responde peor que una sola linea grande. Lo que ya se tomo se resume en
+/// el contador de abajo.
+class _RemediosDeHoy extends ConsumerWidget {
+  const _RemediosDeHoy({required this.speech});
+
+  final SpeechService speech;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dosisAsync = ref.watch(dosisDeHoyProvider);
+    final scheme = Theme.of(context).colorScheme;
+
+    final dosis = dosisAsync.valueOrNull;
+    // Mientras carga o si falla no se ocupa espacio: el resto de la pantalla
+    // sigue siendo util y un error tecnico aqui no le dice nada a esta
+    // persona. La notificacion sigue siendo el aviso que no depende de esto.
+    if (dosis == null || dosis.isEmpty) return const SizedBox.shrink();
+
+    final pendientes = dosis
+        .where((d) =>
+            d.status == meds.DoseStatus.pending ||
+            d.status == meds.DoseStatus.postponed)
+        .toList()
+      ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+    final tomadas =
+        dosis.where((d) => d.status == meds.DoseStatus.taken).length;
+
+    final proxima = pendientes.isEmpty ? null : pendientes.first;
+    final texto = proxima == null
+        ? 'Ya te tomaste todos tus remedios de hoy.'
+        : '${proxima.medicationName}, '
+            '${meds.etiquetaDeDosis(proxima.dose ?? '', proxima.unit ?? '')}, '
+            'a las ${proxima.timeLabel}.';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Semantics(
+        label: 'Tus remedios de hoy. $texto '
+            'Te tomaste $tomadas de ${dosis.length}.',
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: proxima == null ? AgeColors.ok100 : AgeColors.teal100,
+            borderRadius: BorderRadius.circular(AgeRadius.xxl),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    proxima == null
+                        ? Icons.check_circle_rounded
+                        : Icons.medication_rounded,
+                    size: 30,
+                    color:
+                        proxima == null ? AgeColors.ok600 : AgeColors.teal700,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Tus remedios de hoy',
+                      style: AgeText.h2.copyWith(color: scheme.onSurface),
+                    ),
+                  ),
+                  // El mismo gesto de escuchar que el resto de la pantalla.
+                  IconButton(
+                    tooltip: 'Escuchar',
+                    icon: Icon(Icons.volume_up_rounded,
+                        size: 28, color: scheme.onSurfaceVariant),
+                    onPressed: () => speech.speak(texto),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                proxima == null ? texto : proxima.medicationName,
+                style: AgeText.display.copyWith(
+                  fontFamily: 'Nunito Sans',
+                  color: scheme.onSurface,
+                ),
+              ),
+              if (proxima != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  '${meds.etiquetaDeDosis(proxima.dose ?? '', proxima.unit ?? '')}'
+                  ' · a las ${proxima.timeLabel}',
+                  style: AgeText.bodyL.copyWith(color: scheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 16),
+                // Un solo boton, del ancho de la tarjeta. Las otras opciones
+                // (posponer, no la tome) viven en la pantalla de la dosis,
+                // que la familia y la cuidadora si tienen: aqui la respuesta
+                // normal es una sola.
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      backgroundColor: AgeColors.teal600,
+                    ),
+                    onPressed: () async {
+                      final ok = await registrarDosis(
+                        context: context,
+                        ref: ref,
+                        dose: proxima,
+                        status: meds.DoseStatus.taken,
+                      );
+                      if (ok) ref.invalidate(dosisDeHoyProvider);
+                    },
+                    icon: const Icon(Icons.check_rounded, size: 26),
+                    label: const Text('Ya me lo tomé', style: AgeText.bodyL),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 10),
+              Text(
+                'Te tomaste $tomadas de ${dosis.length} de hoy.',
+                style: AgeText.body.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

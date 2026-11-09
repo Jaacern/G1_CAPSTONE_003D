@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/network/upload_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
@@ -71,10 +72,33 @@ class _PrescriptionScanScreenState
         }
       });
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = _mensajeDeError(e));
     } finally {
       if (mounted) setState(() => _scanning = false);
     }
+  }
+
+  /// Traduce el fallo a algo que explique qué hacer.
+  ///
+  /// Las tres causas son distintas y piden cosas distintas: si el servidor
+  /// no tiene el motor encendido, repetir la foto no sirve de nada; si la
+  /// foto salió ilegible, sí.
+  String _mensajeDeError(Object e) {
+    if (e is ApiException) {
+      switch (e.code) {
+        case 'OCR_NOT_CONFIGURED':
+          return 'La lectura de recetas no está habilitada en este '
+              'servidor. Puedes agregar los medicamentos a mano.';
+        case 'OCR_FAILED':
+          return 'No se pudo leer la foto. Intenta de nuevo con más luz, '
+              'el papel plano y la cámara en paralelo.';
+        case 'STORAGE_ERROR':
+          return 'La foto se subió pero no se pudo recuperar. Intenta de '
+              'nuevo.';
+      }
+      return e.message;
+    }
+    return 'No se pudo leer la receta. Intenta de nuevo.';
   }
 
   Future<void> _saveAll() async {

@@ -28,6 +28,7 @@ import '../../features/marketplace/presentation/marketplace_screen.dart';
 import '../../features/medications/presentation/dose_confirm_screen.dart';
 import '../../features/medications/presentation/medication_plan_screen.dart';
 import '../../features/medications/presentation/prescription_scan_screen.dart';
+import '../../features/medications/presentation/prn_screen.dart';
 import '../../features/medications/presentation/treatment_editor_screen.dart';
 import '../../features/medications/presentation/treatment_history_screen.dart';
 import '../../features/patients/presentation/accept_invitation_screen.dart';
@@ -145,6 +146,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/treatment/history',
         builder: (_, st) => TreatmentHistoryScreen(
             patientId: st.uri.queryParameters['patient']!),
+      ),
+      // Medicamentos SOS del paciente: ver los disponibles y registrar su uso.
+      GoRoute(
+        path: '/meds/sos',
+        builder: (_, st) =>
+            PrnScreen(patientId: st.uri.queryParameters['patient']!),
       ),
 
       // --- Alertas ---

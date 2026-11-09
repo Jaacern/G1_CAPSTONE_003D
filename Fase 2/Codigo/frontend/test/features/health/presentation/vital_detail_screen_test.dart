@@ -19,6 +19,12 @@ import 'package:flutter_test/flutter_test.dart';
 /// Repositorio de pacientes con un único paciente, para que
 /// selectedPatientProvider se auto-seleccione sin ambigüedad.
 class _SinglePatientRepo implements PatientsRepository {
+
+  // Los metodos de la ficha clinica (alergias, vacunas, contactos,
+  // tratamientos...) no se usan en esta prueba: si alguno se llamara,
+  // falla con NoSuchMethodError en vez de devolver datos inventados.
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
   static const _only = PatientCard(
     patientId: 'p-test',
     fullName: 'Paciente de prueba',

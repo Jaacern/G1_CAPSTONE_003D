@@ -163,6 +163,25 @@ class _DoseConfirmBodyState extends ConsumerState<_DoseConfirmBody> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          // Se administró pero hubo un problema: un solo botón que abre el
+          // motivo libre. Cubre cualquier caso real (vomitó, escupió, reacción,
+          // atragantamiento) sin encasillar, y avisa al círculo (DEF-003).
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _busy ? null : () => _log(DoseStatus.adverse),
+              icon: const Icon(Icons.report_problem_rounded, size: 24),
+              label: const Text('Se la di pero hubo un problema',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(60),
+                foregroundColor: AppColors.statusAttention,
+                side: const BorderSide(
+                    color: AppColors.statusAttention, width: 1.5),
+              ),
+            ),
+          ),
           const SizedBox(height: 8),
         ],
       ),

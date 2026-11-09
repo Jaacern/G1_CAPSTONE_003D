@@ -137,11 +137,13 @@ Map<String, dynamic> cuerpoLogDosis(DoseStatus status,
     {String? note, DateTime? postponedUntil, DateTime? ahora}) {
   final enviado = status == DoseStatus.skipped ? DoseStatus.missed : status;
   final cuando = ahora ?? DateTime.now();
+  // missed y adverse exigen motivo en el backend.
+  const exigenMotivo = {DoseStatus.missed, DoseStatus.adverse};
   return {
     'status': enviado.apiValue,
-    if (enviado == DoseStatus.taken)
+    if (enviado == DoseStatus.taken || enviado == DoseStatus.adverse)
       'administered_at': cuando.toIso8601String(),
-    if (enviado == DoseStatus.missed) 'reason': (note ?? '').trim(),
+    if (exigenMotivo.contains(enviado)) 'reason': (note ?? '').trim(),
     if (enviado == DoseStatus.postponed)
       'postponed_until': (postponedUntil ?? cuando).toIso8601String(),
   };

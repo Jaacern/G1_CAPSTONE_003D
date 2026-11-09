@@ -23,8 +23,11 @@ from app.routers import (
     marketplace,
     medications,
     patients,
+    prn,
+    reports,
     speech,
     tasks,
+    treatments,
     vitals,
 )
 
@@ -142,6 +145,9 @@ app.include_router(admin.router)
 app.include_router(patients.router)
 app.include_router(vitals.router)
 app.include_router(medications.router)
+app.include_router(treatments.router)
+app.include_router(prn.router)
+app.include_router(reports.router)
 app.include_router(alerts.router)
 app.include_router(files.router)
 app.include_router(logbook.router)

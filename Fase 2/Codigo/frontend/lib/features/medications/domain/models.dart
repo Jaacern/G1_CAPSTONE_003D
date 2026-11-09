@@ -11,7 +11,10 @@ enum DoseStatus {
   taken('taken', 'Tomada', AppColors.statusOk),
   postponed('postponed', 'Pospuesta', AppColors.statusWarning),
   skipped('skipped', 'Omitida', AppColors.statusWarning),
-  missed('missed', 'No tomada', AppColors.statusAttention);
+  missed('missed', 'No tomada', AppColors.statusAttention),
+  // Se administró pero hubo un problema (la vomitó, la escupió, reacción...).
+  // El detalle lo escribe la cuidadora en el motivo. Genera alerta al círculo.
+  adverse('adverse', 'Problema al administrar', AppColors.statusAttention);
 
   const DoseStatus(this.apiValue, this.label, this.color);
 

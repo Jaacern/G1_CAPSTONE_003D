@@ -81,8 +81,22 @@ class _DoctorPatientCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(patient.fullName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             fontSize: 16, fontWeight: FontWeight.w700)),
+                    // Edad · sexo · RUT: con esto se distingue a dos pacientes
+                    // con el mismo nombre sin abrir la ficha.
+                    if (_identidad(patient).isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(_identidad(patient),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary)),
+                    ],
                     if ((patient.topReason ?? '').isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(patient.topReason!,
@@ -101,6 +115,48 @@ class _DoctorPatientCard extends ConsumerWidget {
                   color: AppColors.textSecondary),
             ],
           ),
+          // Domicilio: el otro desempate práctico (y útil si hay que ir).
+          if ((patient.address ?? '').trim().isNotEmpty)
+            _LineaDato(
+              icon: Icons.home_outlined,
+              texto: patient.address!.trim(),
+            ),
+          // Alergias primero: es lo que no se puede pasar por alto.
+          if (patient.allergies.isNotEmpty)
+            _LineaDato(
+              icon: Icons.warning_amber_rounded,
+              texto: 'Alergias: '
+                  '${patient.allergies.map((a) => a.label).join(', ')}',
+              color: patient.allergies.any((a) => a.esGrave)
+                  ? AppColors.critical
+                  : AppColors.statusWarning,
+              negrita: true,
+            ),
+          if (_cronicas(patient).isNotEmpty)
+            _LineaDato(
+              icon: Icons.monitor_heart_outlined,
+              texto: 'Crónico: ${_cronicas(patient).join(' · ')}',
+            ),
+          if (patient.complexity != null || patient.priority != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  if (patient.priority != null)
+                    _Etiqueta(
+                      texto: 'Prioridad ${_nivel(patient.priority!)}',
+                      color: _colorNivel(patient.priority!),
+                    ),
+                  if (patient.complexity != null)
+                    _Etiqueta(
+                      texto: 'Complejidad ${_nivel(patient.complexity!)}',
+                      color: _colorNivel(patient.complexity!),
+                    ),
+                ],
+              ),
+            ),
           // Los numeros, en la misma tarjeta. El semaforo dice que algo pasa;
           // esto dice que. Sin ello hay que entrar a la ficha de cada
           // paciente, mirar, salir y entrar al siguiente para comparar.
@@ -130,6 +186,104 @@ class _DoctorPatientCard extends ConsumerWidget {
       ),
     );
   }
+
+  /// "76 años · Femenino · RUT 5.123.456-K". Solo lo que exista.
+  static String _identidad(PatientCard p) => [
+        if (p.age != null) '${p.age} años',
+        if ((p.sex ?? '').isNotEmpty) _sexo(p.sex!),
+        if ((p.rut ?? '').isNotEmpty) 'RUT ${p.rut}',
+      ].join(' · ');
+
+  /// La base guarda una letra y la API la traduce a palabra; se mira la
+  /// inicial para aceptar las dos formas (igual que la cabecera de la ficha).
+  static String _sexo(String s) => switch (s[0].toUpperCase()) {
+        'F' => 'Femenino',
+        'M' => 'Masculino',
+        _ => 'Otro',
+      };
+
+  /// Enfermedades con su nombre legible; si el backend no las trae (datos de
+  /// prueba antiguos), se humaniza el código.
+  static List<String> _cronicas(PatientCard p) => p.conditionsLabels.isNotEmpty
+      ? p.conditionsLabels
+      : p.conditions.map((c) {
+          final t = c.replaceAll('_', ' ').trim();
+          return t.isEmpty ? c : t[0].toUpperCase() + t.substring(1);
+        }).toList();
+
+  static String _nivel(String v) => switch (v) {
+        'alta' => 'alta',
+        'media' || 'moderada' => v,
+        'baja' => 'baja',
+        _ => v,
+      };
+
+  static Color _colorNivel(String v) => switch (v) {
+        'alta' => AppColors.statusAttention,
+        'media' || 'moderada' => AppColors.statusWarning,
+        _ => AppColors.statusOk,
+      };
+}
+
+/// Una línea de dato con ícono, recortada a una línea para que la tarjeta no
+/// crezca sin control en pantallas angostas.
+class _LineaDato extends StatelessWidget {
+  const _LineaDato({
+    required this.icon,
+    required this.texto,
+    this.color = AppColors.textSecondary,
+    this.negrita = false,
+  });
+
+  final IconData icon;
+  final String texto;
+  final Color color;
+  final bool negrita;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 15, color: color),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              texto,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                color: color,
+                fontWeight: negrita ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Etiqueta extends StatelessWidget {
+  const _Etiqueta({required this.texto, required this.color});
+  final String texto;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(texto,
+          style: TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+    );
+  }
 }
 
 /// Los ultimos valores del paciente, en una linea dentro de su tarjeta.
@@ -154,16 +308,42 @@ class _VitalesEnLinea extends ConsumerWidget {
         vitales.valueOrNull?.where((v) => v.hasData).toList() ?? const [];
     if (conDatos.isEmpty) return const SizedBox.shrink();
 
+    // La lectura más reciente de todas: un valor sin hora no sirve para
+    // decidir (un pulso de hace 3 días no dice cómo está hoy).
+    final ultima = conDatos
+        .map((v) => v.measuredAt)
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+
     return Padding(
       padding: const EdgeInsets.only(top: 10),
-      child: Wrap(
-        spacing: 14,
-        runSpacing: 6,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (final v in conDatos) _ValorSuelto(vital: v),
+          Wrap(
+            spacing: 14,
+            runSpacing: 6,
+            children: [
+              for (final v in conDatos) _ValorSuelto(vital: v),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Última lectura ${_hace(ultima)}',
+            style: const TextStyle(
+                fontSize: 11, color: AppColors.textSecondary),
+          ),
         ],
       ),
     );
+  }
+
+  static String _hace(DateTime dt) {
+    final d = DateTime.now().difference(dt);
+    if (d.inMinutes < 1) return 'recién';
+    if (d.inMinutes < 60) return 'hace ${d.inMinutes} min';
+    if (d.inHours < 24) return 'hace ${d.inHours} h';
+    if (d.inDays == 1) return 'ayer';
+    return 'hace ${d.inDays} días';
   }
 }
 

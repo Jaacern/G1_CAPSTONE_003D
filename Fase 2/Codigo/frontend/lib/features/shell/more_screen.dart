@@ -10,6 +10,7 @@ import '../../core/widgets/common.dart';
 import '../auth/application/auth_controller.dart';
 import '../auth/domain/models.dart';
 import '../patients/application/patients_providers.dart';
+import 'shell_providers.dart';
 
 /// Pestaña "Más" (fiel al wireframe Familiar v1): perfil, lista de pacientes,
 /// roles e invitaciones, y notificaciones/ajustes. Los accesos a módulos sin
@@ -77,12 +78,20 @@ class MoreScreen extends ConsumerWidget {
                   _MoreTile(
                     leading: Icon(p.wellbeingStatus.icon,
                         color: p.wellbeingStatus.color),
-                    title: p.fullName,
+                    title: p.age != null ? '${p.fullName}, ${p.age} años' : p.fullName,
                     subtitle: p.activeAlertsCount > 0
                         ? textoDeAlertasActivas(p.activeAlertsCount)
                         : p.role.label,
-                    onTap: () =>
-                        ref.read(selectedPatientProvider.notifier).select(p),
+                    onTap: () {
+                      // El médico abre la ficha clínica del paciente; el resto
+                      // lo selecciona y vuelve a la pestaña Hoy.
+                      ref.read(selectedPatientProvider.notifier).select(p);
+                      if (role == RoleType.doctor) {
+                        context.push('/doctor/patient?patient=${p.patientId}');
+                      } else {
+                        ref.read(shellTabIndexProvider.notifier).state = 0;
+                      }
+                    },
                   ),
                 if (role == RoleType.family)
                   _MoreTile(

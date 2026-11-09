@@ -28,8 +28,12 @@ import '../../features/marketplace/presentation/marketplace_screen.dart';
 import '../../features/medications/presentation/dose_confirm_screen.dart';
 import '../../features/medications/presentation/medication_plan_screen.dart';
 import '../../features/medications/presentation/prescription_scan_screen.dart';
+import '../../features/medications/presentation/prn_screen.dart';
+import '../../features/medications/presentation/treatment_editor_screen.dart';
+import '../../features/medications/presentation/treatment_history_screen.dart';
 import '../../features/patients/presentation/accept_invitation_screen.dart';
 import '../../features/patients/presentation/create_patient_screen.dart';
+import '../../features/patients/presentation/patient_profile_screen.dart';
 import '../../features/patients/presentation/invite_member_screen.dart';
 import '../../features/premium/presentation/premium_screen.dart';
 import '../../features/profile/presentation/notification_settings_screen.dart';
@@ -130,6 +134,25 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/dose/:id',
         builder: (_, st) => DoseConfirmScreen(doseId: st.pathParameters['id']!),
       ),
+      // Tratamientos (Hito 3): editor de "nuevo tratamiento" e historial.
+      GoRoute(
+        path: '/treatment',
+        builder: (_, st) => TreatmentEditorScreen(
+          patientId: st.uri.queryParameters['patient']!,
+          specialty: st.uri.queryParameters['specialty'] ?? 'general',
+        ),
+      ),
+      GoRoute(
+        path: '/treatment/history',
+        builder: (_, st) => TreatmentHistoryScreen(
+            patientId: st.uri.queryParameters['patient']!),
+      ),
+      // Medicamentos SOS del paciente: ver los disponibles y registrar su uso.
+      GoRoute(
+        path: '/meds/sos',
+        builder: (_, st) =>
+            PrnScreen(patientId: st.uri.queryParameters['patient']!),
+      ),
 
       // --- Alertas ---
       GoRoute(path: '/alerts', builder: (_, __) => const AlertsScreen()),
@@ -191,6 +214,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/doctor/patient',
         builder: (_, st) =>
             DoctorPatientScreen(patientId: st.uri.queryParameters['patient']!),
+      ),
+      GoRoute(
+        path: '/patient/profile',
+        builder: (_, st) => PatientProfileScreen(
+            patientId: st.uri.queryParameters['patient']!),
       ),
 
       // --- Marketplace ---

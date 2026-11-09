@@ -176,6 +176,13 @@ async def generar_dosis(*, dias: int = 14, verbose: bool = True) -> dict[str, in
                 WHERE m.discontinued_at IS NULL
                   AND (m.start_date IS NULL OR CAST(g.d AS date) >= m.start_date)
                   AND (m.end_date   IS NULL OR CAST(g.d AS date) <= m.end_date)
+                  -- Transicion al modelo de tratamientos: si el paciente ya
+                  -- tiene un tratamiento vigente, sus dosis se generan desde
+                  -- treatment_items (bloque siguiente), no desde medications.
+                  -- Asi no se duplican mientras conviven los dos modelos.
+                  AND NOT EXISTS (SELECT 1 FROM treatments tr
+                                   WHERE tr.patient_id = m.patient_id
+                                     AND tr.status = 'vigente')
                   -- Un medicamento sin dias declarados es de todos los dias:
                   -- es lo que asume medications.py cuando la pantalla no
                   -- manda ninguno (_DEFAULT_DAYS). Si aca se exigiera la
@@ -194,6 +201,47 @@ async def generar_dosis(*, dias: int = 14, verbose: bool = True) -> dict[str, in
             {"zona": ZONA, "dias": dias},
         )
         creadas = r.rowcount or 0
+
+        # Dosis desde el modelo de tratamientos: items del tratamiento vigente.
+        # Misma lógica de zona horaria y mismo "todos los días si no hay días
+        # declarados". El slot único es (treatment_item_id, scheduled_at).
+        r2 = await conn.execute(
+            text(
+                """
+                INSERT INTO scheduled_doses (treatment_item_id, scheduled_at, status)
+                SELECT ti.id,
+                       (CAST(g.d AS date) + t.time_of_day)
+                           AT TIME ZONE CAST(:zona AS text),
+                       'pending'
+                FROM treatment_items ti
+                JOIN treatments tr ON tr.id = ti.treatment_id AND tr.status = 'vigente'
+                JOIN treatment_item_times t ON t.treatment_item_id = ti.id
+                CROSS JOIN generate_series(
+                    CAST(now() AT TIME ZONE CAST(:zona AS text) AS date),
+                    CAST(now() AT TIME ZONE CAST(:zona AS text) AS date)
+                        + CAST(:dias AS integer),
+                    interval '1 day'
+                ) AS g(d)
+                WHERE ti.action <> 'removed'
+                  -- Las indicaciones SOS/condicionales (is_prn) NO generan
+                  -- agenda: se usan solo si hacen falta y se registran al usarse.
+                  AND ti.is_prn = false
+                  AND CAST(g.d AS date) >= CAST(tr.effective_from
+                                                AT TIME ZONE CAST(:zona AS text) AS date)
+                  AND (
+                        NOT EXISTS (SELECT 1 FROM treatment_item_days td
+                                     WHERE td.treatment_item_id = ti.id)
+                     OR EXISTS (SELECT 1 FROM treatment_item_days td
+                                 WHERE td.treatment_item_id = ti.id
+                                   AND td.day_of_week = EXTRACT(isodow FROM g.d))
+                  )
+                ON CONFLICT (treatment_item_id, scheduled_at)
+                    WHERE treatment_item_id IS NOT NULL DO NOTHING
+                """
+            ),
+            {"zona": ZONA, "dias": dias},
+        )
+        creadas += r2.rowcount or 0
 
         vigentes = (
             await conn.execute(
@@ -278,11 +326,14 @@ async def marcar_dosis_vencidas(*, verbose: bool = True) -> dict[str, int]:
                 """
                 UPDATE scheduled_doses sd
                    SET status = 'missed', updated_at = now()
-                  FROM medications m
-                 WHERE m.id = sd.medication_id
-                   AND sd.status IN ('pending', 'postponed')
+                 WHERE sd.status IN ('pending', 'postponed')
                    AND coalesce(sd.postponed_until, sd.scheduled_at)
-                       + make_interval(mins => m.grace_window_min) < now()
+                       + make_interval(mins => coalesce(
+                             (SELECT m.grace_window_min FROM medications m
+                               WHERE m.id = sd.medication_id),
+                             (SELECT ti.grace_window_min FROM treatment_items ti
+                               WHERE ti.id = sd.treatment_item_id),
+                             60)) < now()
                 """
             )
         )
@@ -330,13 +381,18 @@ async def alertar_dosis_omitidas(*, verbose: bool = True) -> dict[str, int]:
             await conn.execute(
                 text(
                     """
-                    SELECT sd.id, sd.scheduled_at, m.patient_id,
-                           m.id AS medication_id, m.name, m.dose_text,
+                    SELECT sd.id, sd.scheduled_at,
+                           COALESCE(m.patient_id, tr.patient_id) AS patient_id,
+                           COALESCE(m.id, ti.id)        AS medication_id,
+                           COALESCE(m.name, ti.name)    AS name,
+                           COALESCE(m.dose_text, ti.dose_text) AS dose_text,
                            to_char(sd.scheduled_at AT TIME ZONE
                                    CAST(:zona AS text), 'HH24:MI') AS hora
                     FROM scheduled_doses sd
-                    JOIN medications m ON m.id = sd.medication_id
-                    JOIN patients   p ON p.id = m.patient_id
+                    LEFT JOIN medications m ON m.id = sd.medication_id
+                    LEFT JOIN treatment_items ti ON ti.id = sd.treatment_item_id
+                    LEFT JOIN treatments tr ON tr.id = ti.treatment_id
+                    JOIN patients p ON p.id = COALESCE(m.patient_id, tr.patient_id)
                     WHERE sd.status = 'missed'
                       AND p.deleted_at IS NULL
                       -- Las de la cuidadora no llevan alerta: ella ya sabe
@@ -713,8 +769,10 @@ async def calcular_semaforo(*, verbose: bool = True) -> dict[str, int]:
                         """
                         SELECT count(*)
                         FROM scheduled_doses sd
-                        JOIN medications m ON m.id = sd.medication_id
-                        WHERE m.patient_id = :pid
+                        LEFT JOIN medications m ON m.id = sd.medication_id
+                        LEFT JOIN treatment_items ti ON ti.id = sd.treatment_item_id
+                        LEFT JOIN treatments tr ON tr.id = ti.treatment_id
+                        WHERE COALESCE(m.patient_id, tr.patient_id) = :pid
                           AND sd.status = 'missed'
                           AND CAST(sd.scheduled_at AT TIME ZONE CAST(:zona AS text)
                                    AS date)

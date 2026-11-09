@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../alerts/domain/models.dart';
 import '../../core/theme/app_theme.dart';
 import '../patients/application/patients_providers.dart';
 import '../patients/domain/models.dart';
@@ -131,7 +132,8 @@ class PatientSelectorBar extends ConsumerWidget {
                   // no es lo mismo entrar como familiar de uno que como
                   // cuidadora del otro.
                   p.activeAlertsCount > 0
-                      ? '${p.role.label} · ${p.activeAlertsCount} alerta(s) activa(s)'
+                      ? '${p.role.label} · '
+                          '${textoDeAlertasActivas(p.activeAlertsCount)}'
                       : p.role.label,
                 ),
                 trailing: p.patientId == current.patientId

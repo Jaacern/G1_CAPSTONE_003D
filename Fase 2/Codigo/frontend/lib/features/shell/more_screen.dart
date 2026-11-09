@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../alerts/domain/models.dart';
 import '../../core/config/app_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_controller.dart';
@@ -78,7 +79,7 @@ class MoreScreen extends ConsumerWidget {
                         color: p.wellbeingStatus.color),
                     title: p.fullName,
                     subtitle: p.activeAlertsCount > 0
-                        ? '${p.activeAlertsCount} alerta(s) activa(s)'
+                        ? textoDeAlertasActivas(p.activeAlertsCount)
                         : p.role.label,
                     onTap: () => ref
                         .read(selectedPatientProvider.notifier)

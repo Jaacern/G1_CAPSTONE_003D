@@ -71,6 +71,12 @@ services:
 
       # Voz: transcripcion de notas y lectura en voz alta. Mismo criterio.
       SPEECH_PROVIDER: ${SPEECH_PROVIDER:-none}
+
+      # Lectura del texto de las imagenes. 'tesseract' corre dentro de este
+      # mismo contenedor, asi que la foto de una receta no sale del servidor.
+      # Con 'none' los endpoints responden 503 con un codigo que la
+      # aplicacion distingue, igual que el asistente y la voz.
+      OCR_PROVIDER: ${OCR_PROVIDER:-tesseract}
       SPEECH_REGION: ${SPEECH_REGION:-}
       SPEECH_API_KEY: ${SPEECH_API_KEY:-}
     ports:

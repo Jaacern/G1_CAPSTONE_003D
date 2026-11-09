@@ -1,5 +1,4 @@
-# =============================================================================
-# DEUDA DE SEGURIDAD (DevSecOps) — pendiente de remediacion
+# ======================================================================# DEUDA DE SEGURIDAD (DevSecOps) — pendiente de remediacion
 # -----------------------------------------------------------------------------
 # Dependabot reporto vulnerabilidades en las dependencias marcadas mas abajo con
 # "SEC". Politica del equipo: NO actualizar a ciegas. La remediacion se decide y
@@ -14,8 +13,7 @@
 #   - CVE-2026-85394 (critica) afecta a python-jose <= 3.5.0 y NO tiene parche
 #     upstream a la fecha. Opcion evaluada: migrar de python-jose a PyJWT (toca
 #     app/security.py y app/deps.py). Requiere pruebas de auth. Decision: comitiva.
-# =============================================================================
-
+# ======================================================================
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
 sqlalchemy[asyncio]==2.0.36
@@ -40,3 +38,11 @@ openai==1.57.4
 # es Python puro: no necesita librerias nativas del sistema (a diferencia de
 # WeasyPrint, que exige Cairo/Pango), asi el Dockerfile queda igual de simple.
 reportlab==4.2.5
+# OCR de recetas y documentos. pytesseract es solo la envoltura que llama al
+# binario tesseract, que se instala en el Dockerfile con apt; sin ese binario
+# el import funciona pero extraer falla. Import perezoso: con
+# OCR_PROVIDER=none la aplicacion no toca ninguno de los dos.
+pytesseract==0.3.13
+# Abre la imagen, corrige la orientacion que guarda la camara en el EXIF y la
+# pasa a escala de grises antes de leerla.
+Pillow==11.0.0

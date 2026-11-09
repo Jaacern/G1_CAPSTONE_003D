@@ -133,7 +133,7 @@ class PatientsRepositoryMock implements PatientsRepository {
       patientId: 'p-elena',
       fullName: 'Elena Ramírez',
       birthDate: DateTime(1948, 3, 12),
-      sex: 'female',
+      sex: 'F',
       conditions: const ['Hipertensión', 'Artrosis'],
       wearable: WearableStatus(
         wearableId: 'w-1',
@@ -145,7 +145,7 @@ class PatientsRepositoryMock implements PatientsRepository {
       patientId: 'p-jose',
       fullName: 'José Ramírez',
       birthDate: DateTime(1945, 11, 2),
-      sex: 'male',
+      sex: 'M',
       conditions: const ['Diabetes tipo 2'],
       wearable: WearableStatus(
         wearableId: 'w-2',

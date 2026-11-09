@@ -223,7 +223,7 @@ async def _load_medication(db: AsyncSession, patient_id: str,
              response_model=MedicationCreateOut, status_code=201)
 async def create_medication(
     payload: MedicationCreateIn,
-    ctx: PatientContext = Depends(get_patient_member(roles=["caregiver", "doctor"])),
+    ctx: PatientContext = Depends(get_patient_member(roles=["doctor"])),
     db: AsyncSession = Depends(get_db),
 ):
     if payload.end_date is not None and payload.end_date < payload.start_date:
@@ -231,7 +231,11 @@ async def create_medication(
                        message="La fecha de fin no puede ser anterior a la de inicio.")
 
     days = payload.days_of_week if payload.days_of_week else _DEFAULT_DAYS
-    prescribed_by = ctx.user.user_id if ctx.role == "doctor" else None
+    # Crear, editar y discontinuar quedan en el medico. La cuidadora registra
+    # tomas (6.6), que es otra cosa: puede decir que la dosis se tomo o no,
+    # no cambiar lo que esta indicado. Con eso prescribed_by deja de poder
+    # quedar nulo, que es lo que permite despues saber quien indico cada cosa.
+    prescribed_by = ctx.user.user_id
 
     row = (
         await db.execute(
@@ -295,7 +299,7 @@ async def list_medications(
 async def update_medication(
     medication_id: str,
     payload: MedicationPatchIn,
-    ctx: PatientContext = Depends(get_patient_member(roles=["caregiver", "doctor"])),
+    ctx: PatientContext = Depends(get_patient_member(roles=["doctor"])),
     db: AsyncSession = Depends(get_db),
 ):
     current = await _load_medication(db, ctx.patient_id, medication_id)
@@ -340,7 +344,7 @@ async def update_medication(
 @router.delete("/patients/{patient_id}/medications/{medication_id}", status_code=204)
 async def discontinue_medication(
     medication_id: str,
-    ctx: PatientContext = Depends(get_patient_member(roles=["caregiver", "doctor"])),
+    ctx: PatientContext = Depends(get_patient_member(roles=["doctor"])),
     db: AsyncSession = Depends(get_db),
 ):
     await _load_medication(db, ctx.patient_id, medication_id)

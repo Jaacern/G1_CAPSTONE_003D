@@ -148,8 +148,7 @@ class DoctorPatientScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           FilledButton.icon(
-            onPressed: () =>
-                context.push('/meds/plan?patient=$patientId'),
+            onPressed: () => context.push('/meds/plan?patient=$patientId'),
             icon: const Icon(Icons.add_rounded),
             label: const Text('Recetar medicamento'),
           ),
@@ -179,8 +178,7 @@ class DoctorPatientScreen extends ConsumerWidget {
                     const Expanded(
                       child: Text(
                         'de las dosis registradas en la semana',
-                        style:
-                            TextStyle(color: AppColors.textSecondary),
+                        style: TextStyle(color: AppColors.textSecondary),
                       ),
                     ),
                   ],
@@ -347,16 +345,15 @@ class _MedicationTile extends StatelessWidget {
         // doseLabel ya concuerda el numero con la unidad ("2 comprimidos")
         // y no deja el punto colgando cuando falta un dato.
         '${medication.doseLabel} · ${medication.schedule.join(', ')}',
-        style: const TextStyle(
-            fontSize: 12, color: AppColors.textSecondary),
+        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
             tooltip: 'Editar receta',
-            icon: const Icon(Icons.edit_outlined,
-                color: AppColors.textSecondary),
+            icon:
+                const Icon(Icons.edit_outlined, color: AppColors.textSecondary),
             onPressed: () => context.push(
                 '/meds/plan?patient=$patientId&medication=${medication.id}'),
           ),
@@ -380,12 +377,11 @@ class _ObservationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      title: Text(observation.text,
-          maxLines: 3, overflow: TextOverflow.ellipsis),
+      title:
+          Text(observation.text, maxLines: 3, overflow: TextOverflow.ellipsis),
       subtitle: Text(
         '${observation.authorName} · ${_timeAgo(observation.createdAt)}',
-        style: const TextStyle(
-            fontSize: 12, color: AppColors.textSecondary),
+        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
       ),
     );
   }

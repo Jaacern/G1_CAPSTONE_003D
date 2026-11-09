@@ -29,7 +29,8 @@ class DoseUnitField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
-      initialValue: unidadesDeDosis.contains(value) ? value : unidadesDeDosis.first,
+      initialValue:
+          unidadesDeDosis.contains(value) ? value : unidadesDeDosis.first,
       decoration: InputDecoration(labelText: label),
       items: [
         _cabecera('Por medida'),

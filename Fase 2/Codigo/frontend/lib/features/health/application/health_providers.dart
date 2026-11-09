@@ -33,8 +33,7 @@ final vitalesDePacienteProvider =
 });
 
 /// Umbrales (rangos normales) del paciente seleccionado (GET 5.5).
-final thresholdsProvider =
-    FutureProvider<List<Threshold>>((ref) async {
+final thresholdsProvider = FutureProvider<List<Threshold>>((ref) async {
   final patient = ref.watch(selectedPatientProvider);
   if (patient == null) return [];
   return ref.watch(vitalsRepositoryProvider).getThresholds(patient.patientId);
@@ -168,5 +167,5 @@ class LiveController extends StateNotifier<LiveState> {
   }
 }
 
-final liveControllerProvider =
-    StateNotifierProvider<LiveController, LiveState>((ref) => LiveController(ref));
+final liveControllerProvider = StateNotifierProvider<LiveController, LiveState>(
+    (ref) => LiveController(ref));

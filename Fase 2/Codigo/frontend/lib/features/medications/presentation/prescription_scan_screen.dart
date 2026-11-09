@@ -247,6 +247,7 @@ class _DraftEntry {
 
   final TextEditingController name;
   final TextEditingController dose;
+
   /// Elegida de una lista, no escrita: el backend solo admite diez valores.
   String unit;
   final TextEditingController schedule; // 'HH:mm, HH:mm'

@@ -12,6 +12,7 @@ import '../../../core/widgets/common.dart';
 import '../application/medications_providers.dart';
 import '../data/medications_repository.dart';
 import '../domain/models.dart';
+import 'dose_unit_field.dart';
 
 /// Escaneo de receta con OCR (ticket AGE-405): foto -> subida -> borrador
 /// estructurado editable -> guardar como medicamento(s).
@@ -210,6 +211,7 @@ class _PrescriptionScanScreenState
                   onRemove: () => setState(() {
                     _drafts!.removeAt(i).dispose();
                   }),
+                  onUnitChanged: (u) => setState(() => _drafts![i].unit = u),
                 ),
               ),
             const SizedBox(height: 8),
@@ -245,7 +247,8 @@ class _DraftEntry {
 
   final TextEditingController name;
   final TextEditingController dose;
-  final TextEditingController unit;
+  /// Elegida de una lista, no escrita: el backend solo admite diez valores.
+  String unit;
   final TextEditingController schedule; // 'HH:mm, HH:mm'
   final TextEditingController instructions;
   DateTime startDate;
@@ -254,7 +257,7 @@ class _DraftEntry {
   factory _DraftEntry.from(NewMedication m) => _DraftEntry(
         name: TextEditingController(text: m.name),
         dose: TextEditingController(text: m.dose),
-        unit: TextEditingController(text: m.unit),
+        unit: unidadesDeDosis.contains(m.unit) ? m.unit : unidadesDeDosis.first,
         schedule: TextEditingController(text: m.schedule.join(', ')),
         instructions: TextEditingController(text: m.instructions ?? ''),
         startDate: m.startDate,
@@ -264,7 +267,7 @@ class _DraftEntry {
   NewMedication toNewMedication() => NewMedication(
         name: name.text.trim(),
         dose: dose.text.trim(),
-        unit: unit.text.trim(),
+        unit: unit,
         schedule: schedule.text
             .split(',')
             .map((e) => e.trim())
@@ -278,17 +281,24 @@ class _DraftEntry {
   void dispose() {
     name.dispose();
     dose.dispose();
-    unit.dispose();
     schedule.dispose();
     instructions.dispose();
   }
 }
 
 class _DraftCard extends StatelessWidget {
-  const _DraftCard({required this.entry, required this.onRemove});
+  const _DraftCard({
+    required this.entry,
+    required this.onRemove,
+    required this.onUnitChanged,
+  });
 
   final _DraftEntry entry;
   final VoidCallback onRemove;
+
+  /// La unidad vive en el borrador, que es mutable y no notifica solo. El
+  /// padre envuelve esto en setState para que la tarjeta se redibuje.
+  final ValueChanged<String> onUnitChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -327,9 +337,9 @@ class _DraftCard extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: TextField(
-                  controller: entry.unit,
-                  decoration: const InputDecoration(labelText: 'Unidad'),
+                child: DoseUnitField(
+                  value: entry.unit,
+                  onChanged: onUnitChanged,
                 ),
               ),
             ],

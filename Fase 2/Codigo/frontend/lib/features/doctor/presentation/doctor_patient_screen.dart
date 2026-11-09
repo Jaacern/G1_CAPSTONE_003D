@@ -83,7 +83,7 @@ class DoctorPatientScreen extends ConsumerWidget {
               );
             },
           ),
-          const _SectionLabel('Medicación activa'),
+          const _SectionLabel('Indicaciones vigentes'),
           medications.when(
             loading: () => const AppCard(
               child: SizedBox(height: 70, child: LoadingView()),
@@ -125,7 +125,7 @@ class DoctorPatientScreen extends ConsumerWidget {
           FilledButton.icon(
             onPressed: () => context.push('/meds/plan?patient=$patientId'),
             icon: const Icon(Icons.add_rounded),
-            label: const Text('Recetar medicamento'),
+            label: const Text('Indicar un medicamento'),
           ),
           const _SectionLabel('Adherencia (últimos 7 días)'),
           adherence.when(
@@ -295,7 +295,8 @@ Future<void> _discontinuarReceta(BuildContext context, WidgetRef ref,
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo discontinuar la receta.')),
+        const SnackBar(
+            content: Text('No se pudo discontinuar la indicación.')),
       );
     }
   }
@@ -326,14 +327,14 @@ class _MedicationTile extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            tooltip: 'Editar receta',
+            tooltip: 'Editar indicación',
             icon:
                 const Icon(Icons.edit_outlined, color: AppColors.textSecondary),
             onPressed: () => context.push(
                 '/meds/plan?patient=$patientId&medication=${medication.id}'),
           ),
           IconButton(
-            tooltip: 'Discontinuar receta',
+            tooltip: 'Discontinuar indicación',
             icon: const Icon(Icons.delete_outline_rounded,
                 color: AppColors.critical),
             onPressed: onDiscontinue,

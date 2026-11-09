@@ -168,8 +168,21 @@ Future<void> registrarUsoSos(BuildContext context, WidgetRef ref,
   try {
     await repo.registerUse(patientId, item.itemId, reason: motivo);
   } on ApiException catch (e) {
-    if (context.mounted) showAppSnackBar(context, e.message, error: true);
-    return;
+    if (e.code != 'PRN_TOO_SOON' || !context.mounted) {
+      if (context.mounted) showAppSnackBar(context, e.message, error: true);
+      return;
+    }
+    // Antes del intervalo: se advierte y quien cuida decide si confirma
+    // (puede haber una orden médica de repetir). Queda marcado en el registro.
+    final seguir = await _confirmarAntesDeTiempo(context, e.message);
+    if (seguir != true || !context.mounted) return;
+    try {
+      await repo.registerUse(patientId, item.itemId,
+          reason: motivo, confirmInterval: true);
+    } on ApiException catch (e2) {
+      if (context.mounted) showAppSnackBar(context, e2.message, error: true);
+      return;
+    }
   }
   ref.invalidate(prnItemsProvider(patientId));
   ref.invalidate(prnUsesProvider(patientId));
@@ -218,3 +231,25 @@ Future<String?> _pedirMotivo(BuildContext context, PrnItem item) {
     ),
   );
 }
+
+Future<bool?> _confirmarAntesDeTiempo(BuildContext context, String mensaje) =>
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.schedule_rounded,
+            color: AppColors.statusWarning, size: 32),
+        title: const Text('Antes de tiempo'),
+        content: Text(mensaje),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('No registrar')),
+          FilledButton(
+            style:
+                FilledButton.styleFrom(backgroundColor: AppColors.statusWarning),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Registrar igual'),
+          ),
+        ],
+      ),
+    );

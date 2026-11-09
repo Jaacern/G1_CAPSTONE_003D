@@ -232,3 +232,22 @@ async def register_prn_use(
                          {"pid": ctx.patient_id, "uid2": str(row["id"])})
     ).mappings().first()
     return _uso_out(uso)
+
+
+@router.get("/patients/{patient_id}/prn/uses", response_model=list[PrnUseOut])
+async def list_prn_uses(
+    days: int = Query(7, ge=1, le=30),
+    ctx: PatientContext = Depends(get_patient_member()),
+    db: AsyncSession = Depends(get_db),
+):
+    """Usos SOS de los ultimos [days] dias, del mas reciente al mas antiguo.
+    Es lo que el medico mira para saber si el SOS se esta usando de mas."""
+    rows = (
+        await db.execute(
+            text(_USOS_SQL
+                 + " AND u.administered_at > now() - make_interval(days => :days)"
+                 " ORDER BY u.administered_at DESC LIMIT 200"),
+            {"pid": ctx.patient_id, "days": days},
+        )
+    ).mappings().all()
+    return [_uso_out(r) for r in rows]

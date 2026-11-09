@@ -81,8 +81,22 @@ class _DoctorPatientCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(patient.fullName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             fontSize: 16, fontWeight: FontWeight.w700)),
+                    // Edad · sexo · RUT: con esto se distingue a dos pacientes
+                    // con el mismo nombre sin abrir la ficha.
+                    if (_identidad(patient).isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(_identidad(patient),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary)),
+                    ],
                     if ((patient.topReason ?? '').isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(patient.topReason!,
@@ -130,6 +144,21 @@ class _DoctorPatientCard extends ConsumerWidget {
       ),
     );
   }
+
+  /// "76 años · Femenino · RUT 5.123.456-K". Solo lo que exista.
+  static String _identidad(PatientCard p) => [
+        if (p.age != null) '${p.age} años',
+        if ((p.sex ?? '').isNotEmpty) _sexo(p.sex!),
+        if ((p.rut ?? '').isNotEmpty) 'RUT ${p.rut}',
+      ].join(' · ');
+
+  /// La base guarda una letra y la API la traduce a palabra; se mira la
+  /// inicial para aceptar las dos formas (igual que la cabecera de la ficha).
+  static String _sexo(String s) => switch (s[0].toUpperCase()) {
+        'F' => 'Femenino',
+        'M' => 'Masculino',
+        _ => 'Otro',
+      };
 }
 
 /// Los ultimos valores del paciente, en una linea dentro de su tarjeta.

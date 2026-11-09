@@ -4,6 +4,16 @@ import '../../patients/application/patients_providers.dart';
 import '../data/alerts_repository.dart';
 import '../domain/models.dart';
 
+/// Paciente por el que se filtra el centro de alertas. Nulo quiere decir
+/// todos.
+///
+/// Es aparte del paciente seleccionado de la aplicacion a proposito. Ese no
+/// puede ser nulo, porque Salud y Medicamentos siempre miran a alguien
+/// concreto, y mientras el centro dependia de el no habia forma de ver todas
+/// las alertas juntas: con dos pacientes en el circulo, las de uno tapaban
+/// las del otro y nadie se enteraba.
+final filtroPacienteAlertasProvider = StateProvider<String?>((ref) => null);
+
 /// Lo que necesita la pantalla para pintar el centro de alertas.
 class AlertsState {
   const AlertsState({

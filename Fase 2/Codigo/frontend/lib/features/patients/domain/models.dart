@@ -456,6 +456,11 @@ class PatientCard {
     this.vitalsSummary = const [],
     this.sex,
     this.address,
+    this.conditionsLabels = const [],
+    this.allergies = const [],
+    this.complexity,
+    this.priority,
+    this.insurance,
   });
 
   final String patientId;
@@ -480,6 +485,14 @@ class PatientCard {
   final String? sex;
   final String? address;
 
+  /// Contexto clínico de un vistazo: enfermedades con nombre legible,
+  /// alergias (graves primero), complejidad, prioridad y previsión.
+  final List<String> conditionsLabels;
+  final List<AllergyMini> allergies;
+  final String? complexity;
+  final String? priority;
+  final String? insurance;
+
   /// Copia con el motivo ya humanizado (el backend manda un código técnico).
   PatientCard withHumanizedReason(String reason) => PatientCard(
         patientId: patientId,
@@ -496,6 +509,11 @@ class PatientCard {
         vitalsSummary: vitalsSummary,
         sex: sex,
         address: address,
+        conditionsLabels: conditionsLabels,
+        allergies: allergies,
+        complexity: complexity,
+        priority: priority,
+        insurance: insurance,
       );
 
   factory PatientCard.fromJson(Map<String, dynamic> json) => PatientCard(
@@ -518,6 +536,15 @@ class PatientCard {
             .toList(),
         sex: json['sex'] as String?,
         address: json['address'] as String?,
+        conditionsLabels: ((json['conditions_labels'] ?? const []) as List)
+            .map((e) => e.toString())
+            .toList(),
+        allergies: ((json['allergies'] ?? const []) as List)
+            .map((e) => AllergyMini.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        complexity: json['complexity'] as String?,
+        priority: json['priority'] as String?,
+        insurance: json['insurance'] as String?,
       );
 }
 

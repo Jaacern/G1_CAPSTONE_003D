@@ -3,9 +3,12 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+
+from slowapi.errors import RateLimitExceeded
 
 from app.errors import register_error_handlers
+from app.ratelimit import limiter
 from app.routers import (
     admin,
     alerts,
@@ -131,6 +134,40 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Rate limiting por IP (DevSecOps — hallazgos F3/F4 de la auditoria). El
+# limiter se adjunta al estado de la app y los endpoints sensibles lo aplican
+# con @limiter.limit(...). Su excepcion se traduce al formato de error estandar
+# (code=RATE_LIMITED, 429) para que el cliente la maneje igual que el resto.
+app.state.limiter = limiter
+
+
+@app.on_event("startup")
+async def _verificar_configuracion_segura() -> None:
+    """Puerta de seguridad al arrancar (DevSecOps — F5).
+
+    Rechaza el arranque si el secreto JWT es el default inseguro del repo o es
+    demasiado corto. Igual que la migracion en entrypoint.sh: es preferible que
+    el servicio NO parta a que parta firmando tokens con un secreto publico.
+    """
+    from app.config import ensure_secure_jwt_secret
+
+    ensure_secure_jwt_secret()
+
+
+@app.exception_handler(RateLimitExceeded)
+async def _rate_limit_handler(request, exc):
+    from app.errors import _error_body
+
+    return JSONResponse(
+        status_code=429,
+        content=_error_body(
+            "RATE_LIMITED",
+            "Demasiadas solicitudes. Intenta de nuevo en unos segundos.",
+            request,
+        ),
+    )
+
 
 register_error_handlers(app)
 

@@ -219,10 +219,29 @@ async def main(client, roles):
           await client.post(f"/api/v1/patients/{PACIENTE}/incidents",
                             json={"type": "Invasión alienígena", "severity": "low",
                                   "description": "x"}, headers=token(cuidadora)))
-    check("severidad critical se rechaza mientras no exista el flujo de alertas", 422,
-          await client.post(f"/api/v1/patients/{PACIENTE}/incidents",
-                            json={"type": "Caída", "severity": "critical",
-                                  "description": "x"}, headers=token(cuidadora)))
+    # Un incidente critico se acepta y nace con su alerta. El constraint
+    # ck_incidents_critical_has_alert lo exige: un critico sin alert_id no
+    # puede existir, asi que si el endpoint respondiera 201 sin crearla, el
+    # INSERT reventaria. Se comprueba que la alerta quedo activa y critica,
+    # porque de eso depende que la red de apoyo se entere (DEF-003, RF-36).
+    rc = await client.post(f"/api/v1/patients/{PACIENTE}/incidents",
+                           json={"type": "Caída", "severity": "critical",
+                                 "description": "se cayo en el baño"},
+                           headers=token(cuidadora))
+    check("un incidente critico se acepta", 201, rc)
+    if rc.status_code == 201:
+        async with _eng.begin() as c:
+            al = (await c.execute(_t(
+                "SELECT a.severity, a.status, a.type, a.title "
+                "FROM incidents i JOIN alerts a ON a.id = i.alert_id "
+                "WHERE i.id = :i"), {"i": rc.json()["id"]})).mappings().first()
+        n += 1
+        if al and al["type"] == "incident" and al["severity"] == "critical" \
+                and al["status"] == "active":
+            ok += 1
+            print(f"  OK   el critico nace con su alerta activa: {al['title']}")
+        else:
+            print(f"  FALLA el critico no dejo alerta critica activa: {al}")
     check("descripcion vacia", 422,
           await client.post(f"/api/v1/patients/{PACIENTE}/incidents",
                             json={"type": "Caída", "severity": "low",

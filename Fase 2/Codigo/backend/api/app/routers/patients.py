@@ -122,7 +122,8 @@ class PatientListItem(BaseModel):
     priority:         str | None = None
     insurance:        str | None = None
     # Mini-resumen de signos vitales: últimas lecturas por tipo, para que el
-    # médico reconozca al paciente de un vistazo sin abrir la ficha.
+    # médico reconozca al paciente de un vistazo sin abrir la ficha. Cada
+    # elemento trae measured_at para mostrar qué tan reciente es.
     vitals_summary:   list[dict] = []
 
 
@@ -1174,6 +1175,7 @@ async def list_patients(
                 text(
                     """
                     SELECT DISTINCT ON (vr.type) vr.type, vr.value,
+                           vr.value_secondary, vr.measured_at,
                            COALESCE(vt.unit, '') AS unit
                     FROM vital_readings vr
                     LEFT JOIN vital_types vt ON vt.code = vr.type
@@ -1186,7 +1188,15 @@ async def list_patients(
             )
         ).mappings().all()
         return [
-            {"type": r["type"], "value": float(r["value"]), "unit": r["unit"]}
+            {
+                "type": r["type"],
+                "value": float(r["value"]),
+                "value_secondary": (float(r["value_secondary"])
+                                    if r["value_secondary"] is not None else None),
+                "unit": r["unit"],
+                "measured_at": (r["measured_at"].isoformat()
+                                if r["measured_at"] else None),
+            }
             for r in rows
         ]
 

@@ -1,0 +1,55 @@
+# Revisa el frontend en cada subida. Hasta ahora nada lo hacia: que analyze
+# estuviera limpio y los tests verdes dependia de que alguien se acordara de
+# correrlos a mano antes de empujar.
+#
+# No hay paso de "dart format --set-exit-if-changed" a proposito. Hoy 58
+# archivos del repo no estan formateados, asi que ese paso dejaria el CI rojo
+# desde el primer dia por algo que nadie rompio. Se puede agregar el dia que
+# se formatee todo de una, que es un commit aparte.
+name: Frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Fase 2/Codigo/frontend/**'
+      - '.github/workflows/frontend.yml'
+  pull_request:
+    paths:
+      - 'Fase 2/Codigo/frontend/**'
+      - '.github/workflows/frontend.yml'
+  # Para poder lanzarlo a mano desde la pestana Actions.
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: 'Fase 2/Codigo/frontend'
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          # Fijada, no "stable". Con el canal suelto, el dia que salga una
+          # version nueva con un lint nuevo el CI se pone rojo sin que nadie
+          # haya tocado nada, y eso en epoca de entrega es lo ultimo que se
+          # necesita. Esta es la que se usa para desarrollar.
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+
+      - name: Instalar dependencias
+        run: flutter pub get
+
+      - name: Analizar
+        # Sin --no-fatal-infos a proposito: hoy analyze esta en cero y la
+        # idea es que se quede ahi. Si entra un info, el CI lo frena.
+        run: flutter analyze
+
+      - name: Correr las pruebas
+        run: flutter test --reporter expanded

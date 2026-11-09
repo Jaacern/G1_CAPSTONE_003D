@@ -77,4 +77,12 @@ void main() {
     final texto = tester.widget<Text>(find.text('Alergias: Penicilina'));
     expect(texto.style?.color, AppColors.critical);
   });
+
+  testWidgets('las enfermedades cronicas salen con su nombre', (tester) async {
+    await montar(tester);
+
+    expect(find.text('Crónico: Hipertensión arterial (HTA) · Artrosis'),
+        findsOneWidget);
+    expect(find.text('Crónico: Diabetes mellitus tipo 2 (DM2)'), findsOneWidget);
+  });
 }

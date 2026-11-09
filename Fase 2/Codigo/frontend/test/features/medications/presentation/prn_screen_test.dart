@@ -5,6 +5,7 @@
 // el maximo de 24 h, una crisis puede terminar en sobredosis.
 import 'package:agecare_app/core/theme/app_theme.dart';
 import 'package:agecare_app/features/medications/data/prn_repository.dart';
+import 'package:agecare_app/features/medications/presentation/prn_banner.dart';
 import 'package:agecare_app/features/medications/presentation/prn_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -102,6 +103,19 @@ void main() {
       DateTime.now().subtract(Duration(hours: h)),
   ]);
 
+    expect(find.text('Bromuro de ipratropio'), findsOneWidget);
+  });
+
+  testWidgets('el aviso de SOS aparece solo si el paciente tiene alguno',
+      (tester) async {
+    await montar(tester,
+        pantalla: const Scaffold(
+            body: Column(children: [
+          PrnBanner(patientId: 'p-elena'),
+          PrnBanner(patientId: 'p-jose'),
+        ])));
+
+    expect(find.text('Medicamentos SOS disponibles'), findsOneWidget);
     expect(find.text('Bromuro de ipratropio'), findsOneWidget);
   });
 }

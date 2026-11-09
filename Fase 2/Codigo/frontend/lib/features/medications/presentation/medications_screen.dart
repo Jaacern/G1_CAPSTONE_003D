@@ -14,12 +14,15 @@ import '../application/medications_providers.dart';
 import '../domain/models.dart';
 import 'dose_actions.dart';
 
-/// Roles que el backend autoriza a crear/editar medicamentos y registrar
-/// dosis (la familia es solo-lectura: el backend responde 403).
-bool _canManageMeds(WidgetRef ref) {
-  final role = ref.watch(currentUserProvider)?.primaryRole;
-  return role == RoleType.caregiver || role == RoleType.doctor;
-}
+/// Quien puede crear, editar o discontinuar una indicacion. Solo el medico.
+///
+/// La cuidadora quedaba autorizada junto con el medico, asi que podia cambiar
+/// la dosis de un farmaco o sacarlo del plan. Registrar que una dosis se tomo
+/// es otra cosa y la sigue haciendo ella; decidir que se toma, no.
+///
+/// La familia es solo lectura y el backend responde 403.
+bool _canManageMeds(WidgetRef ref) =>
+    ref.watch(currentUserProvider)?.primaryRole == RoleType.doctor;
 
 /// Quién puede marcar una dosis como tomada. No es lo mismo que gestionar el
 /// plan: 6.6 (POST /doses/{id}/log) comprueba a mano que el llamador sea

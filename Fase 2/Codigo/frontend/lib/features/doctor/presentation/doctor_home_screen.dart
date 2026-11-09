@@ -121,6 +121,22 @@ class _DoctorPatientCard extends ConsumerWidget {
               icon: Icons.home_outlined,
               texto: patient.address!.trim(),
             ),
+          // Alergias primero: es lo que no se puede pasar por alto.
+          if (patient.allergies.isNotEmpty)
+            _LineaDato(
+              icon: Icons.warning_amber_rounded,
+              texto: 'Alergias: '
+                  '${patient.allergies.map((a) => a.label).join(', ')}',
+              color: patient.allergies.any((a) => a.esGrave)
+                  ? AppColors.critical
+                  : AppColors.statusWarning,
+              negrita: true,
+            ),
+          if (_cronicas(patient).isNotEmpty)
+            _LineaDato(
+              icon: Icons.monitor_heart_outlined,
+              texto: 'Crónico: ${_cronicas(patient).join(' · ')}',
+            ),
           // Los numeros, en la misma tarjeta. El semaforo dice que algo pasa;
           // esto dice que. Sin ello hay que entrar a la ficha de cada
           // paciente, mirar, salir y entrar al siguiente para comparar.
@@ -165,15 +181,31 @@ class _DoctorPatientCard extends ConsumerWidget {
         'M' => 'Masculino',
         _ => 'Otro',
       };
+
+  /// Enfermedades con su nombre legible; si el backend no las trae (datos de
+  /// prueba antiguos), se humaniza el código.
+  static List<String> _cronicas(PatientCard p) => p.conditionsLabels.isNotEmpty
+      ? p.conditionsLabels
+      : p.conditions.map((c) {
+          final t = c.replaceAll('_', ' ').trim();
+          return t.isEmpty ? c : t[0].toUpperCase() + t.substring(1);
+        }).toList();
 }
 
 /// Una línea de dato con ícono, recortada a una línea para que la tarjeta no
 /// crezca sin control en pantallas angostas.
 class _LineaDato extends StatelessWidget {
-  const _LineaDato({required this.icon, required this.texto});
+  const _LineaDato({
+    required this.icon,
+    required this.texto,
+    this.color = AppColors.textSecondary,
+    this.negrita = false,
+  });
 
   final IconData icon;
   final String texto;
+  final Color color;
+  final bool negrita;
 
   @override
   Widget build(BuildContext context) {
@@ -181,17 +213,18 @@ class _LineaDato extends StatelessWidget {
       padding: const EdgeInsets.only(top: 6),
       child: Row(
         children: [
-          Icon(icon, size: 15, color: AppColors.textSecondary),
+          Icon(icon, size: 15, color: color),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
               texto,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500),
+              style: TextStyle(
+                fontSize: 12,
+                color: color,
+                fontWeight: negrita ? FontWeight.w700 : FontWeight.w500,
+              ),
             ),
           ),
         ],

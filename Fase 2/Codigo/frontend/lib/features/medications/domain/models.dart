@@ -26,6 +26,79 @@ enum DoseStatus {
 }
 
 /// Medicamento del plan del paciente.
+// ---------------------------------------------------------------------------
+// Unidades de dosis
+//
+// Son exactamente las diez que acepta el backend (ck_medications_dose_unit en
+// 301_medications.sql). Si se agrega una aca sin agregarla alla, el guardado
+// falla con un error de restriccion que no le dice nada util al usuario.
+//
+// Se separan por como se leen. Las de medida no cambian con la cantidad; las
+// que se cuentan se pluralizan, porque "2 comprimido" no lo dice nadie.
+// ---------------------------------------------------------------------------
+
+/// Unidades de medida: la cantidad no las modifica.
+const unidadesDeMedida = <String>['mg', 'g', 'mcg', 'ml', 'UI'];
+
+/// Unidades que se cuentan: la cantidad las pluraliza.
+const unidadesDeCantidad = <String>[
+  'comprimido',
+  'cápsula',
+  'gotas',
+  'puff',
+  'parche',
+];
+
+/// Todas las unidades validas, en el orden en que se ofrecen.
+const unidadesDeDosis = <String>[...unidadesDeMedida, ...unidadesDeCantidad];
+
+/// Singular y plural de las unidades que se cuentan. 'gotas' llega en plural
+/// desde el backend porque ese es el valor que admite la restriccion, pero
+/// una sola gota se lee "1 gota".
+const _singularPlural = <String, List<String>>{
+  'comprimido': ['comprimido', 'comprimidos'],
+  'cápsula': ['cápsula', 'cápsulas'],
+  'gotas': ['gota', 'gotas'],
+  'puff': ['puff', 'puff'],
+  'parche': ['parche', 'parches'],
+};
+
+/// La dosis como la leeria una persona: "2 comprimidos", "10 gotas", "50 mg".
+///
+/// El backend devuelve dose_amount como decimal, asi que sin esto la pantalla
+/// mostraba "50.0 mg". Se saca el decimal cuando no aporta y se concuerda el
+/// numero con la unidad.
+String etiquetaDeDosis(String cantidad, String unidad) {
+  final limpia = cantidad.trim();
+  if (limpia.isEmpty) return unidad;
+  final n = double.tryParse(limpia.replaceAll(',', '.'));
+  final numero = n == null
+      ? limpia
+      : (n == n.roundToDouble()
+          ? n.round().toString()
+          : n.toString().replaceAll('.', ','));
+  final par = _singularPlural[unidad];
+  if (par == null) return '$numero $unidad';
+  return '$numero ${n == 1 ? par.first : par.last}';
+}
+
+/// Quita el prefijo "Forma: X." que una version anterior escribia dentro de
+/// las instrucciones para guardar un dato que la tabla no tenia. Los
+/// medicamentos creados en esa epoca lo siguen trayendo, y sin esto aparece
+/// en pantalla como si el usuario lo hubiera escrito, y se vuelve a duplicar
+/// cada vez que alguien edita y guarda.
+String? sinPrefijoDeForma(String? instrucciones) {
+  if (instrucciones == null) return null;
+  var s = instrucciones.trim();
+  final conPunto = RegExp(r'^Forma:\s*[^.]*\.\s*', caseSensitive: false);
+  while (conPunto.hasMatch(s)) {
+    s = s.replaceFirst(conPunto, '').trim();
+  }
+  // Un "Forma: jarabe" sin nada detras deja el campo vacio, no un resto.
+  if (RegExp(r'^Forma:\s*\S*$', caseSensitive: false).hasMatch(s)) return null;
+  return s.isEmpty ? null : s;
+}
+
 class Medication {
   const Medication({
     required this.id,

@@ -21,6 +21,8 @@ class TreatmentItem {
     this.continuesItemId,
     this.isPrn = false,
     this.scheduleLabel,
+    this.drugCode,
+    this.prnMinIntervalMin,
   });
 
   final String itemId;
@@ -39,6 +41,12 @@ class TreatmentItem {
   final bool isPrn;              // SOS/condicional: no genera agenda
   final String? scheduleLabel;  // "con el desayuno", etiqueta de referencia
 
+  /// Fármaco del catálogo del que viene (unidad y rango fijos), o null.
+  final String? drugCode;
+
+  /// Solo SOS: intervalo mínimo entre usos, en minutos.
+  final int? prnMinIntervalMin;
+
   factory TreatmentItem.fromJson(Map<String, dynamic> j) => TreatmentItem(
         itemId: j['item_id'] as String,
         name: j['name'] as String,
@@ -54,6 +62,8 @@ class TreatmentItem {
         continuesItemId: j['continues_item_id'] as String?,
         isPrn: (j['is_prn'] ?? false) as bool,
         scheduleLabel: j['schedule_label'] as String?,
+        drugCode: j['drug_code'] as String?,
+        prnMinIntervalMin: j['prn_min_interval_min'] as int?,
       );
 }
 

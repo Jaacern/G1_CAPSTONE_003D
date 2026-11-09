@@ -12,8 +12,10 @@ El conteo es por farmaco y paciente, no por fila de indicacion: si el medico
 versiona el tratamiento, los usos de la version anterior siguen contando para
 el maximo de 24 h y para el intervalo.
 """
+import os
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
@@ -53,6 +55,18 @@ WHERE t.patient_id = :pid
   AND ti.action <> 'removed'
 """
 
+
+def _hora_local(dt: datetime) -> str:
+    """HH:MM en la zona de la operacion, para los mensajes a quien cuida."""
+    try:
+        zona = ZoneInfo(os.environ.get("TIMEZONE", "America/Santiago"))
+    except Exception:
+        zona = timezone.utc
+    return dt.astimezone(zona).strftime("%H:%M")
+
+
+def _intervalo_txt(minutos: int) -> str:
+    return f"{minutos // 60} h" if minutos % 60 == 0 else f"{minutos} min"
 
 class PrnItemOut(BaseModel):
     item_id:          str
@@ -188,6 +202,20 @@ async def register_prn_use(
                          "otra dosis: consulta al médico."))
 
     overrode = False
+    # Intervalo minimo de la indicacion: advertencia que se puede confirmar
+    # (puede haber una orden medica de repetir antes). Queda marcado.
+    intervalo = it["prn_min_interval_min"]
+    if intervalo and it["last_used_at"]:
+        desde = it["last_used_at"] + timedelta(minutes=intervalo)
+        if adm < desde:
+            if not payload.confirm_interval:
+                raise ApiError(
+                    status_code=409, code="PRN_TOO_SOON",
+                    message=(f"El último uso fue a las {_hora_local(it['last_used_at'])} y la "
+                             f"indicación es cada {_intervalo_txt(intervalo)}. Lo siguiente "
+                             f"sería desde las {_hora_local(desde)}. Confirma solo si el "
+                             "médico lo autorizó."))
+            overrode = True
 
     row = (
         await db.execute(

@@ -367,7 +367,9 @@ class MedicationsRepositoryMock implements MedicationsRepository {
         NewMedication(
           name: 'Omeprazol',
           dose: '20',
-          unit: 'mg',
+          // En capsulas y no en mg, para que el modo demo ejercite tambien
+          // las unidades que se cuentan y no solo las de medida.
+          unit: 'cápsula',
           schedule: const ['08:00'],
           instructions: 'Tomar en ayunas antes del desayuno.',
           startDate: today,

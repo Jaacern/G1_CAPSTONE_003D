@@ -32,7 +32,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-cambiar-en-produccion}
+      # Sin fallback a proposito (DevSecOps — F5): si JWT_SECRET no esta en el
+      # entorno, la variable queda vacia y la API se niega a arrancar, en vez
+      # de firmar tokens con un secreto publico del repo. Antes habia un
+      # `:-dev-secret-cambiar-en-produccion` que arrancaba inseguro en silencio.
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en el .env (openssl rand -hex 32)}
 
       # Donde estan los .sql que la api aplica al arrancar. La imagen copia
       # solo la carpeta app, asi que los .sql entran montados desde el host

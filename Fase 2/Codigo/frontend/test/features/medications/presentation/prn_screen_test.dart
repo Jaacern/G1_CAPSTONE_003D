@@ -42,6 +42,14 @@ void main() {
     await esperar(tester);
   }
 
+  Future<void> registrar(WidgetTester tester, String motivo) async {
+    await tester.tap(find.text('Registrar uso'));
+    await esperar(tester);
+    await tester.enterText(find.byType(TextField), motivo);
+    await tester.pump();
+    await tester.tap(find.text('Registrar'));
+    await esperar(tester);
+  }
 
   testWidgets('lista el SOS indicado con su dosis e intervalo', (tester) async {
     await montar(tester);
@@ -49,5 +57,13 @@ void main() {
     expect(find.text('Bromuro de ipratropio'), findsOneWidget);
     expect(find.text('2 puff · cada 6 h'), findsOneWidget);
     expect(find.text('Aún no se ha usado.'), findsOneWidget);
+  });
+
+  testWidgets('registrar un uso lo deja en el historial', (tester) async {
+    await montar(tester);
+    await registrar(tester, 'Tos persistente');
+
+    expect(find.textContaining('Tos persistente'), findsOneWidget);
+    expect(find.text('Aún no se ha usado.'), findsNothing);
   });
 }

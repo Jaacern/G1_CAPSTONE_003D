@@ -366,6 +366,15 @@ class PatientsRepositoryMock implements PatientsRepository {
       fullName: 'Elena Ramírez',
       role: RoleType.family,
       wellbeingStatus: WellbeingStatus.ok,
+      age: 78,
+      sex: 'F',
+      rut: '5.123.456-K',
+      address: 'Los Aromos 1234, La Florida',
+      conditions: ['hipertension', 'artrosis'],
+      conditionsLabels: ['Hipertensión arterial (HTA)', 'Artrosis'],
+      allergies: [AllergyMini(label: 'Penicilina', severity: 'severa')],
+      complexity: 'alta',
+      priority: 'baja',
     ),
     const PatientCard(
       patientId: 'p-jose',
@@ -374,6 +383,11 @@ class PatientsRepositoryMock implements PatientsRepository {
       wellbeingStatus: WellbeingStatus.warning,
       activeAlertsCount: 1,
       topReason: 'Wearable sin datos desde hace 3 h',
+      age: 81,
+      sex: 'M',
+      address: 'Pasaje Los Olmos 55, Maipú',
+      conditions: ['diabetes_tipo_2'],
+      conditionsLabels: ['Diabetes mellitus tipo 2 (DM2)'],
     ),
   ];
 

@@ -48,6 +48,15 @@ class PrnScreen extends ConsumerWidget {
                       _PrnCard(item: it, patientId: patientId),
                   ]),
           ),
+          const SizedBox(height: 16),
+          const Text('USOS RECIENTES',
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: .5,
+                  color: AppColors.textSecondary)),
+          const SizedBox(height: 8),
+          _Historial(patientId: patientId),
         ],
       ),
     );
@@ -253,3 +262,45 @@ Future<bool?> _confirmarAntesDeTiempo(BuildContext context, String mensaje) =>
         ],
       ),
     );
+
+/// Usos de los últimos 7 días: qué se dio, por qué, quién y cuándo.
+class _Historial extends ConsumerWidget {
+  const _Historial({required this.patientId});
+  final String patientId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final usos = ref.watch(prnUsesProvider(patientId)).valueOrNull ?? const [];
+    if (usos.isEmpty) {
+      return const AppCard(
+        child: Text('Sin usos en los últimos 7 días.',
+            style: TextStyle(color: AppColors.textSecondary)),
+      );
+    }
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(children: [
+        for (var i = 0; i < usos.length; i++) ...[
+          if (i != 0) const Divider(height: 1),
+          ListTile(
+            dense: true,
+            title: Text('${usos[i].name} · ${usos[i].dose}'),
+            subtitle: Text([
+              usos[i].reason,
+              if (usos[i].loggedByName != null) usos[i].loggedByName!,
+              '${usos[i].administeredAt.day}/${usos[i].administeredAt.month} '
+                  '${_hora(usos[i].administeredAt)}',
+            ].join(' · ')),
+            trailing: usos[i].overrodeInterval
+                ? const Tooltip(
+                    message: 'Antes del intervalo',
+                    child: Icon(Icons.schedule_rounded,
+                        color: AppColors.statusWarning),
+                  )
+                : null,
+          ),
+        ],
+      ]),
+    );
+  }
+}

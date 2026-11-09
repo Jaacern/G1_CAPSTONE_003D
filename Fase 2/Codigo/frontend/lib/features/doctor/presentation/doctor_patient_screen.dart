@@ -295,8 +295,7 @@ Future<void> _discontinuarReceta(BuildContext context, WidgetRef ref,
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('No se pudo discontinuar la indicación.')),
+        const SnackBar(content: Text('No se pudo discontinuar la indicación.')),
       );
     }
   }

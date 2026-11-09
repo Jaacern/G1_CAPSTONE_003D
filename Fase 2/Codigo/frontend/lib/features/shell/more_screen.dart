@@ -81,14 +81,13 @@ class MoreScreen extends ConsumerWidget {
                     subtitle: p.activeAlertsCount > 0
                         ? textoDeAlertasActivas(p.activeAlertsCount)
                         : p.role.label,
-                    onTap: () => ref
-                        .read(selectedPatientProvider.notifier)
-                        .select(p),
+                    onTap: () =>
+                        ref.read(selectedPatientProvider.notifier).select(p),
                   ),
                 if (role == RoleType.family)
                   _MoreTile(
-                    leading: const Icon(Icons.add_rounded,
-                        color: AppColors.primary),
+                    leading:
+                        const Icon(Icons.add_rounded, color: AppColors.primary),
                     title: 'Añadir paciente',
                     titleColor: AppColors.primary,
                     onTap: () => context.push('/patients/create'),
@@ -196,8 +195,7 @@ class MoreScreen extends ConsumerWidget {
 
           const SizedBox(height: 20),
           OutlinedButton.icon(
-            onPressed: () =>
-                ref.read(authControllerProvider.notifier).logout(),
+            onPressed: () => ref.read(authControllerProvider.notifier).logout(),
             icon: const Icon(Icons.logout_rounded, color: AppColors.critical),
             label: const Text('Cerrar sesión',
                 style: TextStyle(color: AppColors.critical)),
@@ -277,11 +275,11 @@ class _MoreTile extends StatelessWidget {
               color: titleColor ?? AppColors.textPrimary)),
       subtitle: subtitle != null
           ? Text(subtitle!,
-              style: const TextStyle(
-                  fontSize: 12, color: AppColors.textSecondary))
+              style:
+                  const TextStyle(fontSize: 12, color: AppColors.textSecondary))
           : null,
-      trailing:
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+      trailing: const Icon(Icons.chevron_right_rounded,
+          color: AppColors.textSecondary),
       onTap: onTap,
     );
   }
@@ -302,9 +300,7 @@ class _RoleBadge extends StatelessWidget {
       ),
       child: Text(role.label,
           style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: role.accentFg)),
+              fontSize: 11, fontWeight: FontWeight.w700, color: role.accentFg)),
     );
   }
 }

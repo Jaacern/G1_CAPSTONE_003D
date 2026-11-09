@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../../alerts/domain/models.dart';
+import '../../auth/application/auth_controller.dart';
 import '../../health/application/health_providers.dart';
 import '../../health/domain/models.dart' as health;
 import '../../patients/application/patients_providers.dart';
@@ -40,6 +41,9 @@ class DoctorHomeScreen extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: [
+              _Saludo(
+                  total: patients.length, porRevisar: _porRevisar(patients)),
+              const SizedBox(height: 14),
               for (final p in patients)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -50,6 +54,76 @@ class DoctorHomeScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  /// Pacientes que no están en verde: los que el médico mira primero.
+  static int _porRevisar(List<PatientCard> ps) =>
+      ps.where((p) => p.wellbeingStatus != WellbeingStatus.ok).length;
+}
+
+/// Saludo al médico por su nombre, con el resumen del día.
+///
+/// La barra superior dice "Hoy" para todos los roles por igual, lo que no
+/// recibe a nadie. Aquí el médico llega a su nombre y a una frase que le dice
+/// de una cuántos pacientes tiene y cuántos necesitan atención, en vez de una
+/// lista fría. El saludo cambia con la hora.
+class _Saludo extends ConsumerWidget {
+  const _Saludo({required this.total, required this.porRevisar});
+
+  final int total;
+  final int porRevisar;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider);
+    final nombre = _nombreCorto(user?.fullName);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          nombre.isEmpty ? '${_saludoHora()}.' : '${_saludoHora()}, $nombre',
+          style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+              color: AppColors.textPrimary),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          _resumen(total, porRevisar),
+          style:
+              const TextStyle(fontSize: 13.5, color: AppColors.textSecondary),
+        ),
+      ],
+    );
+  }
+
+  static String _saludoHora() {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Buenos días';
+    if (h < 20) return 'Buenas tardes';
+    return 'Buenas noches';
+  }
+
+  static String _resumen(int total, int porRevisar) {
+    if (total == 0) return 'No tienes pacientes asignados.';
+    final pac = total == 1 ? '1 paciente' : '$total pacientes';
+    if (porRevisar == 0) return 'Tienes $pac, todos estables.';
+    if (porRevisar == 1) return 'Tienes $pac · 1 por revisar.';
+    return 'Tienes $pac · $porRevisar por revisar.';
+  }
+
+  /// "Dra. Carmen Orellana" -> "Dra. Carmen". Un saludo con el nombre completo
+  /// y sus dos apellidos suena a formulario, no a saludo.
+  static String _nombreCorto(String? full) {
+    final n = (full ?? '').trim();
+    if (n.isEmpty) return '';
+    final partes = n.split(RegExp(r'\s+'));
+    // Si parte con tratamiento (Dr., Dra.), se deja el tratamiento + nombre.
+    if (RegExp(r'^(dr|dra)\.?$', caseSensitive: false).hasMatch(partes.first)) {
+      return partes.take(2).join(' ');
+    }
+    return partes.first;
   }
 }
 

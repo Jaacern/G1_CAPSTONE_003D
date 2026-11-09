@@ -79,10 +79,12 @@ void main() {
     expect(find.textContaining('F ·'), findsNothing);
   });
 
-  testWidgets('las enfermedades de base salen en la cabecera', (tester) async {
+  testWidgets('las enfermedades de base salen en el resumen', (tester) async {
     await montar(tester);
 
-    expect(find.text('Antecedentes'), findsOneWidget);
+    // El detalle clinico se movio de la cabecera fija (que se repetia en las
+    // cinco pestanas) al Resumen. El rotulo va en mayusculas.
+    expect(find.text('ANTECEDENTES'), findsOneWidget);
     expect(find.text('Hipertensión'), findsOneWidget);
     expect(find.text('Artrosis'), findsOneWidget);
   });

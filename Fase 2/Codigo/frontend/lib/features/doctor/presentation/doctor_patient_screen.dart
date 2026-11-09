@@ -55,20 +55,25 @@ class DoctorPatientScreen extends ConsumerWidget {
         ),
         body: Column(
           children: [
+            // Contexto fijo y mínimo en todas las pestañas: edad, sexo y
+            // semáforo. La edad hace falta para leer cualquier valor (54 lpm
+            // no significa lo mismo a los 50 que a los 90). El nombre ya está
+            // en la barra; el detalle clínico vive en Resumen.
             if (patient != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: _Cabecera(
-                  patient: patient,
-                  detalle: detalle.valueOrNull,
-                  onTap: () =>
-                      context.push('/patient/profile?patient=$patientId'),
-                ),
+              _Contexto(
+                patient: patient,
+                detalle: detalle.valueOrNull,
+                onTap: () =>
+                    context.push('/patient/profile?patient=$patientId'),
               ),
             Expanded(
               child: TabBarView(
                 children: [
-                  _ResumenTab(patientId: patientId),
+                  _ResumenTab(
+                    patientId: patientId,
+                    patient: patient,
+                    detalle: detalle.valueOrNull,
+                  ),
                   _TratamientosTab(patientId: patientId),
                   const _ControlesTab(),
                   _BitacoraTab(patientId: patientId),
@@ -83,18 +88,74 @@ class DoctorPatientScreen extends ConsumerWidget {
   }
 }
 
-/// Resumen: signos vitales actuales + adherencia. La vista de 5 segundos.
+/// Resumen: la vista de 5 segundos. Por qué mirarlo hoy, qué no se puede
+/// pasar por alto (alergias y enfermedades de base), sus vitales y cómo va
+/// con la medicación.
 class _ResumenTab extends ConsumerWidget {
-  const _ResumenTab({required this.patientId});
+  const _ResumenTab(
+      {required this.patientId, required this.patient, required this.detalle});
   final String patientId;
+  final PatientCard? patient;
+  final Patient? detalle;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final latestVitals = ref.watch(latestVitalsProvider);
     final adherence = ref.watch(adherenceProvider);
+    final motivo = (patient?.topReason ?? '').trim();
+    final alergias = patient?.allergies ?? const <AllergyMini>[];
+    final condiciones = detalle?.conditions ?? const <String>[];
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
       children: [
+        if (patient != null && motivo.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _Motivo(estado: patient!.wellbeingStatus, texto: motivo),
+        ],
+        if (alergias.isNotEmpty || condiciones.isNotEmpty) ...[
+          const _SectionLabel('Antecedentes'),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (alergias.isNotEmpty)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.warning_amber_rounded,
+                          size: 18,
+                          color: alergias.any((a) => a.esGrave)
+                              ? AppColors.critical
+                              : AgeColors.warn700),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Alergias: ${alergias.map((a) => a.label).join(', ')}',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: alergias.any((a) => a.esGrave)
+                                ? AppColors.critical
+                                : AgeColors.warn700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                if (alergias.isNotEmpty && condiciones.isNotEmpty)
+                  const SizedBox(height: 12),
+                if (condiciones.isNotEmpty)
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final c in condiciones) _Antecedente(texto: c),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ],
         const _SectionLabel('Signos vitales actuales'),
         latestVitals.when(
           loading: () =>
@@ -451,9 +512,8 @@ class _SpecialtyTreatmentCard extends StatelessWidget {
                     it.isPrn
                         ? Icons.emergency_rounded
                         : Icons.medication_rounded,
-                    color: it.isPrn
-                        ? AppColors.statusWarning
-                        : AppColors.primary),
+                    color:
+                        it.isPrn ? AppColors.statusWarning : AppColors.primary),
                 title: Row(
                   children: [
                     Flexible(child: Text(it.name)),
@@ -530,12 +590,11 @@ class _ObservationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      title: Text(observation.text,
-          maxLines: 3, overflow: TextOverflow.ellipsis),
+      title:
+          Text(observation.text, maxLines: 3, overflow: TextOverflow.ellipsis),
       subtitle: Text(
         '${observation.authorName} · ${_timeAgo(observation.createdAt)}',
-        style: const TextStyle(
-            fontSize: 12, color: AppColors.textSecondary),
+        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
       ),
     );
   }
@@ -570,9 +629,13 @@ String _timeAgo(DateTime dt) {
 /// muestra lo que ya trae el listado, nombre y estado, en vez de dejar la
 /// cabecera en blanco o poner un indicador que empuje el resto de la ficha
 /// hacia abajo cuando llegue.
-class _Cabecera extends StatelessWidget {
-  const _Cabecera(
-      {required this.patient, required this.detalle, this.onTap});
+/// Barra de contexto fija arriba de las pestañas. Es deliberadamente mínima:
+/// edad y sexo (que hacen falta para leer cualquier valor de la ficha) y el
+/// semáforo. No repite nombre, alergias ni enfermedades porque eso ya está en
+/// la barra de título y en Resumen; antes esta cabecera traía todo y se veía
+/// igual en las cinco pestañas.
+class _Contexto extends StatelessWidget {
+  const _Contexto({required this.patient, required this.detalle, this.onTap});
 
   final PatientCard patient;
   final Patient? detalle;
@@ -587,71 +650,37 @@ class _Cabecera extends StatelessWidget {
       if (detalle?.sex != null) _sexo(detalle!.sex!),
     ].join(' · ');
 
-    return AppCard(
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+    return Material(
+      color: AppColors.surface,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+          decoration: const BoxDecoration(
+            border:
+                Border(bottom: BorderSide(color: AppColors.divider, width: 1)),
+          ),
+          child: Row(
             children: [
-              InitialsAvatar(
-                name: patient.fullName,
-                photoUrl: patient.photoUrl,
-                radius: 24,
-              ),
-              const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(patient.fullName,
-                        style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w700)),
-                    if (edadYSexo.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(edadYSexo,
-                          style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary)),
-                    ],
-                    if ((patient.topReason ?? '').isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(patient.topReason!,
-                          style: const TextStyle(
-                              fontSize: 13, color: AppColors.textSecondary)),
-                    ],
-                  ],
+                child: Text(
+                  edadYSexo.isEmpty ? 'Ficha clínica' : edadYSexo,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary),
                 ),
               ),
               WellbeingChip(status: patient.wellbeingStatus),
-              if (onTap != null) ...[
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right_rounded,
-                    color: AppColors.textSecondary),
-              ],
+              if (onTap != null)
+                const Padding(
+                  padding: EdgeInsets.only(left: 2),
+                  child: Icon(Icons.chevron_right_rounded,
+                      color: AppColors.textSecondary),
+                ),
             ],
           ),
-          if (detalle != null && detalle!.conditions.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-            const SizedBox(height: 12),
-            const Text('Antecedentes',
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.4,
-                    color: AppColors.textSecondary)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final c in detalle!.conditions) _Antecedente(texto: c),
-              ],
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -666,6 +695,39 @@ class _Cabecera extends StatelessWidget {
       'F' => 'Femenino',
       _ => 'Otro',
     };
+  }
+}
+
+/// "Por qué mirarlo hoy": el motivo del semáforo con el tinte del estado.
+/// Encabeza Resumen porque es lo primero que el médico necesita saber.
+class _Motivo extends StatelessWidget {
+  const _Motivo({required this.estado, required this.texto});
+
+  final WellbeingStatus estado;
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: estado.tint,
+        borderRadius: BorderRadius.circular(AgeRadius.m),
+      ),
+      child: Row(
+        children: [
+          Icon(estado.icon, size: 18, color: estado.onTint),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(texto,
+                style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: estado.onTint)),
+          ),
+        ],
+      ),
+    );
   }
 }
 

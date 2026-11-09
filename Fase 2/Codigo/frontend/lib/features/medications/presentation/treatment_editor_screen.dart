@@ -492,6 +492,30 @@ class _ItemCard extends ConsumerWidget {
               onChanged();
             },
           ),
+          if (draft.isPrn) ...[
+            const SizedBox(height: 4),
+            DropdownButtonFormField<int?>(
+              initialValue: draft.prnMinIntervalMin,
+              decoration: const InputDecoration(
+                labelText: 'Intervalo mínimo entre usos',
+                helperText: 'Avisa a quien cuida si lo usa antes de tiempo.',
+              ),
+              items: const [
+                DropdownMenuItem<int?>(value: null, child: Text('Sin intervalo')),
+                DropdownMenuItem<int?>(value: 60, child: Text('Cada 1 h')),
+                DropdownMenuItem<int?>(value: 120, child: Text('Cada 2 h')),
+                DropdownMenuItem<int?>(value: 240, child: Text('Cada 4 h')),
+                DropdownMenuItem<int?>(value: 360, child: Text('Cada 6 h')),
+                DropdownMenuItem<int?>(value: 480, child: Text('Cada 8 h')),
+                DropdownMenuItem<int?>(value: 720, child: Text('Cada 12 h')),
+                DropdownMenuItem<int?>(value: 1440, child: Text('Una vez al día')),
+              ],
+              onChanged: (v) {
+                draft.prnMinIntervalMin = v;
+                onChanged();
+              },
+            ),
+          ],
           if (!draft.isPrn) ...[
             const SizedBox(height: 8),
             _HorariosEditor(

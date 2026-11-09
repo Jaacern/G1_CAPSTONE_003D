@@ -114,6 +114,13 @@ class PatientListItem(BaseModel):
     rut:              str | None = None
     sex:              str | None = None
     address:          str | None = None
+    # Contexto clínico de un vistazo (Fase 6): nombres legibles de las
+    # enfermedades, alergias (graves primero), complejidad, prioridad y previsión.
+    conditions_labels: list[str] = []
+    allergies:        list[dict] = []     # [{label, severity}]
+    complexity:       str | None = None
+    priority:         str | None = None
+    insurance:        str | None = None
     # Mini-resumen de signos vitales: últimas lecturas por tipo, para que el
     # médico reconozca al paciente de un vistazo sin abrir la ficha.
     vitals_summary:   list[dict] = []
@@ -1087,12 +1094,34 @@ async def list_patients(
                 """
                 SELECT p.id, p.full_name, p.photo_url, pm.role,
                        p.rut_number, p.rut_dv, p.sex, p.address,
+                       p.complexity, p.priority, p.insurance,
                        date_part('year', age(p.birth_date))::int AS age,
                        COALESCE((
                            SELECT array_agg(pc.condition ORDER BY pc.condition)
                            FROM patient_conditions pc
                            WHERE pc.patient_id = p.id AND pc.deleted_at IS NULL
                        ), ARRAY[]::text[]) AS conditions,
+                       COALESCE((
+                           SELECT array_agg(COALESCE(cc.label, pc.condition)
+                                            ORDER BY pc.condition)
+                           FROM patient_conditions pc
+                           LEFT JOIN condition_catalog cc ON cc.code = pc.condition
+                           WHERE pc.patient_id = p.id AND pc.deleted_at IS NULL
+                       ), ARRAY[]::text[]) AS conditions_labels,
+                       -- Alergias como "etiqueta|severidad", graves primero.
+                       COALESCE((
+                           SELECT array_agg(COALESCE(ac.label, pa.substance)
+                                            || '|' || pa.severity
+                                            ORDER BY CASE pa.severity
+                                                WHEN 'anafilaxia' THEN 0
+                                                WHEN 'severa' THEN 1
+                                                WHEN 'moderada' THEN 2
+                                                ELSE 3 END,
+                                            pa.substance)
+                           FROM patient_allergies pa
+                           LEFT JOIN allergen_catalog ac ON ac.code = pa.substance
+                           WHERE pa.patient_id = p.id AND pa.deleted_at IS NULL
+                       ), ARRAY[]::text[]) AS allergies,
                        COALESCE((
                            SELECT count(*) FROM alerts a
                            WHERE a.patient_id = p.id AND a.status = 'active'
@@ -1161,6 +1190,13 @@ async def list_patients(
             for r in rows
         ]
 
+    def _alergias(r) -> list[dict]:
+        out = []
+        for a in r["allergies"] or []:
+            label, _, sev = a.rpartition("|")
+            out.append({"label": label, "severity": sev})
+        return out
+
     # Orden de triage: primero quien más atención necesita. Criticas, luego
     # cuántas alertas activas, y a igualdad por nombre para que sea estable.
     _peso = {"attention": 0, "warning": 1, "ok": 2}
@@ -1180,6 +1216,11 @@ async def list_patients(
             rut=_rut(r),
             sex=_SEX_DB_TO_API.get(r["sex"], r["sex"]),
             address=r["address"],
+            conditions_labels=list(r["conditions_labels"]),
+            allergies=_alergias(r),
+            complexity=r["complexity"],
+            priority=r["priority"],
+            insurance=r["insurance"],
             vitals_summary=await _vitals_summary(str(r["id"])),
         ))
     items.sort(key=lambda it: (

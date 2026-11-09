@@ -175,6 +175,18 @@ async def register_prn_use(
         raise ApiError(status_code=422, code="VALIDATION_ERROR",
                        message="Solo se registran usos de las últimas 12 horas.")
 
+    # Maximo de 24 h del farmaco: bloqueo duro. Pasarlo no es una decision de
+    # quien cuida; se le pide llamar al medico.
+    if it["max_daily"] is not None:
+        tras = float(it["amount_24h"]) + float(it["dose_amount"])
+        maximo = float(it["max_daily"])
+        if tras > maximo:
+            raise ApiError(
+                status_code=422, code="PRN_MAX_DAILY",
+                message=(f"Con este uso serían {tras:g} {it['dose_unit']} en 24 h y "
+                         f"el máximo de {it['name']} es {maximo:g}. No registres "
+                         "otra dosis: consulta al médico."))
+
     overrode = False
 
     row = (

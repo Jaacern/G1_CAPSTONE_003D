@@ -137,6 +137,26 @@ class _DoctorPatientCard extends ConsumerWidget {
               icon: Icons.monitor_heart_outlined,
               texto: 'Crónico: ${_cronicas(patient).join(' · ')}',
             ),
+          if (patient.complexity != null || patient.priority != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  if (patient.priority != null)
+                    _Etiqueta(
+                      texto: 'Prioridad ${_nivel(patient.priority!)}',
+                      color: _colorNivel(patient.priority!),
+                    ),
+                  if (patient.complexity != null)
+                    _Etiqueta(
+                      texto: 'Complejidad ${_nivel(patient.complexity!)}',
+                      color: _colorNivel(patient.complexity!),
+                    ),
+                ],
+              ),
+            ),
           // Los numeros, en la misma tarjeta. El semaforo dice que algo pasa;
           // esto dice que. Sin ello hay que entrar a la ficha de cada
           // paciente, mirar, salir y entrar al siguiente para comparar.
@@ -190,6 +210,19 @@ class _DoctorPatientCard extends ConsumerWidget {
           final t = c.replaceAll('_', ' ').trim();
           return t.isEmpty ? c : t[0].toUpperCase() + t.substring(1);
         }).toList();
+
+  static String _nivel(String v) => switch (v) {
+        'alta' => 'alta',
+        'media' || 'moderada' => v,
+        'baja' => 'baja',
+        _ => v,
+      };
+
+  static Color _colorNivel(String v) => switch (v) {
+        'alta' => AppColors.statusAttention,
+        'media' || 'moderada' => AppColors.statusWarning,
+        _ => AppColors.statusOk,
+      };
 }
 
 /// Una línea de dato con ícono, recortada a una línea para que la tarjeta no
@@ -229,6 +262,26 @@ class _LineaDato extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _Etiqueta extends StatelessWidget {
+  const _Etiqueta({required this.texto, required this.color});
+  final String texto;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(texto,
+          style: TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w700, color: color)),
     );
   }
 }

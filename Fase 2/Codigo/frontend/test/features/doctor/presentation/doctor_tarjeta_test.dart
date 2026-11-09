@@ -92,4 +92,12 @@ void main() {
     expect(find.text('Prioridad baja'), findsOneWidget);
     expect(find.text('Complejidad alta'), findsOneWidget);
   });
+
+  testWidgets('sin datos clinicos no aparecen lineas vacias', (tester) async {
+    await montar(tester);
+
+    // Jose no tiene alergias ni prioridad: solo la tarjeta de Elena las trae.
+    expect(find.textContaining('Alergias:'), findsOneWidget);
+    expect(find.textContaining('Prioridad'), findsOneWidget);
+  });
 }

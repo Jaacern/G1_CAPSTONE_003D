@@ -1,0 +1,10 @@
+# Override OPCIONAL de puertos para máquinas con el 5432 ocupado
+# (p. ej. un PostgreSQL local del host). No se carga solo: hay que pedirlo.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.puertos.yml up -d db api mantenimiento
+#
+# La API no cambia: sigue hablando con la BD por la red interna (db:5432).
+services:
+  db:
+    ports: !override
+      - "127.0.0.1:5433:5432"

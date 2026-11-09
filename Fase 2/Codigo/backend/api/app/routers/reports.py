@@ -108,13 +108,19 @@ async def _alergias(db: AsyncSession, patient_id: str) -> list[dict]:
 
 async def _tratamientos_vigentes(db: AsyncSession, patient_id: str) -> list[dict]:
     """Indicaciones vigentes de todas las especialidades (lo que el paciente
-    toma hoy), con su dosis y horarios."""
+    toma hoy), con su dosis, horarios y quien las indico.
+
+    El que indico va por tratamiento y no por paciente: cada especialidad
+    tiene su medico, y en urgencias hay que saber a quien llamar por cada
+    farmaco."""
     rows = (
         await db.execute(
             text(
                 """
                 SELECT t.specialty, ti.name, ti.dose_text, ti.is_prn,
-                       ti.schedule_label,
+                       ti.schedule_label, t.prescriber_role,
+                       NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), '')
+                         AS prescriber_name,
                        COALESCE(
                          (SELECT string_agg(to_char(tt.time_of_day, 'HH24:MI'), ', '
                                             ORDER BY tt.time_of_day)
@@ -122,6 +128,7 @@ async def _tratamientos_vigentes(db: AsyncSession, patient_id: str) -> list[dict
                           WHERE tt.treatment_item_id = ti.id), '') AS horarios
                 FROM treatments t
                 JOIN treatment_items ti ON ti.treatment_id = t.id
+                LEFT JOIN users u ON u.id = t.prescribed_by
                 WHERE t.patient_id = :pid AND t.status = 'vigente'
                   AND ti.action <> 'removed'
                 ORDER BY t.specialty, ti.is_prn, ti.name
@@ -312,7 +319,7 @@ def _hoja_emergencia_pdf(datos: dict, patologias: list[str],
     if not tratamientos:
         el.append(Paragraph("Sin tratamiento vigente registrado.", body))
     else:
-        filas = [["Especialidad", "Fármaco", "Dosis", "Indicación"]]
+        filas = [["Especialidad / médico", "Fármaco", "Dosis", "Indicación"]]
         for it in tratamientos:
             if it["is_prn"]:
                 ind = "SOS" + (f" ({it['schedule_label']})"
@@ -322,7 +329,7 @@ def _hoja_emergencia_pdf(datos: dict, patologias: list[str],
                 if it.get("schedule_label"):
                     ind += f" ({it['schedule_label']})"
             filas.append([
-                _SPEC_LABEL.get(it["specialty"], it["specialty"]),
+                _especialidad_y_medico(it),
                 it["name"], it["dose_text"], ind,
             ])
         t_tr = Table(filas, colWidths=[34 * mm, 48 * mm, 26 * mm, 54 * mm])
@@ -383,6 +390,18 @@ def _hoja_emergencia_pdf(datos: dict, patologias: list[str],
     doc.build(el)
     buf.seek(0)
     return buf.read()
+
+
+def _especialidad_y_medico(it: dict) -> str:
+    """Celda 'Especialidad' con quien indico el tratamiento debajo.
+
+    Si lo indico una cuidadora (prescriber_role='caregiver') se dice, para que
+    nadie en urgencias lo lea como una indicacion medica."""
+    esp = _SPEC_LABEL.get(it["specialty"], it["specialty"])
+    nombre = it.get("prescriber_name") or "Sin registro"
+    if it.get("prescriber_role") == "caregiver":
+        nombre += " (cuidadora)"
+    return f"{esp}\n{nombre}"
 
 
 def _fmt_valor(v: dict) -> str:

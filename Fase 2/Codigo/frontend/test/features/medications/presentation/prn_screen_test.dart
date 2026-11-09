@@ -66,4 +66,17 @@ void main() {
     expect(find.textContaining('Tos persistente'), findsOneWidget);
     expect(find.text('Aún no se ha usado.'), findsNothing);
   });
+
+  testWidgets('un uso antes del intervalo pide confirmacion', (tester) async {
+    await montar(tester);
+    await registrar(tester, 'Tos persistente');
+    await registrar(tester, 'Le falta el aire');
+
+    expect(find.text('Registrar igual'), findsOneWidget);
+    await tester.tap(find.text('Registrar igual'));
+    await esperar(tester);
+
+    expect(find.textContaining('Le falta el aire'), findsOneWidget);
+    expect(find.byTooltip('Antes del intervalo'), findsOneWidget);
+  });
 }

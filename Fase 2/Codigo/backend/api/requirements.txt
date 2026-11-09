@@ -44,3 +44,10 @@ pytesseract==0.3.13
 # Abre la imagen, corrige la orientacion que guarda la camara en el EXIF y la
 # pasa a escala de grises antes de leerla.
 Pillow==11.0.0
+
+# Rate limiting (DevSecOps — hallazgo F3/F4 de la auditoria de seguridad).
+# Pone un limite por IP a los endpoints sensibles (login, refresh, vinculacion
+# de dispositivo, SOS, IA, voz) para frenar fuerza bruta y abuso de recursos.
+# Backend en memoria por defecto (suficiente para un unico worker / demo); con
+# varios workers o replicas, apuntar storage_uri a Redis.
+slowapi==0.1.9

@@ -85,4 +85,11 @@ void main() {
         findsOneWidget);
     expect(find.text('Crónico: Diabetes mellitus tipo 2 (DM2)'), findsOneWidget);
   });
+
+  testWidgets('prioridad y complejidad salen como etiquetas', (tester) async {
+    await montar(tester);
+
+    expect(find.text('Prioridad baja'), findsOneWidget);
+    expect(find.text('Complejidad alta'), findsOneWidget);
+  });
 }

@@ -512,10 +512,23 @@ class PatientCard {
 
 /// Lectura reciente de un signo vital, para el mini-resumen de la tarjeta.
 class VitalMini {
-  const VitalMini({required this.type, required this.value, required this.unit});
+  const VitalMini({
+    required this.type,
+    required this.value,
+    required this.unit,
+    this.valueSecondary,
+    this.measuredAt,
+  });
   final String type;
   final double value;
   final String unit;
+
+  /// Diastólica, solo para presión arterial.
+  final double? valueSecondary;
+
+  /// Cuándo se tomó: el médico tiene que saber si el dato es de hace 5 minutos
+  /// o de hace 3 días antes de usarlo.
+  final DateTime? measuredAt;
 
   /// Etiqueta corta legible del tipo.
   String get label => switch (type) {
@@ -534,6 +547,10 @@ class VitalMini {
         type: j['type'] as String,
         value: (j['value'] as num).toDouble(),
         unit: (j['unit'] ?? '') as String,
+        valueSecondary: (j['value_secondary'] as num?)?.toDouble(),
+        measuredAt: j['measured_at'] != null
+            ? DateTime.tryParse(j['measured_at'] as String)
+            : null,
       );
 }
 

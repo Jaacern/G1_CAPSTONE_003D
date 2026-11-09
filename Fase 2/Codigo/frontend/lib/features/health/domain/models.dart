@@ -34,14 +34,18 @@ enum VitalSource {
 
 /// Tipos de vital (alineados con enum VitalType de la API).
 enum VitalType {
-  heartRate('heart_rate', 'Ritmo cardíaco', 'bpm', '❤️', Icons.favorite_rounded),
+  heartRate(
+      'heart_rate', 'Ritmo cardíaco', 'bpm', '❤️', Icons.favorite_rounded),
   spo2('spo2', 'Oxígeno (SpO2)', '%', '🫁', Icons.air_rounded),
-  bloodPressure('blood_pressure', 'Presión arterial', 'mmHg', '🩸', Icons.bloodtype_rounded),
-  temperature('temperature', 'Temperatura', '°C', '🌡️', Icons.thermostat_rounded),
+  bloodPressure('blood_pressure', 'Presión arterial', 'mmHg', '🩸',
+      Icons.bloodtype_rounded),
+  temperature(
+      'temperature', 'Temperatura', '°C', '🌡️', Icons.thermostat_rounded),
   glucose('glucose', 'Glucosa', 'mg/dL', '🍬', Icons.water_drop_rounded),
   sleep('sleep', 'Sueño', 'h', '😴', Icons.bedtime_rounded),
   steps('steps', 'Pasos', 'pasos', '🚶', Icons.directions_walk_rounded),
-  sedentaryMin('sedentary_min', 'Tiempo sedentario', 'min', '🪑', Icons.chair_rounded),
+  sedentaryMin(
+      'sedentary_min', 'Tiempo sedentario', 'min', '🪑', Icons.chair_rounded),
   fallEvent('fall_event', 'Caídas', 'eventos', '⚠️', Icons.warning_rounded);
 
   /// true para los signos vitales "clínicos" que se muestran en el grupo
@@ -83,9 +87,7 @@ enum VitalType {
   Color get seriesColor => switch (this) {
         VitalType.heartRate => AgeChart.heart,
         VitalType.spo2 => AgeChart.spo2,
-        VitalType.steps ||
-        VitalType.sedentaryMin =>
-          AgeChart.activity,
+        VitalType.steps || VitalType.sedentaryMin => AgeChart.activity,
         VitalType.sleep => AgeChart.sleep,
         _ => AgeChart.heart,
       };
@@ -116,18 +118,28 @@ class VitalReading {
 }
 
 class VitalPoint {
-  const VitalPoint({required this.ts, required this.value, this.min, this.max});
+  const VitalPoint(
+      {required this.ts,
+      required this.value,
+      this.min,
+      this.max,
+      this.valueSecondary});
 
   final DateTime ts;
   final double value;
   final double? min;
   final double? max;
 
+  /// Solo en presión arterial: la diastólica (value es la sistólica). El
+  /// resto de vitales lo dejan en null.
+  final double? valueSecondary;
+
   factory VitalPoint.fromJson(Map<String, dynamic> json) => VitalPoint(
         ts: DateTime.parse(json['ts'] as String),
         value: (json['value'] as num).toDouble(),
         min: (json['min'] as num?)?.toDouble(),
         max: (json['max'] as num?)?.toDouble(),
+        valueSecondary: (json['value_secondary'] as num?)?.toDouble(),
       );
 }
 

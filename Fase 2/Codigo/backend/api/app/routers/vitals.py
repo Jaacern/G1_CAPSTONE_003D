@@ -113,6 +113,11 @@ class SeriesPoint(BaseModel):
     value: float | None
     min: float | None = None
     max: float | None = None
+    # Solo en presion arterial: promedio de la diastolica del periodo. El
+    # grafico dibuja sistolica (value) y diastolica (value_secondary) como dos
+    # lineas, que es como se lee una presion; para el resto de vitales queda
+    # en null y se usa la banda min-max.
+    value_secondary: float | None = None
 
 
 class ThresholdOut(BaseModel):
@@ -547,12 +552,18 @@ async def get_series(
         "to": date_to,
     }
 
+    # La presion arterial tiene dos componentes (sistolica en value,
+    # diastolica en value_secondary). El grafico las dibuja como dos lineas,
+    # asi que aqui se traen las dos y NO la banda min-max, que para presion se
+    # leia como si fuera la diastolica sin serlo.
+    es_presion = type == VitalType.blood_pressure
+
     if granularity == Granularity.raw:
         rows = (
             await db.execute(
                 text(
                     """
-                    SELECT measured_at AS ts, value
+                    SELECT measured_at AS ts, value, value_secondary
                     FROM vital_readings
                     WHERE patient_id = :pid
                       AND type = :type
@@ -565,7 +576,15 @@ async def get_series(
             )
         ).mappings().all()
         points = [
-            SeriesPoint(ts=r["ts"], value=float(r["value"]), min=None, max=None)
+            SeriesPoint(
+                ts=r["ts"],
+                value=float(r["value"]),
+                min=None,
+                max=None,
+                value_secondary=float(r["value_secondary"])
+                if es_presion and r["value_secondary"] is not None
+                else None,
+            )
             for r in rows
         ]
     else:
@@ -577,7 +596,8 @@ async def get_series(
                     SELECT date_trunc('{unit}', measured_at) AS ts,
                            avg(value) AS avg_v,
                            min(value) AS min_v,
-                           max(value) AS max_v
+                           max(value) AS max_v,
+                           avg(value_secondary) AS avg_v2
                     FROM vital_readings
                     WHERE patient_id = :pid
                       AND type = :type
@@ -594,8 +614,15 @@ async def get_series(
             SeriesPoint(
                 ts=r["ts"],
                 value=float(r["avg_v"]) if r["avg_v"] is not None else None,
-                min=float(r["min_v"]) if r["min_v"] is not None else None,
-                max=float(r["max_v"]) if r["max_v"] is not None else None,
+                # Para presion la banda min-max se omite: confunde con la
+                # diastolica. Para el resto se conserva.
+                min=None if es_presion
+                else (float(r["min_v"]) if r["min_v"] is not None else None),
+                max=None if es_presion
+                else (float(r["max_v"]) if r["max_v"] is not None else None),
+                value_secondary=float(r["avg_v2"])
+                if es_presion and r["avg_v2"] is not None
+                else None,
             )
             for r in rows
         ]

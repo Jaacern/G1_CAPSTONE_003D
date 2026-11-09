@@ -93,8 +93,8 @@ class VitalsRepositoryHttp implements VitalsRepository {
 
   @override
   Future<List<LatestVital>> getLatest(String patientId) async {
-    final res =
-        await _api.get<Map<String, dynamic>>('/patients/$patientId/vitals/latest');
+    final res = await _api
+        .get<Map<String, dynamic>>('/patients/$patientId/vitals/latest');
     return ((res['items'] ?? []) as List)
         .map((e) => LatestVital.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -237,14 +237,30 @@ class VitalsRepositoryMock implements VitalsRepository {
       final day = from.add(Duration(days: i));
       final value =
           (_baseline(type) + _jitter(type, rng)).clamp(0, double.infinity);
+      if (type == VitalType.bloodPressure) {
+        // Presión: sistólica (value) y diastólica (~2/3), sin banda mín–máx.
+        // La diastólica acompaña a la sistólica para que las dos líneas se
+        // muevan juntas, como una presión real.
+        final dia =
+            (value * 0.64 + rng.nextDouble() * 6 - 3).clamp(0, double.infinity);
+        points.add(VitalPoint(
+          ts: day,
+          value: double.parse(value.toStringAsFixed(0)),
+          valueSecondary: double.parse(dia.toStringAsFixed(0)),
+        ));
+        continue;
+      }
       final spread = _dailySpread(type);
       points.add(VitalPoint(
         ts: day,
         value: double.parse(value.toStringAsFixed(1)),
         min: spread > 0
-            ? double.parse((value - spread).clamp(0, double.infinity).toStringAsFixed(1))
+            ? double.parse(
+                (value - spread).clamp(0, double.infinity).toStringAsFixed(1))
             : null,
-        max: spread > 0 ? double.parse((value + spread).toStringAsFixed(1)) : null,
+        max: spread > 0
+            ? double.parse((value + spread).toStringAsFixed(1))
+            : null,
       ));
     }
     Threshold? threshold;

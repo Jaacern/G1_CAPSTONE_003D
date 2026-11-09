@@ -125,68 +125,75 @@ class VitalDetailScreen extends ConsumerWidget {
                 final grain = adaptive?.grain ?? _grainForRange(range);
                 // El fallback por hora se usó si pedimos semana/día pero el
                 // backend solo tenía datos de hoy.
-                final isFallbackHour =
-                    grain == _Grain.hour && _grainForRange(range) != _Grain.hour;
+                final isFallbackHour = grain == _Grain.hour &&
+                    _grainForRange(range) != _Grain.hour;
                 if (data == null || data.points.isEmpty) {
                   return const EmptyView(
                       icon: Icons.show_chart_rounded,
                       title: 'Sin datos en este rango');
                 }
                 return Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 24, 24),
-                      child: Column(
-                        children: [
-                          Expanded(
-                              child:
-                                  _TrendChart(series: data, grain: grain)),
-                          if (data.points.any((p) => p.min != null && p.max != null))
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                grain.legend,
+                  padding: const EdgeInsets.fromLTRB(16, 8, 24, 24),
+                  child: Column(
+                    children: [
+                      Expanded(child: _TrendChart(series: data, grain: grain)),
+                      if (data.points.any((p) => p.valueSecondary != null))
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Línea llena: sistólica · línea punteada: diastólica',
+                            style: TextStyle(
+                                fontSize: 12, color: AppColors.textSecondary),
+                          ),
+                        )
+                      else if (data.points
+                          .any((p) => p.min != null && p.max != null))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            grain.legend,
+                            style: const TextStyle(
+                                fontSize: 12, color: AppColors.textSecondary),
+                          ),
+                        ),
+                      if (isFallbackHour)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Aún hay poco historial: se muestra el detalle por hora de hoy.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                fontSize: 11, color: AppColors.textSecondary),
+                          ),
+                        ),
+                      if (data.sources.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: _SourcesSummary(sources: data.sources),
+                        ),
+                      if (data.threshold != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                  width: 18,
+                                  height: 3,
+                                  color: AppColors.statusAttention),
+                              const SizedBox(width: 6),
+                              Text(
+                                _thresholdLabel(data.threshold!, type),
                                 style: const TextStyle(
                                     fontSize: 12,
                                     color: AppColors.textSecondary),
                               ),
-                            ),
-                          if (isFallbackHour)
-                            const Padding(
-                              padding: EdgeInsets.only(top: 4),
-                              child: Text(
-                                'Aún hay poco historial: se muestra el detalle por hora de hoy.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.textSecondary),
-                              ),
-                            ),
-                          if (data.sources.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 10),
-                              child: _SourcesSummary(sources: data.sources),
-                            ),
-                          if (data.threshold != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                      width: 18, height: 3,
-                                      color: AppColors.statusAttention),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    _thresholdLabel(data.threshold!, type),
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        color: AppColors.textSecondary),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    );
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                );
               },
             ),
           ),
@@ -221,12 +228,25 @@ class _TrendChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final points = series.points;
     final avgSpots = <FlSpot>[
-      for (var i = 0; i < points.length; i++) FlSpot(i.toDouble(), points[i].value)
+      for (var i = 0; i < points.length; i++)
+        FlSpot(i.toDouble(), points[i].value)
+    ];
+
+    // Presión arterial: dos líneas, sistólica (value) y diastólica
+    // (valueSecondary). No lleva banda mín–máx porque la diastólica ocupa ese
+    // lugar y mezclarlas se leía como un gráfico roto.
+    final esPresion = points.any((p) => p.valueSecondary != null);
+    final diaSpots = <FlSpot>[
+      for (var i = 0; i < points.length; i++)
+        if (points[i].valueSecondary != null)
+          FlSpot(i.toDouble(), points[i].valueSecondary!)
     ];
 
     // Banda mín–máx como ÁREA sombreada: se dibuja la línea del máximo con su
-    // relleno hacia abajo recortado a la línea del mínimo. Más limpia.
-    final hasMinMax = points.any((p) => p.min != null && p.max != null);
+    // relleno hacia abajo recortado a la línea del mínimo. Más limpia. No
+    // aplica a la presión.
+    final hasMinMax =
+        !esPresion && points.any((p) => p.min != null && p.max != null);
     final maxSpots = <FlSpot>[
       for (var i = 0; i < points.length; i++)
         FlSpot(i.toDouble(), points[i].max ?? points[i].value)
@@ -242,6 +262,11 @@ class _TrendChart extends StatelessWidget {
     for (final p in points) {
       if (p.min != null && p.min! < minY) minY = p.min!;
       if (p.max != null && p.max! > maxY) maxY = p.max!;
+      // La diastólica es la que baja el piso del gráfico de presión.
+      if (p.valueSecondary != null) {
+        if (p.valueSecondary! < minY) minY = p.valueSecondary!;
+        if (p.valueSecondary! > maxY) maxY = p.valueSecondary!;
+      }
     }
     final t = series.threshold;
     if (t?.minValue != null && t!.minValue! < minY) minY = t.minValue!;
@@ -258,12 +283,14 @@ class _TrendChart extends StatelessWidget {
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
-          getDrawingHorizontalLine: (v) =>
-              FlLine(color: AppColors.divider.withValues(alpha: .6), strokeWidth: 1),
+          getDrawingHorizontalLine: (v) => FlLine(
+              color: AppColors.divider.withValues(alpha: .6), strokeWidth: 1),
         ),
         titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           leftTitles: const AxisTitles(
             sideTitles: SideTitles(showTitles: true, reservedSize: 42),
           ),
@@ -277,8 +304,7 @@ class _TrendChart extends StatelessWidget {
                 if (i < 0 || i >= points.length) return const SizedBox.shrink();
                 return Padding(
                   padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                      DateFormat(grain.axisFormat).format(points[i].ts),
+                  child: Text(DateFormat(grain.axisFormat).format(points[i].ts),
                       style: const TextStyle(
                           fontSize: 11, color: AppColors.textSecondary)),
                 );
@@ -380,10 +406,23 @@ class _TrendChart extends StatelessWidget {
               },
             ),
             belowBarData: BarAreaData(
-              show: true,
+              show: !esPresion,
               color: lineColor.withValues(alpha: .06),
             ),
           ),
+          // Diastólica: segunda línea de la presión, más tenue y sin relleno
+          // para no competir con la sistólica.
+          if (esPresion && diaSpots.length == points.length)
+            LineChartBarData(
+              spots: diaSpots,
+              isCurved: true,
+              curveSmoothness: .2,
+              color: lineColor.withValues(alpha: .55),
+              barWidth: 2,
+              dashArray: const [5, 4],
+              dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(show: false),
+            ),
         ],
         lineTouchData: LineTouchData(
           touchTooltipData: LineTouchTooltipData(
@@ -392,21 +431,37 @@ class _TrendChart extends StatelessWidget {
             // no la hay. Solo esa línea muestra tooltip; las transparentes de la
             // banda devuelven null para que NO salga el recuadro blanco vacío.
             getTooltipItems: (touched) {
+              // La línea de la sistólica/promedio es la primera tras la banda
+              // mín–máx (2 líneas transparentes) o la primera si no hay banda.
+              // En presión la diastólica es la línea siguiente; su tooltip se
+              // omite porque la sistólica ya muestra las dos cifras.
               final avgBarIndex = hasMinMax ? 2 : 0;
               return touched.map((s) {
                 if (s.barIndex != avgBarIndex) return null;
                 final p = points[s.spotIndex];
-                final mn = p.min != null ? ' · mín ${p.min!.toStringAsFixed(0)}' : '';
-                final mx = p.max != null ? ' · máx ${p.max!.toStringAsFixed(0)}' : '';
                 final when = switch (grain) {
                   _Grain.hour => DateFormat("d MMM HH:mm", 'es').format(p.ts),
                   _Grain.day => DateFormat('d MMM', 'es').format(p.ts),
                   _Grain.week =>
                     'Semana del ${DateFormat('d MMM', 'es').format(p.ts)}',
                 };
+                // Presión: "128/82 mmHg". El resto: valor + banda si la hay.
+                final String cuerpo;
+                if (esPresion && p.valueSecondary != null) {
+                  cuerpo = '${p.value.toStringAsFixed(0)}/'
+                      '${p.valueSecondary!.toStringAsFixed(0)} ${series.type.unit}';
+                } else {
+                  final mn = p.min != null
+                      ? ' · mín ${p.min!.toStringAsFixed(0)}'
+                      : '';
+                  final mx = p.max != null
+                      ? ' · máx ${p.max!.toStringAsFixed(0)}'
+                      : '';
+                  cuerpo =
+                      '${p.value.toStringAsFixed(0)} ${series.type.unit} (promedio)$mn$mx';
+                }
                 return LineTooltipItem(
-                  '${p.value.toStringAsFixed(0)} ${series.type.unit} (promedio)$mn$mx\n'
-                  '$when',
+                  '$cuerpo\n$when',
                   const TextStyle(color: Colors.white, fontSize: 12),
                 );
               }).toList();
@@ -451,8 +506,8 @@ class _SourcesSummary extends StatelessWidget {
             ),
             child: Text(
               '${e.key.emoji} ${e.key.label}: ${e.value}',
-              style: const TextStyle(
-                  fontSize: 11, color: AppColors.textSecondary),
+              style:
+                  const TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
           ),
       ],

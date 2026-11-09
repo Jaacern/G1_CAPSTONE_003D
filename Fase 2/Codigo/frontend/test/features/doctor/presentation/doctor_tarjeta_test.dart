@@ -63,4 +63,11 @@ void main() {
     expect(find.text('78 años · Femenino · RUT 5.123.456-K'), findsOneWidget);
     expect(find.text('81 años · Masculino'), findsOneWidget);
   });
+
+  testWidgets('la tarjeta muestra el domicilio', (tester) async {
+    await montar(tester);
+
+    expect(find.text('Los Aromos 1234, La Florida'), findsOneWidget);
+    expect(find.text('Pasaje Los Olmos 55, Maipú'), findsOneWidget);
+  });
 }

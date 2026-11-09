@@ -454,6 +454,8 @@ class PatientCard {
     this.conditions = const [],
     this.rut,
     this.vitalsSummary = const [],
+    this.sex,
+    this.address,
   });
 
   final String patientId;
@@ -473,6 +475,11 @@ class PatientCard {
   final String? rut;
   final List<VitalMini> vitalsSummary;
 
+  /// Sexo y domicilio: junto al RUT, separan a dos pacientes con el mismo
+  /// nombre ("Juanito Pérez" de Maipú vs. el de La Florida).
+  final String? sex;
+  final String? address;
+
   /// Copia con el motivo ya humanizado (el backend manda un código técnico).
   PatientCard withHumanizedReason(String reason) => PatientCard(
         patientId: patientId,
@@ -487,6 +494,8 @@ class PatientCard {
         conditions: conditions,
         rut: rut,
         vitalsSummary: vitalsSummary,
+        sex: sex,
+        address: address,
       );
 
   factory PatientCard.fromJson(Map<String, dynamic> json) => PatientCard(
@@ -507,6 +516,8 @@ class PatientCard {
         vitalsSummary: ((json['vitals_summary'] ?? const []) as List)
             .map((e) => VitalMini.fromJson(e as Map<String, dynamic>))
             .toList(),
+        sex: json['sex'] as String?,
+        address: json['address'] as String?,
       );
 }
 

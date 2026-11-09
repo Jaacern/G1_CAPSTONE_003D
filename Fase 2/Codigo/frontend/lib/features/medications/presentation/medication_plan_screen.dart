@@ -9,6 +9,7 @@ import '../../../core/widgets/common.dart';
 import '../application/medications_providers.dart';
 import '../data/medications_repository.dart';
 import '../domain/models.dart';
+import 'dose_unit_field.dart';
 
 /// Formulario para crear o editar un medicamento del plan (ticket AGE-402).
 /// Al guardar, programa recordatorios locales para las próximas dosis.
@@ -35,7 +36,10 @@ class _MedicationPlanScreenState extends ConsumerState<MedicationPlanScreen> {
   DateTime _startDate = DateTime.now();
   DateTime? _endDate;
 
-  static const _units = ['mg', 'ml', 'g', 'mcg', 'UI', 'gotas'];
+  // Las unidades validas viven en el modelo, al lado de la restriccion del
+  // backend que las define. Duplicar la lista aca fue justamente lo que dejo
+  // al formulario ofreciendo seis de las diez que la base acepta.
+  static const _units = unidadesDeDosis;
 
   bool _loading = false;
   bool _saving = false;
@@ -222,15 +226,9 @@ class _MedicationPlanScreenState extends ConsumerState<MedicationPlanScreen> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: DropdownButtonFormField<String>(
-                          initialValue: _unit,
-                          decoration:
-                              const InputDecoration(labelText: 'Unidad'),
-                          items: [
-                            for (final u in _units)
-                              DropdownMenuItem(value: u, child: Text(u)),
-                          ],
-                          onChanged: (v) => setState(() => _unit = v ?? _unit),
+                        child: DoseUnitField(
+                          value: _unit,
+                          onChanged: (u) => setState(() => _unit = u),
                         ),
                       ),
                     ],

@@ -94,4 +94,14 @@ void main() {
         matching: find.byWidgetPredicate((w) => w is ButtonStyleButton)));
     expect(boton.onPressed, isNull);
   });
+
+  testWidgets('la pantalla SOS con el maximo alcanzado cabe en 320 dp',
+      (tester) async {
+    await montar(tester, ancho: 320, usos: [
+    for (final h in [7, 10, 13, 16, 19, 22])
+      DateTime.now().subtract(Duration(hours: h)),
+  ]);
+
+    expect(find.text('Bromuro de ipratropio'), findsOneWidget);
+  });
 }

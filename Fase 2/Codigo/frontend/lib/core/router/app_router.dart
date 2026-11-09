@@ -8,6 +8,9 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/alerts/presentation/alerts_screen.dart';
 import '../../features/alerts/presentation/alert_detail_screen.dart';
+import '../../features/caregiver/presentation/caregiver_log_screen.dart';
+import '../../features/caregiver/presentation/caregiver_tasks_screen.dart';
+import '../../features/caregiver/presentation/caregiver_today_screen.dart';
 import '../../features/caregiver/presentation/checkin_screen.dart';
 import '../../features/caregiver/presentation/handover_screen.dart';
 import '../../features/caregiver/presentation/incident_screen.dart';
@@ -67,10 +70,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-      GoRoute(path: '/register', builder: (_, st) => RegisterScreen(
-            invitationToken: st.uri.queryParameters['invite'],
-          )),
-      GoRoute(path: '/recover', builder: (_, __) => const RecoverPasswordScreen()),
+      GoRoute(
+          path: '/register',
+          builder: (_, st) => RegisterScreen(
+                invitationToken: st.uri.queryParameters['invite'],
+              )),
+      GoRoute(
+          path: '/recover', builder: (_, __) => const RecoverPasswordScreen()),
 
       // Shell principal por rol.
       GoRoute(path: '/home', builder: (_, __) => const MainShell()),
@@ -100,7 +106,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       // --- Pacientes ---
-      GoRoute(path: '/patients/create', builder: (_, __) => const CreatePatientScreen()),
+      GoRoute(
+          path: '/patients/create',
+          builder: (_, __) => const CreatePatientScreen()),
       // Invita al miembro sobre el paciente seleccionado (selectedPatientProvider).
       GoRoute(path: '/invite', builder: (_, __) => const InviteMemberScreen()),
       // Lado del invitado: ingresar el código de 6 dígitos (AGE-205 / DAC05-7).
@@ -118,8 +126,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/meds/scan',
-        builder: (_, st) =>
-            PrescriptionScanScreen(patientId: st.uri.queryParameters['patient']!),
+        builder: (_, st) => PrescriptionScanScreen(
+            patientId: st.uri.queryParameters['patient']!),
       ),
       GoRoute(
         path: '/dose/:id',
@@ -143,13 +151,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/alerts', builder: (_, __) => const AlertsScreen()),
       GoRoute(
         path: '/alerts/:id',
-        builder: (_, st) => AlertDetailScreen(alertId: st.pathParameters['id']!),
+        builder: (_, st) =>
+            AlertDetailScreen(alertId: st.pathParameters['id']!),
       ),
 
       // --- Comunicación ---
       GoRoute(
         path: '/chat',
-        builder: (_, st) => ChatScreen(patientId: st.uri.queryParameters['patient']),
+        builder: (_, st) =>
+            ChatScreen(patientId: st.uri.queryParameters['patient']),
       ),
       GoRoute(
         path: '/assistant',
@@ -158,18 +168,45 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       // --- Cuidadora ---
-      GoRoute(path: '/cg/checkin', builder: (_, st) => CheckinScreen(patientId: st.uri.queryParameters['patient']!)),
-      GoRoute(path: '/cg/task', builder: (_, st) => TaskEditScreen(patientId: st.uri.queryParameters['patient']!, taskId: st.uri.queryParameters['task'])),
-      GoRoute(path: '/cg/observation', builder: (_, st) => ObservationScreen(patientId: st.uri.queryParameters['patient']!)),
-      GoRoute(path: '/cg/incident', builder: (_, st) => IncidentScreen(patientId: st.uri.queryParameters['patient']!)),
-      GoRoute(path: '/cg/handover', builder: (_, st) => HandoverScreen(patientId: st.uri.queryParameters['patient']!)),
-      GoRoute(path: '/cg/reports', builder: (_, __) => const CaregiverReportsScreen()),
+      GoRoute(
+          path: '/cg/checkin',
+          builder: (_, st) =>
+              CheckinScreen(patientId: st.uri.queryParameters['patient']!)),
+      GoRoute(
+          path: '/cg/task',
+          builder: (_, st) => TaskEditScreen(
+              patientId: st.uri.queryParameters['patient']!,
+              taskId: st.uri.queryParameters['task'])),
+      GoRoute(
+          path: '/cg/observation',
+          builder: (_, st) =>
+              ObservationScreen(patientId: st.uri.queryParameters['patient']!)),
+      GoRoute(
+          path: '/cg/incident',
+          builder: (_, st) =>
+              IncidentScreen(patientId: st.uri.queryParameters['patient']!)),
+      GoRoute(
+          path: '/cg/handover',
+          builder: (_, st) =>
+              HandoverScreen(patientId: st.uri.queryParameters['patient']!)),
+      GoRoute(
+          path: '/cg/reports',
+          builder: (_, __) => const CaregiverReportsScreen()),
+      // Estas tres pantallas existian sin ruta ni nadie que las instanciara,
+      // asi que ninguna cuidadora podia abrirlas. Con ellas se caian tambien
+      // el check-in, la observacion, el incidente y el relevo, porque los
+      // unicos botones que llevaban alla vivian adentro.
+      GoRoute(
+          path: '/cg/today', builder: (_, __) => const CaregiverTodayScreen()),
+      GoRoute(
+          path: '/cg/tasks', builder: (_, __) => const CaregiverTasksScreen()),
+      GoRoute(path: '/cg/log', builder: (_, __) => const CaregiverLogScreen()),
 
       // --- Médico ---
       GoRoute(
         path: '/doctor/patient',
-        builder: (_, st) => DoctorPatientScreen(
-            patientId: st.uri.queryParameters['patient']!),
+        builder: (_, st) =>
+            DoctorPatientScreen(patientId: st.uri.queryParameters['patient']!),
       ),
       GoRoute(
         path: '/patient/profile',
@@ -178,7 +215,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       // --- Marketplace ---
-      GoRoute(path: '/marketplace', builder: (_, __) => const MarketplaceScreen()),
+      GoRoute(
+          path: '/marketplace', builder: (_, __) => const MarketplaceScreen()),
       GoRoute(
         path: '/marketplace/caregivers/:id',
         builder: (_, st) =>
@@ -192,9 +230,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             DocumentsScreen(patientId: st.uri.queryParameters['patient']),
       ),
       GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
-      GoRoute(path: '/settings/notifications', builder: (_, __) => const NotificationSettingsScreen()),
+      GoRoute(
+          path: '/settings/notifications',
+          builder: (_, __) => const NotificationSettingsScreen()),
       // Alias usado desde ProfileScreen.
-      GoRoute(path: '/profile/notifications', builder: (_, __) => const NotificationSettingsScreen()),
+      GoRoute(
+          path: '/profile/notifications',
+          builder: (_, __) => const NotificationSettingsScreen()),
       GoRoute(path: '/premium', builder: (_, __) => const PremiumScreen()),
 
       // --- Solo desarrollo: catálogo del design system (AGE-105) ---

@@ -5,6 +5,14 @@ import '../../../core/theme/app_theme.dart';
 /// Modelos del centro de alertas (alineados con la Especificación de Endpoints).
 
 /// Tipo de alerta. Cada valor lleva su representación de API, etiqueta e icono.
+/// Cuantas alertas activas tiene un paciente, dicho como lo diria alguien.
+///
+/// Se escribia "3 alerta(s) activa(s)" en tres pantallas distintas. Los
+/// parentesis son una forma de no decidir, y quien lee la aplicacion no esta
+/// leyendo un formulario.
+String textoDeAlertasActivas(int cuantas) =>
+    cuantas == 1 ? '1 alerta activa' : '$cuantas alertas activas';
+
 enum AlertType {
   fall('fall', 'Caída detectada', Icons.personal_injury_rounded),
   vitalOutOfRange('vital_out_of_range', 'Signo vital fuera de rango',

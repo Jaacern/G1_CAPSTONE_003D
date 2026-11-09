@@ -15,7 +15,7 @@ import '../domain/models.dart';
 import 'dose_unit_field.dart';
 
 /// Escaneo de receta con OCR (ticket AGE-405): foto -> subida -> borrador
-/// estructurado editable -> guardar como medicamento(s).
+/// estructurado editable -> guardar como indicaciones.
 class PrescriptionScanScreen extends ConsumerStatefulWidget {
   const PrescriptionScanScreen({super.key, required this.patientId});
 
@@ -90,7 +90,10 @@ class _PrescriptionScanScreenState
       ref.invalidate(todayDosesProvider);
       if (mounted) {
         showAppSnackBar(
-            context, 'Se guardó ${drafts.length} medicamento(s) de la receta.');
+            context,
+            drafts.length == 1
+                ? 'Se guardó 1 indicación de la receta.'
+                : 'Se guardaron ${drafts.length} indicaciones de la receta.');
         context.pop();
       }
     } catch (e) {
@@ -224,7 +227,9 @@ class _PrescriptionScanScreenState
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.save_rounded),
-              label: Text('Guardar como medicamento(s) (${_drafts!.length})'),
+              label: Text(_drafts!.length == 1
+                  ? 'Guardar 1 indicación'
+                  : 'Guardar ${_drafts!.length} indicaciones'),
             ),
           ],
         ],

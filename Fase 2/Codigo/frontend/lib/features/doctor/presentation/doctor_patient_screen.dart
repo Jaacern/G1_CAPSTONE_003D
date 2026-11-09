@@ -30,10 +30,13 @@ class DoctorPatientScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final patient = ref.watch(selectedPatientProvider);
+    // Edad, sexo y enfermedades: van aparte porque el listado de pacientes no
+    // los trae completos, solo el detalle.
+    final detalle = ref.watch(selectedPatientDetailProvider);
     final name = patient?.fullName ?? 'Paciente';
 
     // Ficha organizada en pestañas para que el médico llegue y ubique todo sin
-    // una columna infinita (Fase 1). La cabecera del paciente queda fija arriba.
+    // una columna infinita. La cabecera del paciente queda fija arriba.
     return DefaultTabController(
       length: 5,
       child: Scaffold(
@@ -53,7 +56,15 @@ class DoctorPatientScreen extends ConsumerWidget {
         body: Column(
           children: [
             if (patient != null)
-              _PatientHeader(patient: patient, patientId: patientId),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: _Cabecera(
+                  patient: patient,
+                  detalle: detalle.valueOrNull,
+                  onTap: () =>
+                      context.push('/patient/profile?patient=$patientId'),
+                ),
+              ),
             Expanded(
               child: TabBarView(
                 children: [
@@ -65,59 +76,6 @@ class DoctorPatientScreen extends ConsumerWidget {
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Cabecera fija: identidad, edad, enfermedades y semáforo. Toca para abrir el
-/// perfil clínico completo.
-class _PatientHeader extends StatelessWidget {
-  const _PatientHeader({required this.patient, required this.patientId});
-  final PatientCard patient;
-  final String patientId;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: AppCard(
-        onTap: () => context.push('/patient/profile?patient=$patientId'),
-        child: Row(
-          children: [
-            InitialsAvatar(
-                name: patient.fullName, photoUrl: patient.photoUrl, radius: 24),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                      patient.age != null
-                          ? '${patient.fullName}, ${patient.age} años'
-                          : patient.fullName,
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w700)),
-                  if (patient.conditions.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                        patient.conditions
-                            .map((c) => c.replaceAll('_', ' '))
-                            .join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 13, color: AppColors.textSecondary)),
-                  ],
-                ],
-              ),
-            ),
-            WellbeingChip(status: patient.wellbeingStatus),
-            const SizedBox(width: 4),
-            const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textSecondary),
           ],
         ),
       ),
@@ -593,4 +551,145 @@ String _timeAgo(DateTime dt) {
   if (diff.inHours < 24) return 'hace ${diff.inHours} h';
   if (diff.inDays == 1) return 'ayer';
   return 'hace ${diff.inDays} días';
+}
+
+/// Cabecera de la ficha: quien es el paciente antes de mirar un solo numero.
+///
+/// La edad no es un adorno. Cincuenta y cuatro latidos por minuto son
+/// bradicardia en alguien de cincuenta y pueden ser normales en alguien de
+/// noventa, asi que una ficha que muestra el pulso sin la edad obliga al
+/// profesional a pedir el dato por otro lado antes de decidir. Lo mismo con
+/// las enfermedades de base: la misma presion se lee distinto en un paciente
+/// hipertenso que en uno que no lo es.
+///
+/// El dato estaba en la base desde el principio (patients.birth_date y la
+/// tabla patient_conditions) y el modelo del front ya calculaba la edad. Solo
+/// no se dibujaba.
+///
+/// [detalle] llega nulo mientras carga o si la peticion falla. En ese caso se
+/// muestra lo que ya trae el listado, nombre y estado, en vez de dejar la
+/// cabecera en blanco o poner un indicador que empuje el resto de la ficha
+/// hacia abajo cuando llegue.
+class _Cabecera extends StatelessWidget {
+  const _Cabecera(
+      {required this.patient, required this.detalle, this.onTap});
+
+  final PatientCard patient;
+  final Patient? detalle;
+
+  /// Abre el perfil clínico completo (alergias, vacunas, contactos, PDF).
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final edadYSexo = <String>[
+      if (detalle != null) '${detalle!.age} años',
+      if (detalle?.sex != null) _sexo(detalle!.sex!),
+    ].join(' · ');
+
+    return AppCard(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              InitialsAvatar(
+                name: patient.fullName,
+                photoUrl: patient.photoUrl,
+                radius: 24,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(patient.fullName,
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700)),
+                    if (edadYSexo.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(edadYSexo,
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary)),
+                    ],
+                    if ((patient.topReason ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(patient.topReason!,
+                          style: const TextStyle(
+                              fontSize: 13, color: AppColors.textSecondary)),
+                    ],
+                  ],
+                ),
+              ),
+              WellbeingChip(status: patient.wellbeingStatus),
+              if (onTap != null) ...[
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right_rounded,
+                    color: AppColors.textSecondary),
+              ],
+            ],
+          ),
+          if (detalle != null && detalle!.conditions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            const Text('Antecedentes',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.4,
+                    color: AppColors.textSecondary)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final c in detalle!.conditions) _Antecedente(texto: c),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// El backend guarda una sola letra (ck_patients_sex admite M, F u O), pero
+  /// los datos de prueba traian la palabra completa. Se mira la inicial para
+  /// que ninguna de las dos formas termine mostrando "Otro".
+  static String _sexo(String s) {
+    if (s.isEmpty) return 'Otro';
+    return switch (s[0].toUpperCase()) {
+      'M' => 'Masculino',
+      'F' => 'Femenino',
+      _ => 'Otro',
+    };
+  }
+}
+
+class _Antecedente extends StatelessWidget {
+  const _Antecedente({required this.texto});
+
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(AgeRadius.full),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Text(
+        texto,
+        style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary),
+      ),
+    );
+  }
 }

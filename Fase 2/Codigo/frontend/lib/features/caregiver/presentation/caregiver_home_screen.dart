@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
@@ -71,6 +72,12 @@ class CaregiverHomeScreen extends ConsumerWidget {
               },
             ),
           ),
+          // Accesos a su propio trabajo. Las cuatro pantallas que hay detras
+          // existian sin ruta ni boton, asi que una cuidadora no podia marcar
+          // una tarea, hacer su check-in, dejar una observacion, reportar un
+          // incidente, hacer el relevo ni ver sus reportes. Solo registrar
+          // dosis, que es lo que esta pantalla ya mostraba.
+          const _AccesosDeTurno(),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
             child: Align(
@@ -82,6 +89,108 @@ class CaregiverHomeScreen extends ConsumerWidget {
           // Dosis del día + plan, con permiso de registro/edición de la cuidadora.
           const Expanded(child: MedicationsBody()),
         ],
+      ),
+    );
+  }
+}
+
+/// Accesos al trabajo de la cuidadora desde su pantalla de inicio.
+///
+/// Su turno, sus tareas, la bitacora y los reportes vivian en pantallas que
+/// nadie instanciaba y que no tenian ruta: existian, compilaban, hasta habia
+/// una prueba que medía que cupieran en 320 dp, y ninguna cuidadora podia
+/// abrirlas. Los botones del check-in, la observacion, el incidente y el
+/// relevo estaban dentro de una de ellas, asi que se cayeron todos juntos.
+///
+/// Van arriba de la medicacion y no en el menu Mas porque son lo que hace
+/// durante el turno, no una configuracion que se toca una vez.
+///
+/// Se agregan aqui en vez de reemplazar esta pantalla por la del turno,
+/// que seria lo mas directo, porque esa no muestra la medicacion y no existe
+/// una ruta de medicamentos suelta: cambiarla le quitaria el registro de
+/// dosis, que es su tarea de todos los dias.
+class _AccesosDeTurno extends StatelessWidget {
+  const _AccesosDeTurno();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Row(
+        children: [
+          _Acceso(
+            icon: Icons.schedule_rounded,
+            label: 'Mi turno',
+            color: AppColors.primary,
+            onTap: () => context.push('/cg/today'),
+          ),
+          const SizedBox(width: 10),
+          _Acceso(
+            icon: Icons.checklist_rounded,
+            label: 'Tareas',
+            color: AppColors.secondary,
+            onTap: () => context.push('/cg/tasks'),
+          ),
+          const SizedBox(width: 10),
+          _Acceso(
+            icon: Icons.menu_book_rounded,
+            label: 'Bitácora',
+            color: AppColors.accent,
+            onTap: () => context.push('/cg/log'),
+          ),
+          const SizedBox(width: 10),
+          _Acceso(
+            icon: Icons.bar_chart_rounded,
+            label: 'Reportes',
+            color: AppColors.textSecondary,
+            onTap: () => context.push('/cg/reports'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Acceso extends StatelessWidget {
+  const _Acceso({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AgeRadius.xl),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: .10),
+            borderRadius: BorderRadius.circular(AgeRadius.xl),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: color, size: 24),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: color, fontWeight: FontWeight.w700, fontSize: 11),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

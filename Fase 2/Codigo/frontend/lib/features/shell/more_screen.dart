@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../alerts/domain/models.dart';
 import '../../core/config/app_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_controller.dart';
@@ -79,12 +80,11 @@ class MoreScreen extends ConsumerWidget {
                         color: p.wellbeingStatus.color),
                     title: p.age != null ? '${p.fullName}, ${p.age} años' : p.fullName,
                     subtitle: p.activeAlertsCount > 0
-                        ? '${p.activeAlertsCount} alerta(s) activa(s)'
+                        ? textoDeAlertasActivas(p.activeAlertsCount)
                         : p.role.label,
                     onTap: () {
-                      // Antes solo seleccionaba y no pasaba nada visible (bug).
-                      // Ahora: el médico abre la ficha clínica del paciente; el
-                      // resto lo selecciona y vuelve a la pestaña Hoy.
+                      // El médico abre la ficha clínica del paciente; el resto
+                      // lo selecciona y vuelve a la pestaña Hoy.
                       ref.read(selectedPatientProvider.notifier).select(p);
                       if (role == RoleType.doctor) {
                         context.push('/doctor/patient?patient=${p.patientId}');
@@ -95,8 +95,8 @@ class MoreScreen extends ConsumerWidget {
                   ),
                 if (role == RoleType.family)
                   _MoreTile(
-                    leading: const Icon(Icons.add_rounded,
-                        color: AppColors.primary),
+                    leading:
+                        const Icon(Icons.add_rounded, color: AppColors.primary),
                     title: 'Añadir paciente',
                     titleColor: AppColors.primary,
                     onTap: () => context.push('/patients/create'),
@@ -204,8 +204,7 @@ class MoreScreen extends ConsumerWidget {
 
           const SizedBox(height: 20),
           OutlinedButton.icon(
-            onPressed: () =>
-                ref.read(authControllerProvider.notifier).logout(),
+            onPressed: () => ref.read(authControllerProvider.notifier).logout(),
             icon: const Icon(Icons.logout_rounded, color: AppColors.critical),
             label: const Text('Cerrar sesión',
                 style: TextStyle(color: AppColors.critical)),
@@ -285,11 +284,11 @@ class _MoreTile extends StatelessWidget {
               color: titleColor ?? AppColors.textPrimary)),
       subtitle: subtitle != null
           ? Text(subtitle!,
-              style: const TextStyle(
-                  fontSize: 12, color: AppColors.textSecondary))
+              style:
+                  const TextStyle(fontSize: 12, color: AppColors.textSecondary))
           : null,
-      trailing:
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+      trailing: const Icon(Icons.chevron_right_rounded,
+          color: AppColors.textSecondary),
       onTap: onTap,
     );
   }
@@ -310,9 +309,7 @@ class _RoleBadge extends StatelessWidget {
       ),
       child: Text(role.label,
           style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: role.accentFg)),
+              fontSize: 11, fontWeight: FontWeight.w700, color: role.accentFg)),
     );
   }
 }

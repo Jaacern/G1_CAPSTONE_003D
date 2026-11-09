@@ -18,6 +18,7 @@ abstract class PatientsRepository {
     required RoleType role,
     String? email,
   });
+
   /// Valida el token de invitación y vincula al usuario actual al círculo
   /// de cuidado del paciente. Devuelve la tarjeta del paciente ya vinculado.
   Future<PatientCard> acceptInvitation(String token);
@@ -289,7 +290,9 @@ class PatientsRepositoryHttp implements PatientsRepository {
 
   @override
   Future<Invitation> invite(
-      {required String patientId, required RoleType role, String? email}) async {
+      {required String patientId,
+      required RoleType role,
+      String? email}) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/patients/$patientId/invitations',
       data: {'role': role.apiValue, if (email != null) 'email': email},
@@ -319,8 +322,8 @@ class PatientsRepositoryHttp implements PatientsRepository {
 
   @override
   Future<WearableStatus> wearableStatus(String patientId) async {
-    final data =
-        await _api.get<Map<String, dynamic>>('/patients/$patientId/wearable/status');
+    final data = await _api
+        .get<Map<String, dynamic>>('/patients/$patientId/wearable/status');
     return WearableStatus.fromJson(data);
   }
 }
@@ -334,7 +337,7 @@ class PatientsRepositoryMock implements PatientsRepository {
       patientId: 'p-elena',
       fullName: 'Elena Ramírez',
       birthDate: DateTime(1948, 3, 12),
-      sex: 'female',
+      sex: 'F',
       conditions: const ['Hipertensión', 'Artrosis'],
       wearable: WearableStatus(
         wearableId: 'w-1',
@@ -346,7 +349,7 @@ class PatientsRepositoryMock implements PatientsRepository {
       patientId: 'p-jose',
       fullName: 'José Ramírez',
       birthDate: DateTime(1945, 11, 2),
-      sex: 'male',
+      sex: 'M',
       conditions: const ['Diabetes tipo 2'],
       wearable: WearableStatus(
         wearableId: 'w-2',
@@ -414,7 +417,9 @@ class PatientsRepositoryMock implements PatientsRepository {
 
   @override
   Future<Invitation> invite(
-      {required String patientId, required RoleType role, String? email}) async {
+      {required String patientId,
+      required RoleType role,
+      String? email}) async {
     await Future.delayed(const Duration(milliseconds: 300));
     final code = _generateUnusedCode();
     final expiresAt = DateTime.now().add(const Duration(hours: 48));

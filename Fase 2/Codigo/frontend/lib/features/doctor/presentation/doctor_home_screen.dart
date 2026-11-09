@@ -115,6 +115,12 @@ class _DoctorPatientCard extends ConsumerWidget {
                   color: AppColors.textSecondary),
             ],
           ),
+          // Domicilio: el otro desempate práctico (y útil si hay que ir).
+          if ((patient.address ?? '').trim().isNotEmpty)
+            _LineaDato(
+              icon: Icons.home_outlined,
+              texto: patient.address!.trim(),
+            ),
           // Los numeros, en la misma tarjeta. El semaforo dice que algo pasa;
           // esto dice que. Sin ello hay que entrar a la ficha de cada
           // paciente, mirar, salir y entrar al siguiente para comparar.
@@ -159,6 +165,39 @@ class _DoctorPatientCard extends ConsumerWidget {
         'M' => 'Masculino',
         _ => 'Otro',
       };
+}
+
+/// Una línea de dato con ícono, recortada a una línea para que la tarjeta no
+/// crezca sin control en pantallas angostas.
+class _LineaDato extends StatelessWidget {
+  const _LineaDato({required this.icon, required this.texto});
+
+  final IconData icon;
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 15, color: AppColors.textSecondary),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              texto,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Los ultimos valores del paciente, en una linea dentro de su tarjeta.

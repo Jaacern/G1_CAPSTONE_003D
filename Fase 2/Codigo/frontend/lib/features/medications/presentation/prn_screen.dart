@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../application/prn_providers.dart';
+import '../data/prn_repository.dart';
 import '../domain/prn.dart';
 
 /// Medicamentos SOS del paciente: qué hay indicado "solo si se necesita",
@@ -119,6 +121,17 @@ class _PrnCard extends ConsumerWidget {
                         fontWeight: FontWeight.w600,
                         color: AppColors.statusWarning)),
               ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: tope
+                    ? null
+                    : () => registrarUsoSos(context, ref, patientId, item),
+                icon: const Icon(Icons.add_task_rounded),
+                label: const Text('Registrar uso'),
+              ),
+            ),
           ],
         ),
       ),
@@ -143,3 +156,65 @@ class _PrnCard extends ConsumerWidget {
 
 String _hora(DateTime d) =>
     '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
+
+/// Pide el motivo y registra el uso del SOS. El backend valida el máximo de
+/// 24 h y el intervalo; aquí solo se muestra lo que responde.
+Future<void> registrarUsoSos(BuildContext context, WidgetRef ref,
+    String patientId, PrnItem item) async {
+  final motivo = await _pedirMotivo(context, item);
+  if (motivo == null || !context.mounted) return;
+  final repo = ref.read(prnRepositoryProvider);
+  try {
+    await repo.registerUse(patientId, item.itemId, reason: motivo);
+  } on ApiException catch (e) {
+    if (context.mounted) showAppSnackBar(context, e.message, error: true);
+    return;
+  }
+  ref.invalidate(prnItemsProvider(patientId));
+  ref.invalidate(prnUsesProvider(patientId));
+  if (context.mounted) {
+    showAppSnackBar(context, 'Uso de ${item.name} registrado.');
+  }
+}
+
+Future<String?> _pedirMotivo(BuildContext context, PrnItem item) {
+  final ctrl = TextEditingController();
+  return showDialog<String>(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setLocal) => AlertDialog(
+        title: Text('Registrar ${item.name}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Dosis: ${item.dose}. Queda con la hora de ahora.',
+                style: const TextStyle(fontSize: 13)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Motivo',
+                hintText: 'Ej: le falta el aire',
+              ),
+              onChanged: (_) => setLocal(() {}),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: ctrl.text.trim().length < 3
+                ? null
+                : () => Navigator.of(ctx).pop(ctrl.text.trim()),
+            child: const Text('Registrar'),
+          ),
+        ],
+      ),
+    ),
+  );
+}

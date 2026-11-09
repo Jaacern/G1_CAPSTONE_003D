@@ -109,8 +109,11 @@ class PatientListItem(BaseModel):
     active_alerts_count: int = 0
     critical_alerts_count: int = 0
     top_reason:       str | None = None
-    # Desempate cuando coinciden nombre y apellido (dos "Elena Rosales").
+    # Desempate cuando coinciden nombre y apellido (dos "Elena Rosales"): RUT,
+    # sexo y domicilio. Con eso el médico distingue a dos "Juanito Pérez".
     rut:              str | None = None
+    sex:              str | None = None
+    address:          str | None = None
     # Mini-resumen de signos vitales: últimas lecturas por tipo, para que el
     # médico reconozca al paciente de un vistazo sin abrir la ficha.
     vitals_summary:   list[dict] = []
@@ -1083,7 +1086,7 @@ async def list_patients(
             text(
                 """
                 SELECT p.id, p.full_name, p.photo_url, pm.role,
-                       p.rut_number, p.rut_dv,
+                       p.rut_number, p.rut_dv, p.sex, p.address,
                        date_part('year', age(p.birth_date))::int AS age,
                        COALESCE((
                            SELECT array_agg(pc.condition ORDER BY pc.condition)
@@ -1175,6 +1178,8 @@ async def list_patients(
             critical_alerts_count=int(r["critical_alerts"]),
             top_reason=r["top_reason"],
             rut=_rut(r),
+            sex=_SEX_DB_TO_API.get(r["sex"], r["sex"]),
+            address=r["address"],
             vitals_summary=await _vitals_summary(str(r["id"])),
         ))
     items.sort(key=lambda it: (

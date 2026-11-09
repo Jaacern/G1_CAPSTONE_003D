@@ -69,7 +69,27 @@ _CADA_HORAS = re.compile(r"\bc(?:ada)?\s*/?\s*(\d{1,2})\s*h(?:r?s?|oras?)?\b", r
 # "3 veces al dia", "2 veces por dia"
 _VECES_DIA = re.compile(r"\b(\d{1,2})\s*veces?\s*(?:al|por)\s*(?:d[ií]a|24\s*h)", re.I)
 
+# El OCR de una foto de receta se come espacios: "1 comprimido cada 24 horas"
+# vuelve como "1 comprimidocada 24 horas". No es un caso raro, es lo normal
+# cuando la linea esta apretada o el papel venia doblado, y cuesta la
+# indicacion entera: sin el espacio, "cada" ya no empieza palabra y la
+# frecuencia no se reconoce, asi que el borrador sale sin horarios.
+#
+# Se despegan solo estas palabras y solo cuando vienen pegadas DETRAS de
+# otra. Arreglar los espacios en general seria inventar texto; aca lo unico
+# que se asume es que ninguna palabra del castellano termina en "cada",
+# "veces" o "cad".
+_PEGADAS = re.compile(r"(?<=[a-záéíóúñ])(cada|veces|c/)", re.I)
+# El otro pegote frecuente es el numero: "comprimido3 veces al dia". Solo se
+# separa cuando lo que sigue es la frecuencia, para no partir un nombre que
+# lleva numero de verdad, como "Omega3" o "complejo B12".
+_PEGADO_NUM = re.compile(r"(?<=[a-záéíóúñ])(?=\d{1,2}\s*veces)", re.I)
 
+
+def _despegar(linea: str) -> str:
+    return _PEGADO_NUM.sub(" ", _PEGADAS.sub(r" \1", linea))
+
+# Momentos del dia escritos con palabras.
 _MOMENTOS = [
     (re.compile(r"\b(ma[ñn]ana|desayuno|ayunas|am\b)", re.I), "08:00"),
     (re.compile(r"\b(mediod[ií]a|almuerzo)", re.I),     "13:00"),
@@ -228,10 +248,14 @@ def leer_receta(texto: str, *, maximo: int = 12) -> list[Borrador]:
     borradores: list[Borrador] = []
     vistos: set[str] = set()
 
-    for linea in texto.splitlines():
-        linea = linea.strip()
-        if len(linea) < 6 or _RUIDO.match(linea):
+    for cruda in texto.splitlines():
+        cruda = cruda.strip()
+        if len(cruda) < 6 or _RUIDO.match(cruda):
             continue
+        # Se analiza la version despegada, pero origen guarda la linea tal
+        # como la leyo el motor: es la que el medico compara con la foto, y
+        # ahi conviene que se vea lo que el OCR entendio de verdad.
+        linea = _despegar(cruda)
 
         nombre, sobra = _nombre_e_instrucciones(linea)
         if not nombre:
@@ -262,7 +286,7 @@ def leer_receta(texto: str, *, maximo: int = 12) -> list[Borrador]:
             unit=unit,
             schedule=horarios,
             instructions=". ".join(notas),
-            origen=linea,
+            origen=cruda,
         )
         if not b.utilizable:
             continue

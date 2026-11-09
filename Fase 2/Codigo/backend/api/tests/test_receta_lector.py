@@ -159,6 +159,30 @@ def main():
           b and "850" in b.origen and "comprimido" in b.origen,
           b.origen if b else None)
 
+    # ---------------- espacios que el OCR se come ----------------
+    # Tesseract junta palabras cuando la linea viene apretada. Pasa en casi
+    # toda foto de receta y, sin tratarlo, la frecuencia se pierde entera.
+    print("espacios perdidos por el OCR")
+    b = uno("Metformina 850 mg - 1 comprimidocada 12 horas")
+    check("'comprimidocada 12 horas' sigue dando dos horarios",
+          b is not None and b.schedule == ["08:00", "20:00"],
+          b.schedule if b else None)
+    check("y no se lleva el pegote al nombre",
+          b is not None and b.name.lower() == "metformina",
+          b.name if b else None)
+    check("origen conserva la linea pegada, que es lo que leyo el motor",
+          b is not None and "comprimidocada" in b.origen,
+          b.origen if b else None)
+    b = uno("Paracetamol 500 mg - 1 comprimido3 veces al dia")
+    check("'comprimido3 veces al dia' tambien se recupera",
+          b is not None and len(b.schedule) == 3,
+          b.schedule if b else None)
+    # Lo que NO debe hacer: partir una palabra de verdad.
+    b = uno("Cadaverina 10 mg cada 24 horas")
+    check("no parte una palabra que empieza con esas letras",
+          b is not None and b.name.lower() == "cadaverina",
+          b.name if b else None)
+
     print()
     print(f"resultado: {ok} de {n}")
     # Codigo de salida para que el CI lo vea.

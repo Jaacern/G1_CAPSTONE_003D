@@ -8,6 +8,9 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/alerts/presentation/alerts_screen.dart';
 import '../../features/alerts/presentation/alert_detail_screen.dart';
+import '../../features/caregiver/presentation/caregiver_log_screen.dart';
+import '../../features/caregiver/presentation/caregiver_tasks_screen.dart';
+import '../../features/caregiver/presentation/caregiver_today_screen.dart';
 import '../../features/caregiver/presentation/checkin_screen.dart';
 import '../../features/caregiver/presentation/handover_screen.dart';
 import '../../features/caregiver/presentation/incident_screen.dart';
@@ -148,6 +151,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/cg/incident', builder: (_, st) => IncidentScreen(patientId: st.uri.queryParameters['patient']!)),
       GoRoute(path: '/cg/handover', builder: (_, st) => HandoverScreen(patientId: st.uri.queryParameters['patient']!)),
       GoRoute(path: '/cg/reports', builder: (_, __) => const CaregiverReportsScreen()),
+      // Estas tres pantallas existian sin ruta ni nadie que las instanciara,
+      // asi que ninguna cuidadora podia abrirlas. Con ellas se caian tambien
+      // el check-in, la observacion, el incidente y el relevo, porque los
+      // unicos botones que llevaban alla vivian adentro.
+      GoRoute(path: '/cg/today', builder: (_, __) => const CaregiverTodayScreen()),
+      GoRoute(path: '/cg/tasks', builder: (_, __) => const CaregiverTasksScreen()),
+      GoRoute(path: '/cg/log', builder: (_, __) => const CaregiverLogScreen()),
 
       // --- Médico ---
       GoRoute(

@@ -342,6 +342,49 @@ async def _ficha_base(db: AsyncSession, patient_id: str) -> tuple[str, list]:
             fuentes.append(Fuente(tabla="alerts", id=str(a["id"]),
                                   label="Alertas"))
 
+    # Texto de los documentos del expediente, el que dejo el OCR. Sin esto
+    # el asistente no puede responder sobre una receta o un examen aunque la
+    # foto este subida: para el modelo una imagen no existe.
+    #
+    # Se recortan los documentos a 1200 caracteres cada uno y se toman los
+    # cuatro mas recientes. El examen de laboratorio de dos paginas se come
+    # el contexto entero, y lo que importa de el casi siempre esta arriba.
+    documentos = (
+        await db.execute(
+            text(
+                """
+                SELECT f.id,
+                       COALESCE(NULLIF(f.original_name, ''), 'documento')
+                           AS nombre,
+                       to_char(f.created_at, 'DD-MM-YYYY') AS cuando,
+                       left(o.texto, 1200) AS texto,
+                       length(o.texto)     AS largo
+                FROM file_ocr o
+                JOIN files f ON f.id = o.file_id
+                WHERE f.patient_id = :pid
+                  AND f.scope = 'patient'
+                  AND f.status = 'stored'
+                  AND f.purged_at IS NULL
+                ORDER BY f.created_at DESC
+                LIMIT 4
+                """
+            ),
+            {"pid": patient_id},
+        )
+    ).mappings().all()
+    for d in documentos:
+        recorte = d["texto"].strip()
+        if len(recorte) < 20:
+            # Una foto sin texto legible. Meterla solo gastaria contexto.
+            continue
+        cola = " (recortado)" if d["largo"] > len(recorte) else ""
+        partes.append(
+            f"Documento del expediente \"{d['nombre']}\" ({d['cuando']}), "
+            f"texto leido de la imagen{cola}: {recorte}"
+        )
+        fuentes.append(Fuente(tabla="files", id=str(d["id"]),
+                              label=f"Documento: {d['nombre']}"))
+
     return "\n".join(partes), fuentes
 
 

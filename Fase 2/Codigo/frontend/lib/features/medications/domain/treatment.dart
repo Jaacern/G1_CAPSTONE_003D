@@ -260,6 +260,7 @@ class TreatmentItemDraft {
     this.removed = false,
     this.isPrn = false,
     this.scheduleLabel,
+    this.prnMinIntervalMin,
   });
 
   String name;
@@ -272,6 +273,7 @@ class TreatmentItemDraft {
   bool removed;
   bool isPrn;
   String? scheduleLabel;
+  int? prnMinIntervalMin; // solo SOS: minutos entre usos
 
   /// Crea el borrador a partir de una indicación vigente (para precargar).
   factory TreatmentItemDraft.fromItem(TreatmentItem it) => TreatmentItemDraft(
@@ -283,6 +285,10 @@ class TreatmentItemDraft {
         continuesItemId: it.itemId,
         isPrn: it.isPrn,
         scheduleLabel: it.scheduleLabel,
+        // Se conservan el vínculo con el catálogo (la unidad sigue fija y
+        // la dosis se revalida al guardar) y el intervalo del SOS.
+        drugCode: it.drugCode,
+        prnMinIntervalMin: it.prnMinIntervalMin,
       );
 
   Map<String, dynamic> toJson() => {
@@ -297,5 +303,7 @@ class TreatmentItemDraft {
         if (scheduleLabel != null && scheduleLabel!.trim().isNotEmpty)
           'schedule_label': scheduleLabel,
         if (continuesItemId != null) 'continues_item_id': continuesItemId,
+        if (isPrn && prnMinIntervalMin != null)
+          'prn_min_interval_min': prnMinIntervalMin,
       };
 }

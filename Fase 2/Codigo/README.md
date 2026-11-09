@@ -411,18 +411,119 @@ flutter run \
 
 ## 🔐 Seguridad
 
-AgeCare implementa múltiples capas de seguridad siguiendo el enfoque **DevSecOps**:
+AgeCare se construye con enfoque **DevSecOps**: la seguridad no es una capa que se
+añade al final, sino un control que acompaña cada cambio. Las garantías base del
+sistema son:
 
 | Mecanismo | Descripción |
 |-----------|-------------|
-| 🔑 **JWT** | Autenticación stateless con tokens firmados y rotación de refresh tokens |
-| 🔒 **Cifrado E2E** | Cifrado de extremo a extremo en comunicaciones |
-| 🛡️ **DevSecOps** | Análisis de seguridad integrado en el pipeline CI/CD |
-| 🏥 **RBAC** | Control de acceso basado en roles (Familiar / Cuidador / Médico / Admin) |
+| 🔑 **JWT** | Autenticación stateless con tokens firmados (HS256) y rotación de refresh tokens con detección de reuso |
+| 🧱 **Reconocimiento estricto de entrada (LangSec)** | Todo input se valida contra un esquema tipado (Pydantic) en el borde, antes de procesarse; los enums cierran los valores aceptados |
+| 🏥 **RBAC por recurso** | Autorización por membresía viva en cada paciente (`patient_members`), no solo por rol global |
+| 🚦 **Rate limiting** | Límite por IP en login, refresh, vinculación de dispositivos, SOS e IA/voz (SlowAPI) |
+| 🗄️ **SQL parametrizado** | Todas las consultas usan parámetros; el SQL dinámico solo compone identificadores desde listas blancas del servidor |
 | 📋 **Auditoría** | Registro de acciones críticas sobre datos clínicos |
-| ☁️ **Azure Security** | Configuración de seguridad a nivel de infraestructura cloud |
 
-> ⚠️ Los datos de salud de adultos mayores se tratan conforme a estándares de privacidad y protección de datos sensibles. El archivo `.env` con credenciales reales **nunca** se versiona.
+> ⚠️ Los datos de salud de adultos mayores se tratan conforme a estándares de
+> privacidad y protección de datos sensibles. El archivo `.env` con credenciales
+> reales **nunca** se versiona (está en `.gitignore`).
+
+### 🛡️ Auditoría de seguridad ofensiva (Red Team + DevSecOps)
+
+Dado que gran parte del código se produjo con asistencia de **IA generativa**, se
+realizó una **auditoría de seguridad ofensiva** sobre todo el monorepo, con el
+criterio de que *el código asistido por IA es verosímil pero no confiable por
+defecto*: compila, luce idiomático y suele traer controles "de fachada" (un
+chequeo que existe pero que nada activa, una validación por lista negra, un
+secreto de ejemplo que se cuela a producción). Esos son precisamente los patrones
+que un atacante busca.
+
+**Marcos aplicados:** OWASP Top 10 (web), OWASP API Security Top 10, OWASP Mobile
+Top 10, revisión de CVE de dependencias, endurecimiento de contenedores y
+principios **LangSec** (*Language-theoretic Security*: reconocer por completo el
+lenguaje de entrada antes de procesarlo, y rechazar lo ambiguo).
+
+#### Cómo se aplica el estándar en un monorepo como el nuestro
+
+El repo mezcla documentación académica, backend Python, frontend Dart, app de
+reloj Kotlin, SQL e infraestructura. La auditoría se organizó **por superficie de
+ataque y límite de confianza**, no por carpeta:
+
+- **Borde HTTP (backend):** autenticación, sesiones, autorización por recurso
+  (IDOR/BOLA), inyección SQL, SSRF, manejo de archivos, rate limiting.
+- **Cliente (frontend/app):** almacenamiento de tokens, secretos embebidos,
+  comunicación en claro, apertura de URLs/esquemas, logging sensible.
+- **Cadena de suministro:** CVE de dependencias (`requirements.txt`, `pubspec.yaml`).
+- **Infraestructura:** `Dockerfile`, `docker-compose.yml`, manejo de secretos.
+- **Fuera de alcance de código:** la documentación y las evidencias no se auditan
+  como software, pero sí se verifica que no filtren secretos.
+
+Cada hallazgo exige un **límite de confianza real cruzado** (un principal de menor
+privilegio, un recurso afectado y un resultado concreto); no se reportan "malas
+prácticas" sin impacto demostrable. Los fixes son el cambio mínimo que restablece
+la invariante en el último punto de decisión confiable.
+
+#### Hallazgos y remediación
+
+| ID | Hallazgo | Marco | Severidad | Estado |
+|----|----------|-------|:---------:|:------:|
+| **F1** | Bloqueo por intentos del código de vinculación era cosmético (`attempts` nunca se incrementaba) | A07 / API | 🔴 Crítico | ✅ Corregido |
+| **F2** | API key de proveedor de IA viva en `.env` del working tree / respaldos | A05 | 🟠 Alto | 🔑 Rotación (operativa) |
+| **F3** | Sin rate limiting en toda la API (fuerza bruta y abuso de recursos) | A07 / API4 | 🟠 Alto | ✅ Corregido |
+| **F4** | Login sin freno a intentos fallidos | A07 | 🟠 Alto | ✅ Corregido |
+| **F5** | Secreto JWT por defecto con *fallback silencioso* en config y compose | A02 / A05 | 🟠 Alto | ✅ Corregido |
+| **F6** | Dependencias con CVE: `python-jose 3.3.0 → 3.5.0`, `python-multipart 0.0.12 → 0.0.31` (DoS de parser — caso LangSec) | A06 | 🟡 Medio | ✅ Corregido |
+| **F7** | Tokens de sesión en `localStorage` (Flutter Web) | Mobile M9 | 🟡 Medio | 📋 Planificado |
+| **F8** | Rol `caregiver` puede recetar/editar/suspender medicación | A01 / API5 | 🟡 Medio | 📋 Por decisión de producto |
+
+**Verificado y sin hallazgos** (defensa ya correcta): inyección SQL (parametrización
++ listas blancas), IDOR/BOLA a nivel de objeto en los 19 routers, SSRF (las URLs
+salientes solo provienen de configuración, no de entrada del usuario), inyección de
+comandos y deserialización (ausentes), rotación y detección de reuso de refresh
+tokens, hashing de contraseñas (bcrypt) y de tokens (SHA-256), y la *no*
+explotabilidad del `alg:none` / confusión de algoritmos de `python-jose` porque el
+código fija `algorithms=["HS256"]` de forma explícita.
+
+#### Correcciones aplicadas en esta entrega
+
+- **F1 — Conteo real de intentos del código de vinculación** (`routers/devices.py`):
+  cada intento fallido sobre un código vigente incrementa `attempts` (capado en el
+  máximo para no violar el `CHECK` de la tabla) y lo bloquea con `429`. La defensa
+  contra la fuerza bruta *ciega* (sin conocer el paciente) la aporta el rate limiting
+  por IP de F3, porque un código errado no coincide con ninguna fila y no habría
+  contador que tocar — las dos capas se complementan.
+- **F3 / F4 — Rate limiting por IP** (`app/ratelimit.py`, `app/main.py`): SlowAPI con
+  límites por endpoint sensible (login, refresh, vinculación, SOS, IA/voz), con el
+  error traducido al formato estándar (`RATE_LIMITED`, `429`).
+- **F5 — Arranque seguro del secreto JWT** (`app/config.py`, `app/main.py`,
+  `docker-compose.yml`): la API **se niega a arrancar** si `JWT_SECRET` falta, es el
+  valor por defecto del repo o es demasiado corto. Se eliminó el `fallback` silencioso
+  del `docker-compose`. Mejor no servir que servir firmando con un secreto público.
+- **F6 — Actualización de dependencias con CVE** (`requirements.txt`): `python-jose`
+  `3.3.0 → 3.5.0` (CVE-2024-33663/33664, el *JWT bomb* por JWE) y `python-multipart`
+  `0.0.12 → 0.0.31` (serie de CVE de DoS del parser: ReDoS de `Content-Type`,
+  preámbulo/epílogo, cabeceras sin límite, `Content-Length` negativo). Son fallos
+  **LangSec** de libro: parsers que aceptan entrada malformada y colapsan; la versión
+  nueva es un reconocedor más estricto. No se actualizó a ciegas — se reconstruyó la
+  imagen y se validó auth (login/refresh/me) y subida multipart contra Postgres real
+  antes de fijar las versiones, sin regresiones.
+
+> **Validación:** los fixes se probaron contra el backend real (contenedores levantados):
+> arranque rechazado sin secreto, login cortado al superar el límite, uso legítimo intacto
+> tras la ventana, y el contador de intentos clavándose en el máximo sin romper el esquema.
+> Lo que **no** se pudo validar sin un despliegue productivo (config de secretos, DoS bajo
+> carga de F6, CSP del hosting web) queda señalado explícitamente en el informe de auditoría.
+
+#### Nota sobre desarrollo asistido por IA
+
+El uso de IA aceleró la construcción, pero introdujo una clase de riesgo propia:
+controles que *parecen* implementados. F1 es el caso de libro — el comentario, el
+`CHECK` en SQL y el chequeo en Python afirmaban un bloqueo que **nunca se ejecutaba**.
+Por eso la postura del proyecto es tratar todo código generado como no confiable hasta
+auditarlo, y verificar el comportamiento contra el sistema real, no contra lo que el
+código dice que hace.
+
+*Auditoría y remediación: **Javier Cerna (jaacern)** — rol Tech Lead · DevSecOps · Red Team.*
 
 ---
 

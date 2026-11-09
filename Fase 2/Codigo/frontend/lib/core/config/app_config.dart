@@ -67,8 +67,12 @@ class AppConfig {
   /// Documentos clínicos del paciente (recetas, estudios).
   static bool get hasDocuments => true;
 
-  /// OCR / escaneo de recetas para crear medicamentos. Sin backend aún.
-  static bool get hasPrescriptionScan => useMocks;
+  /// OCR / escaneo de recetas para proponer indicaciones.
+  ///
+  /// El servidor puede tener el motor apagado (OCR_PROVIDER=none), y en ese
+  /// caso responde 503 con OCR_NOT_CONFIGURED. Eso lo avisa la pantalla
+  /// cuando pasa; no se puede saber desde aquí antes de preguntar.
+  static bool get hasPrescriptionScan => true;
 
   /// Fotos de familia y feed de contenido del adulto mayor.
   static bool get hasElderContent => true;

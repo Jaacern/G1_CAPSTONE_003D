@@ -168,7 +168,7 @@ class Medication {
         schedule: ((json['times'] ?? json['schedule'] ?? []) as List)
             .map((e) => e.toString())
             .toList(),
-        instructions: json['instructions'] as String?,
+        instructions: sinPrefijoDeForma(json['instructions'] as String?),
         // Backend: is_active. Fallback a active (mock).
         active: (json['is_active'] ?? json['active'] ?? true) as bool,
         startDate: json['start_date'] != null

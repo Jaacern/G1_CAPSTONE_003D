@@ -33,7 +33,7 @@ Notas de alcance:
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,6 +41,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.deps import PatientContext, get_patient_member
 from app.errors import ApiError
+from app.ratelimit import LIMIT_DEVICE_LINK, limiter
 from app.security import (
     generate_device_token,
     generate_link_code,
@@ -414,16 +415,36 @@ async def device_self_unlink(
 # Vincular dispositivo con el código (lo llama el reloj, sin JWT de persona)
 # --------------------------------------------------------------------------
 @router.post("/devices/link", response_model=DeviceLinkOut, status_code=201)
+@limiter.limit(LIMIT_DEVICE_LINK)
 async def link_device(
+    request: Request,
     payload: DeviceLinkIn,
     db: AsyncSession = Depends(get_db),
 ):
     """Canjea un código por un token de dispositivo.
 
     Validaciones: el código debe existir, estar vigente (no usado/revocado/
-    vencido) y no haber superado los intentos. Si el código existe pero no
-    coincide nada, igual contamos un intento sobre los códigos vigentes del
-    paciente para activar el bloqueo por fuerza bruta.
+    vencido) y no haber superado los intentos.
+
+    Defensa contra fuerza bruta del código de 6 dígitos (1.000.000 de
+    combinaciones) en dos capas:
+
+      1. Por fila (aquí): cada canje fallido sobre un código vigente
+         incrementa device_link_codes.attempts y, al llegar a MAX_LINK_ATTEMPTS,
+         el código queda inservible (429). Esto frena al atacante que ya conoce
+         un código vigente y lo está afinando. HISTÓRICO: el chequeo
+         `attempts >= MAX_LINK_ATTEMPTS` existía, pero el contador nunca se
+         incrementaba, así que el "bloqueo a 5 intentos" era cosmético. Esta
+         función ahora sí lo incrementa.
+
+      2. Por IP (en main.py, SlowAPI): /devices/link tiene rate limiting, que
+         es la única defensa efectiva contra la fuerza bruta CIEGA, donde el
+         atacante prueba códigos al azar sin conocer el paciente (cada código
+         errado no matchea ninguna fila, así que no hay un contador por fila
+         que tocar). Las dos capas se complementan: la fila cubre el acierto
+         parcial, la IP cubre el barrido masivo.
+
+    Endurecido por jaacern (auditoría de seguridad, 2026-11) — hallazgo F1.
     """
     code_hash = hash_token(payload.code)
 
@@ -453,8 +474,14 @@ async def link_device(
     now = datetime.now(timezone.utc)
     if link["used_at"] is not None or link["revoked_at"] is not None:
         raise invalid
+
+    # Vencido: cuenta como intento fallido antes de rechazar, para que afinar
+    # un código ya vencido tampoco sea gratis.
     if link["expires_at"] <= now:
+        await _contar_intento_fallido(db, str(link["id"]), link["attempts"])
         raise invalid
+
+    # Ya bloqueado por intentos previos.
     if link["attempts"] >= MAX_LINK_ATTEMPTS:
         raise ApiError(
             status_code=429,
@@ -804,6 +831,32 @@ async def _resolve_elder_account(db: AsyncSession, patient_id: str, patient) -> 
     )
 
     return elder_user_id
+
+
+async def _contar_intento_fallido(db: AsyncSession, link_id: str, actuales: int) -> None:
+    """Suma 1 a device_link_codes.attempts, capado en MAX_LINK_ATTEMPTS.
+
+    Se capa a propósito: la columna tiene CHECK (attempts BETWEEN 0 AND 5), así
+    que un `attempts + 1` sin tope reventaría la transacción al sexto fallo.
+    Con LEAST(...) el contador se queda clavado en el máximo y el código queda
+    bloqueado de forma estable. Hace commit propio para que el intento quede
+    registrado aunque la petición termine en error.
+
+    Endurecido por jaacern (auditoría de seguridad, 2026-11) — hallazgo F1.
+    """
+    if actuales >= MAX_LINK_ATTEMPTS:
+        return
+    await db.execute(
+        text(
+            """
+            UPDATE device_link_codes
+               SET attempts = LEAST(attempts + 1, :max)
+             WHERE id = :id
+            """
+        ),
+        {"id": link_id, "max": MAX_LINK_ATTEMPTS},
+    )
+    await db.commit()
 
 
 def _json_or_none(value) -> str | None:

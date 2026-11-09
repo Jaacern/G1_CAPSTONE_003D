@@ -100,4 +100,10 @@ void main() {
     expect(find.textContaining('Alergias:'), findsOneWidget);
     expect(find.textContaining('Prioridad'), findsOneWidget);
   });
+
+  testWidgets('la tarjeta dice cuando fue la ultima lectura', (tester) async {
+    await montar(tester);
+
+    expect(find.textContaining('Última lectura'), findsNWidgets(2));
+  });
 }

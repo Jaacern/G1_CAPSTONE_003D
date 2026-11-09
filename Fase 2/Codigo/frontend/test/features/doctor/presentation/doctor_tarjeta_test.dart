@@ -83,7 +83,8 @@ void main() {
 
     expect(find.text('Crónico: Hipertensión arterial (HTA) · Artrosis'),
         findsOneWidget);
-    expect(find.text('Crónico: Diabetes mellitus tipo 2 (DM2)'), findsOneWidget);
+    expect(
+        find.text('Crónico: Diabetes mellitus tipo 2 (DM2)'), findsOneWidget);
   });
 
   testWidgets('prioridad y complejidad salen como etiquetas', (tester) async {
@@ -105,6 +106,19 @@ void main() {
     await montar(tester);
 
     expect(find.textContaining('Última lectura'), findsNWidgets(2));
+  });
+
+  testWidgets('en pantalla ancha antecedentes y vitales van lado a lado',
+      (tester) async {
+    await montar(tester, ancho: 1024);
+
+    final alergia = tester.getTopLeft(find.text('Alergias: Penicilina'));
+    final lectura =
+        tester.getTopLeft(find.textContaining('Última lectura').first);
+    // Los vitales quedan a la derecha de los antecedentes, a la misma altura
+    // aproximada, en vez de debajo.
+    expect(lectura.dx, greaterThan(alergia.dx + 300));
+    expect((lectura.dy - alergia.dy).abs(), lessThan(40));
   });
 
   testWidgets('con todos los datos la tarjeta cabe en 320 dp', (tester) async {

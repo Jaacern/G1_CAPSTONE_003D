@@ -113,13 +113,15 @@ class MedicationsRepositoryHttp implements MedicationsRepository {
   @override
   Future<PrescriptionDraft> scanPrescription(
       String patientId, String fileUrl) async {
-    // El backend aún no tiene OCR de recetas. Evitamos llamar a un endpoint
-    // inexistente y damos un mensaje claro de "Próximamente".
-    throw ApiException(
-      statusCode: 501,
-      code: 'NOT_IMPLEMENTED',
-      message: 'El escaneo de recetas (OCR) estará disponible próximamente.',
+    // Lo que vuelve son BORRADORES: el servidor no guarda nada. Las dosis
+    // las confirma el médico campo por campo en el formulario, porque un
+    // "50 mg" borroso se lee "500" y de aquí sale lo que se le da a una
+    // persona de 78 años.
+    final data = await _api.post<Map<String, dynamic>>(
+      '/patients/$patientId/medications/scan',
+      data: {'media_url': fileUrl},
     );
+    return PrescriptionDraft.fromJson(data);
   }
 }
 

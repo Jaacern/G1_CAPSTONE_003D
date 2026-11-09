@@ -341,8 +341,7 @@ Fase 2/Codigo/
 ├── 📁 watch_app/               # App de reloj (Wear OS, Kotlin)
 │   └── app/src/main/           # HeartRateService · VitalsUploader · MainActivity
 │
-├── 📄 README.md                # Este documento
-└── 📄 TESTING.md               # Guía de pruebas
+└── 📄 README.md                # Este documento (incluye guía de ejecución y pruebas)
 ```
 
 ---
@@ -374,6 +373,30 @@ docker compose up -d db api      # o: podman compose up -d db api
 #   - Docs API:    http://localhost:8000/docs
 #   - PostgreSQL:  localhost:5432
 ```
+
+#### Instalar las dependencias de Python (local, sin Docker)
+
+> 💡 Si al correr un script de Python sale `ModuleNotFoundError` (por ejemplo
+> `No module named 'fastapi'` o `'slowapi'`), es porque faltan las dependencias
+> instaladas. No edites `requirements.txt`: ya está completo, solo hay que
+> instalarlo. Suele pasar tras un `git pull` que agregó una dependencia nueva.
+
+```bash
+cd backend/api
+
+# Crear y activar el entorno virtual (una sola vez)
+python3 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+
+# Instalar las dependencias (repetir tras cada pull que agregue alguna)
+pip install -r requirements.txt
+```
+
+> 🚧 **Pendiente (más adelante):** el **OCR de recetas** está en desarrollo; cuando
+> se use, necesita el binario `tesseract` en el sistema
+> (`sudo apt-get install -y tesseract-ocr tesseract-ocr-spa`). La **guía de
+> pruebas** (`python tests/correr.py` con una base Postgres levantada) se
+> documentará aquí cuando esté lista.
 
 ### Frontend (Flutter)
 
@@ -534,7 +557,7 @@ código dice que hace.
 | 📋 ERS (Especificación de Requisitos) | Requisitos funcionales y no funcionales del sistema | ✅ Fase 2 |
 | 📐 Arquitectura del Sistema | Diagrama detallado de componentes y flujos | ✅ Fase 2 |
 | 🗄️ Modelo de Datos | Esquema ER completo de PostgreSQL + diccionario de datos | ✅ Fase 2 |
-| 🧪 Guía de Pruebas | Ver [`TESTING.md`](./TESTING.md) | ✅ Fase 2 |
+| 🧪 Guía de Pruebas | Ver [Instalación y Ejecución](#️-instalación-y-ejecución) → *Backend en local sin Docker* | ✅ Fase 2 |
 | 📊 Diagramas UML | Casos de uso, clases y secuencia | 🔄 En progreso |
 | 📖 Manual Técnico | Guía de despliegue y operación | ⏳ Pendiente |
 | 🎤 Presentación Final | Presentación para comisión evaluadora | ⏳ Pendiente |

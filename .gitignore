@@ -39,3 +39,6 @@ watch_app/app/libs/
 .idea/
 *.iml
 local.properties
+# Kiro (config local del IDE) y material de apoyo del skill de auditoria.
+.kiro/
+security-audit-skill/

@@ -308,16 +308,42 @@ class _VitalesEnLinea extends ConsumerWidget {
         vitales.valueOrNull?.where((v) => v.hasData).toList() ?? const [];
     if (conDatos.isEmpty) return const SizedBox.shrink();
 
+    // La lectura más reciente de todas: un valor sin hora no sirve para
+    // decidir (un pulso de hace 3 días no dice cómo está hoy).
+    final ultima = conDatos
+        .map((v) => v.measuredAt)
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+
     return Padding(
       padding: const EdgeInsets.only(top: 10),
-      child: Wrap(
-        spacing: 14,
-        runSpacing: 6,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (final v in conDatos) _ValorSuelto(vital: v),
+          Wrap(
+            spacing: 14,
+            runSpacing: 6,
+            children: [
+              for (final v in conDatos) _ValorSuelto(vital: v),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Última lectura ${_hace(ultima)}',
+            style: const TextStyle(
+                fontSize: 11, color: AppColors.textSecondary),
+          ),
         ],
       ),
     );
+  }
+
+  static String _hace(DateTime dt) {
+    final d = DateTime.now().difference(dt);
+    if (d.inMinutes < 1) return 'recién';
+    if (d.inMinutes < 60) return 'hace ${d.inMinutes} min';
+    if (d.inHours < 24) return 'hace ${d.inHours} h';
+    if (d.inDays == 1) return 'ayer';
+    return 'hace ${d.inDays} días';
   }
 }
 

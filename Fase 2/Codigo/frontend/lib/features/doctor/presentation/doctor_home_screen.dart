@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../alerts/domain/models.dart';
 import '../../health/application/health_providers.dart';
 import '../../health/domain/models.dart' as health;
 import '../../patients/application/patients_providers.dart';
@@ -91,23 +92,10 @@ class _DoctorPatientCard extends ConsumerWidget {
                   ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  WellbeingChip(status: patient.wellbeingStatus),
-                  if (patient.activeAlertsCount > 0) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      '${patient.activeAlertsCount} alerta(s)',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.statusAttention,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+              // El semaforo es lo unico que va a la derecha del nombre. El
+              // conteo de alertas se bajo a la linea de estado porque en 320
+              // dp "2 alertas activas" no cabe aqui y desbordaba la tarjeta.
+              WellbeingChip(status: patient.wellbeingStatus),
               const SizedBox(width: 4),
               const Icon(Icons.chevron_right_rounded,
                   color: AppColors.textSecondary),
@@ -117,6 +105,27 @@ class _DoctorPatientCard extends ConsumerWidget {
           // esto dice que. Sin ello hay que entrar a la ficha de cada
           // paciente, mirar, salir y entrar al siguiente para comparar.
           _VitalesEnLinea(patientId: patient.patientId),
+          if (patient.activeAlertsCount > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.notifications_active_rounded,
+                      size: 15, color: AppColors.statusAttention),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      textoDeAlertasActivas(patient.activeAlertsCount),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.statusAttention,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

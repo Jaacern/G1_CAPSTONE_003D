@@ -1,0 +1,121 @@
+# Revisa el backend en cada subida.
+#
+# Las pruebas hablan con el esquema real: aplican datos, llaman al endpoint y
+# comprueban lo que quedo en la base. Asi que no hay forma de correrlas sin
+# una base de verdad, y por eso este job levanta un Postgres 16 en vez de
+# simular nada.
+#
+# No necesita levantar uvicorn: las pruebas montan la aplicacion FastAPI en el
+# mismo proceso con httpx.ASGITransport, asi que pasan por todos los
+# middlewares y dependencias sin abrir un puerto.
+name: Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Fase 2/Codigo/backend/**'
+      - '.github/workflows/backend.yml'
+  pull_request:
+    paths:
+      - 'Fase 2/Codigo/backend/**'
+      - '.github/workflows/backend.yml'
+  workflow_dispatch:
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      db:
+        # La misma version que el docker-compose del proyecto. Con otra, un
+        # fallo del CI no diría nada sobre lo que corre en la maquina de nadie.
+        image: postgres:16
+        env:
+          POSTGRES_USER: agecare
+          POSTGRES_PASSWORD: agecare
+          POSTGRES_DB: agecare
+        ports:
+          - 5432:5432
+        # Sin esto los pasos arrancan antes de que Postgres acepte conexiones
+        # y el primero falla por carrera, no por el codigo.
+        options: >-
+          --health-cmd "pg_isready -U agecare -d agecare"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: agecare
+      POSTGRES_PASSWORD: agecare
+      POSTGRES_DB: agecare
+      JWT_SECRET: solo-para-el-ci
+      TIMEZONE: America/Santiago
+      STORAGE_BACKEND: local
+      STORAGE_LOCAL_DIR: /tmp/agecare-files
+      STORAGE_PUBLIC_BASE_URL: http://testserver
+      # Sin proveedor, el asistente y la voz responden 503 con un codigo que
+      # la aplicacion distingue. Las pruebas comprueban justamente eso, asi
+      # que no hace falta ninguna clave.
+      ASSISTANT_PROVIDER: none
+      SPEECH_PROVIDER: none
+      # El OCR si se prueba de verdad, con el motor encendido: es el unico
+      # modo de saber si el binario de tesseract esta donde la imagen dice.
+      OCR_PROVIDER: tesseract
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar tesseract
+        # El mismo paquete que instala el Dockerfile, con el idioma espanol.
+        # Va aparte de pip porque pytesseract es solo un envoltorio: sin el
+        # binario, las pruebas del OCR fallan con un error que no se parece
+        # en nada a la causa.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            tesseract-ocr tesseract-ocr-spa
+          tesseract --version | head -1
+
+      - uses: actions/setup-python@v5
+        with:
+          # La misma que la imagen del Dockerfile.
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: 'Fase 2/Codigo/backend/api/requirements.txt'
+
+      - name: Instalar dependencias
+        working-directory: 'Fase 2/Codigo/backend/api'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Aplicar el esquema
+        working-directory: 'Fase 2/Codigo/backend'
+        # En el orden del nombre, que es el mismo que usa
+        # docker-entrypoint-initdb.d al crear el volumen. ON_ERROR_STOP para
+        # que un .sql roto frene aqui y no se note doce pruebas despues.
+        run: |
+          export PGPASSWORD=agecare
+          for f in sql/*.sql; do
+            echo "--- $f"
+            psql -h 127.0.0.1 -p 5432 -U agecare -d agecare -v ON_ERROR_STOP=1 -q -f "$f"
+          done
+
+      - name: Comprobar el aplicador de migraciones
+        working-directory: 'Fase 2/Codigo/backend/api'
+        # Prueba de humo del modo que usa el contenedor al arrancar. Sobre una
+        # base recien creada tiene que anotar los archivos sin reejecutarlos.
+        # Si esto se rompe, el despliegue no levanta.
+        run: |
+          export AGECARE_SQL_DIR="$GITHUB_WORKSPACE/Fase 2/Codigo/backend/sql"
+          python -m app.migrate --auto
+
+      - name: Correr las pruebas
+        working-directory: 'Fase 2/Codigo/backend/api'
+        run: |
+          mkdir -p "$STORAGE_LOCAL_DIR"
+          python tests/correr.py

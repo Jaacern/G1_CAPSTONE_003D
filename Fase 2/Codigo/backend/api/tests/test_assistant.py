@@ -246,15 +246,25 @@ async def main(client, rr):
             ok += 1; print("  OK   sigue en la misma conversacion")
         else:
             print(f"  FALLA {r2.status_code}")
-        # La conversacion puede traer consultas previas de los datos de
-        # demo, asi que se mide que el historial haya CRECIDO en el par de
-        # la pregunta anterior, no que valga exactamente dos.
+        # Al modelo le llegan las preguntas anteriores, NO sus respuestas.
+        # Es a proposito: con las respuestas copiaba las cifras y fechas que
+        # habia contestado antes en vez de leer el expediente de ahora, y un
+        # error viejo se repetia para siempre. Se comprueba las dos mitades,
+        # que la pregunta anterior este y que la respuesta anterior no, que
+        # es la parte que de verdad puede volver a romperse.
+        hist = FALSO.llamadas[-1]["historial"]
+        texto_hist = " ".join(m.get("content", "") for m in hist)
         n += 1
-        crecio = len(FALSO.llamadas[-1]["historial"]) - len(FALSO.llamadas[-2]["historial"])
-        if crecio == 2 and len(FALSO.llamadas[-1]["historial"]) % 2 == 0:
-            ok += 1; print("  OK   le manda la pregunta y respuesta anteriores")
+        if hist and all(m.get("role") == "system" for m in hist) \
+                and "que medicamentos toma" in texto_hist:
+            ok += 1; print("  OK   le manda las preguntas anteriores")
         else:
-            print(f"  FALLA el historial crecio en {crecio}")
+            print(f"  FALLA no le llego la pregunta anterior: {hist}")
+        n += 1
+        if "Respuesta a:" not in texto_hist:
+            ok += 1; print("  OK   no le manda sus respuestas anteriores")
+        else:
+            print("  FALLA le mando su propia respuesta anterior")
 
         async with _eng.begin() as c:
             titulo = (await c.execute(_t(

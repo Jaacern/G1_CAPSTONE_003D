@@ -12,16 +12,18 @@ Notas de alcance para este hito:
 import re
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Request, Response, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
-from app.deps import CurrentUser, get_current_user
+from app.deps import CurrentUser, get_current_user, is_verified_doctor
 from app.errors import ApiError
 from app.ratelimit import LIMIT_LOGIN, LIMIT_REFRESH, limiter
+from app.validators import clean_person_name, normalize_phone, parse_rut
 from app.security import (
     create_access_token,
     generate_refresh_token,
@@ -79,6 +81,10 @@ async def _load_memberships(db: AsyncSession, user_id: str) -> list[dict]:
                 WHERE pm.user_id = :uid
                   AND pm.removed_at IS NULL
                   AND p.deleted_at IS NULL
+                  -- Una membresía 'doctor' solo cuenta con habilitación vigente.
+                  AND (pm.role <> 'doctor' OR EXISTS (
+                        SELECT 1 FROM doctor_profiles d
+                        WHERE d.user_id = pm.user_id AND d.revoked_at IS NULL))
                 ORDER BY p.full_name
                 """
             ),
@@ -102,11 +108,19 @@ class UserOut(BaseModel):
     user_id: str
     full_name: str
     first_name: str
+    second_name: str | None = None
     last_name: str
+    second_last_name: str | None = None
+    # "12.345.678-5"; nulo si la cuenta no lo registró.
+    rut: str | None = None
     email: str
     phone: str | None = None
     avatar_url: str | None = None
     locale: str
+    # Tipo de persona para la plataforma (family|caregiver|doctor|elder).
+    account_type: str = "family"
+    # Solo tiene sentido para account_type == 'doctor'.
+    doctor_verified: bool = False
     memberships: list["MembershipOut"] = []
 
 
@@ -118,18 +132,59 @@ class MembershipOut(BaseModel):
 
 class RegisterIn(BaseModel):
     first_name: str = Field(min_length=1, max_length=60)
+    second_name: str | None = Field(default=None, max_length=60)
     last_name:  str = Field(min_length=1, max_length=60)
+    second_last_name: str | None = Field(default=None, max_length=60)
+    # Obligatorio para la cuidadora: entra a casas ajenas y se publica en el
+    # marketplace. El familiar no lo necesita.
+    rut: str | None = None
     email: EmailStr
     password: str
     phone: str | None = None
+    # Qué persona se registra. Obligatorio salvo que venga una invitación, que
+    # ya define el rol. 'elder' no se ofrece: la cuenta del adulto mayor la
+    # crea su familia. 'doctor' exige el código de habilitación.
+    account_type: Literal["family", "caregiver", "doctor"] | None = None
+    doctor_enrollment_token: str | None = None
     invitation_token: str | None = None
     locale: str = "es"
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def _nombre_valido(cls, v: str) -> str:
+        return clean_person_name(v)
+
+    @field_validator("second_name", "second_last_name")
+    @classmethod
+    def _nombre_opcional(cls, v: str | None) -> str | None:
+        return clean_person_name(v) if v and v.strip() else None
+
+    @field_validator("rut")
+    @classmethod
+    def _rut_valido(cls, v: str | None) -> str | None:
+        if not v or not v.strip():
+            return None
+        numero, dv = parse_rut(v)
+        return f"{numero}-{dv}"
+
+    @field_validator("phone")
+    @classmethod
+    def _telefono_valido(cls, v: str | None) -> str | None:
+        return normalize_phone(v) if v else None
+
+
+def rut_legible(numero: int | None, dv: str | None) -> str | None:
+    """12345678, '5' -> '12.345.678-5'."""
+    if numero is None or dv is None:
+        return None
+    return f"{numero:,}".replace(",", ".") + f"-{dv}"
 
 
 class RegisterOut(BaseModel):
     user_id: str
     email: str
     role: str | None
+    account_type: str
     access_token: str
     refresh_token: str
 
@@ -173,10 +228,31 @@ class ResetIn(BaseModel):
 
 class ProfilePatchIn(BaseModel):
     first_name: str | None = Field(default=None, min_length=1, max_length=60)
+    # Para segundo nombre y segundo apellido, "" significa quitarlo; ausente
+    # (None) significa no tocarlo.
+    second_name: str | None = Field(default=None, max_length=60)
     last_name:  str | None = Field(default=None, min_length=1, max_length=60)
+    second_last_name: str | None = Field(default=None, max_length=60)
     phone: str | None = None
     avatar_url: str | None = None
     locale: str | None = None
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def _nombre_valido(cls, v: str | None) -> str | None:
+        return clean_person_name(v) if v is not None else None
+
+    @field_validator("second_name", "second_last_name")
+    @classmethod
+    def _nombre_opcional(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return clean_person_name(v) if v.strip() else ""
+
+    @field_validator("phone")
+    @classmethod
+    def _telefono_valido(cls, v: str | None) -> str | None:
+        return normalize_phone(v) if v else None
 
 
 class DeviceIn(BaseModel):
@@ -240,12 +316,113 @@ async def register(payload: RegisterIn, db: AsyncSession = Depends(get_db)):
                 message="La invitación no existe, ya fue usada o está vencida.",
             )
 
+    # ── Tipo de cuenta ────────────────────────────────────────────────────
+    # Con invitación, el rol lo define quien invita. Sin invitación hay que
+    # elegirlo: ya no se asume "familiar" en silencio.
+    if invitation is not None:
+        account_type = invitation["role"]
+        if payload.account_type is not None and payload.account_type != account_type:
+            raise ApiError(
+                status_code=422,
+                code="ROLE_MISMATCH",
+                message="El tipo de cuenta no coincide con el de la invitación.",
+            )
+    else:
+        if payload.account_type is None:
+            raise ApiError(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="Hay datos inválidos en la solicitud. Revisa los campos marcados.",
+                details=[{"field": "account_type",
+                          "message": "Indica si te registras como familiar, cuidador(a) o médico."}],
+            )
+        account_type = payload.account_type
+
+    # Médico: nadie se declara médico. Hace falta el código que emite el
+    # personal de AgeCare tras verificar el registro profesional, y ese código
+    # está ligado al correo con el que se registra.
+    enrollment = None
+    if account_type == "doctor":
+        if invitation is not None or not payload.doctor_enrollment_token:
+            raise ApiError(
+                status_code=403,
+                code="DOCTOR_ENROLLMENT_REQUIRED",
+                message=(
+                    "Las cuentas de médico las habilita el equipo de AgeCare. "
+                    "Crea tu cuenta con el código de habilitación y luego ingresa la invitación."
+                ),
+            )
+        enrollment = (
+            await db.execute(
+                text(
+                    """
+                    SELECT id, license_number, specialty, created_by
+                    FROM doctor_enrollments
+                    WHERE token_hash = :th
+                      AND lower(email) = lower(:email)
+                      AND accepted_at IS NULL
+                      AND revoked_at IS NULL
+                      AND expires_at > now()
+                    FOR UPDATE
+                    """
+                ),
+                {"th": hash_token(payload.doctor_enrollment_token),
+                 "email": payload.email},
+            )
+        ).mappings().first()
+        if enrollment is None:
+            raise ApiError(
+                status_code=403,
+                code="INVALID_DOCTOR_ENROLLMENT",
+                message="El código de habilitación no existe, ya fue usado, venció o no corresponde a este correo.",
+            )
+    elif payload.doctor_enrollment_token:
+        raise ApiError(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Hay datos inválidos en la solicitud. Revisa los campos marcados.",
+            details=[{"field": "doctor_enrollment_token",
+                      "message": "El código de habilitación solo aplica a cuentas de médico."}],
+        )
+
+    # Cuidador(a): entra a la casa de un adulto mayor y la familia tiene que
+    # poder identificarla y llamarla. Sin RUT ni teléfono no hay cuenta.
+    if account_type == "caregiver":
+        faltan = []
+        if payload.rut is None:
+            faltan.append({"field": "rut",
+                           "message": "El RUT es obligatorio para cuidadores(as)."})
+        if payload.phone is None:
+            faltan.append({"field": "phone",
+                           "message": "El teléfono es obligatorio para cuidadores(as)."})
+        if faltan:
+            raise ApiError(
+                status_code=422, code="VALIDATION_ERROR",
+                message="Hay datos inválidos en la solicitud. Revisa los campos marcados.",
+                details=faltan,
+            )
+
+    rut_numero = rut_dv = None
+    if payload.rut is not None:
+        n, rut_dv = payload.rut.split("-")
+        rut_numero = int(n)
+        if (await db.execute(
+            text("SELECT 1 FROM users WHERE rut_number = :n"), {"n": rut_numero},
+        )).first():
+            raise ApiError(
+                status_code=409, code="RUT_ALREADY_EXISTS",
+                message="Ya existe una cuenta con ese RUT.",
+            )
+
     user_id = str(uuid.uuid4())
     await db.execute(
         text(
             """
-            INSERT INTO users (id, email, password_hash, first_name, last_name, phone, locale)
-            VALUES (:id, :email, :ph, :fn, :ln, :phone, :locale)
+            INSERT INTO users (id, email, password_hash, first_name, second_name,
+                               last_name, second_last_name, rut_number, rut_dv,
+                               phone, locale, account_type)
+            VALUES (:id, :email, :ph, :fn, :sn, :ln, :sln, :rn, :rdv,
+                    :phone, :locale, :atype)
             """
         ),
         {
@@ -253,11 +430,33 @@ async def register(payload: RegisterIn, db: AsyncSession = Depends(get_db)):
             "email": payload.email,
             "ph": hash_password(payload.password),
             "fn": payload.first_name,
+            "sn": payload.second_name,
             "ln": payload.last_name,
+            "sln": payload.second_last_name,
+            "rn": rut_numero,
+            "rdv": rut_dv,
             "phone": payload.phone,
             "locale": payload.locale,
+            "atype": account_type,
         },
     )
+
+    if enrollment is not None:
+        await db.execute(
+            text(
+                """
+                INSERT INTO doctor_profiles (user_id, license_number, specialty, verified_by)
+                VALUES (:uid, :lic, :spec, :by)
+                """
+            ),
+            {"uid": user_id, "lic": enrollment["license_number"],
+             "spec": enrollment["specialty"], "by": enrollment["created_by"]},
+        )
+        await db.execute(
+            text("UPDATE doctor_enrollments SET accepted_at = now(), accepted_by = :uid "
+                 "WHERE id = :eid"),
+            {"uid": user_id, "eid": enrollment["id"]},
+        )
 
     role = None
     if invitation is not None:
@@ -290,6 +489,7 @@ async def register(payload: RegisterIn, db: AsyncSession = Depends(get_db)):
         user_id=user_id,
         email=payload.email,
         role=role,
+        account_type=account_type,
         access_token=access,
         refresh_token=refresh,
     )
@@ -305,8 +505,9 @@ async def login(request: Request, payload: LoginIn, db: AsyncSession = Depends(g
         await db.execute(
             text(
                 """
-                SELECT id, email, password_hash, first_name, last_name, full_name,
-                       phone, avatar_url, locale
+                SELECT id, email, password_hash, first_name, second_name,
+                       last_name, second_last_name, full_name, rut_number, rut_dv,
+                       phone, avatar_url, locale, account_type
                 FROM users
                 WHERE lower(email) = lower(:email)
                   AND is_active = true
@@ -334,12 +535,18 @@ async def login(request: Request, payload: LoginIn, db: AsyncSession = Depends(g
         user=UserOut(
             user_id=str(user["id"]),
             first_name=user["first_name"],
+            second_name=user["second_name"],
             last_name=user["last_name"],
+            second_last_name=user["second_last_name"],
+            rut=rut_legible(user["rut_number"], user["rut_dv"]),
             full_name=user["full_name"],
             email=user["email"],
             phone=user["phone"],
             avatar_url=user["avatar_url"],
             locale=user["locale"],
+            account_type=user["account_type"],
+            doctor_verified=(user["account_type"] == "doctor"
+                             and await is_verified_doctor(db, str(user["id"]))),
             memberships=[MembershipOut(**m) for m in memberships],
         ),
         memberships=[MembershipOut(**m) for m in memberships],
@@ -484,8 +691,9 @@ async def get_me(
         await db.execute(
             text(
                 """
-                SELECT id, email, first_name, last_name, full_name,
-                       phone, avatar_url, locale
+                SELECT id, email, first_name, second_name, last_name,
+                       second_last_name, full_name, rut_number, rut_dv,
+                       phone, avatar_url, locale, account_type
                 FROM users WHERE id = :uid
                 """
             ),
@@ -496,12 +704,18 @@ async def get_me(
     return UserOut(
         user_id=str(row["id"]),
         first_name=row["first_name"],
+        second_name=row["second_name"],
         last_name=row["last_name"],
+        second_last_name=row["second_last_name"],
+        rut=rut_legible(row["rut_number"], row["rut_dv"]),
         full_name=row["full_name"],
         email=row["email"],
         phone=row["phone"],
         avatar_url=row["avatar_url"],
         locale=row["locale"],
+        account_type=row["account_type"],
+        doctor_verified=(row["account_type"] == "doctor"
+                         and await is_verified_doctor(db, user.user_id)),
         memberships=[MembershipOut(**m) for m in memberships],
     )
 
@@ -516,6 +730,10 @@ async def patch_me(
     db: AsyncSession = Depends(get_db),
 ):
     fields = payload.model_dump(exclude_unset=True)
+    # "" en un campo opcional del nombre es quitarlo: se guarda NULL.
+    for k in ("second_name", "second_last_name"):
+        if fields.get(k) == "":
+            fields[k] = None
     if fields:
         sets = ", ".join(f"{k} = :{k}" for k in fields)
         fields["uid"] = user.user_id

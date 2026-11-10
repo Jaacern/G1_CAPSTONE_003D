@@ -35,6 +35,12 @@ class MainShell extends ConsumerWidget {
       return const ElderHomeScreen();
     }
 
+    // Médico sin habilitación vigente: el backend le niega todo acceso
+    // clínico, así que mostrarle la app del médico solo daría errores.
+    if (user != null && user.isUnverifiedDoctor) {
+      return const _MedicoSinHabilitacion();
+    }
+
     final tabs = switch (role) {
       RoleType.caregiver => caregiverTabs,
       RoleType.doctor => doctorTabs,
@@ -128,6 +134,61 @@ class MainShell extends ConsumerWidget {
     ShellTab('Salud', '❤️', HealthScreen()),
     ShellTab('Más', '☰', MoreScreen()),
   ];
+}
+
+/// Pantalla para un médico cuya habilitación no está vigente.
+class _MedicoSinHabilitacion extends ConsumerWidget {
+  const _MedicoSinHabilitacion();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.verified_user_outlined,
+                      size: 56, color: AppColors.primary),
+                  const SizedBox(height: 16),
+                  const Text('Tu cuenta de médico no está habilitada',
+                      textAlign: TextAlign.center,
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Para proteger a los pacientes, solo un médico con registro '
+                    'profesional verificado por AgeCare puede ver fichas e indicar '
+                    'tratamientos. Escribe al equipo de AgeCare para revisar tu habilitación.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 24),
+                  OutlinedButton.icon(
+                    onPressed: () => ref
+                        .read(authControllerProvider.notifier)
+                        .refreshProfile(),
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Volver a comprobar'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () =>
+                        ref.read(authControllerProvider.notifier).logout(),
+                    child: const Text('Cerrar sesión'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Barra superior de [MainShell]: muestra el título de la pestaña activa en

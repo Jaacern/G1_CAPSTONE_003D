@@ -87,6 +87,7 @@ Future<void> montar(WidgetTester tester,
       currentUserProvider.overrideWith((ref) => const User(
             userId: 'u-1',
             fullName: 'Benjamín Camus',
+            accountType: RoleType.family,
             email: 'familia@agecare.app',
           )),
     ],

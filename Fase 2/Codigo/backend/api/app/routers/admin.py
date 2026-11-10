@@ -30,6 +30,7 @@ LAS REGLAS QUE VIGILA, QUE ANTES NO VIGILABA NADIE
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
@@ -43,6 +44,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.deps import StaffUser, get_staff_user
 from app.errors import ApiError
+from app.security import generate_refresh_token, hash_token
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
@@ -980,3 +982,196 @@ async def crear_limite(
         )
     ).mappings().first()
     return LimitKeyOut(**fila)
+
+
+# ---------------------------------------------------------------------------
+# Habilitación de médicos
+# ---------------------------------------------------------------------------
+# QUE RESUELVE
+#     El rol 'doctor' da poder de receta sobre un paciente. Si cualquiera
+#     pudiera declararse médico, o recibirlo por una invitación, una persona
+#     sin título podría indicar tratamientos y dosis. Por eso una cuenta de
+#     médico solo existe si el personal de AgeCare verificó antes el número
+#     de registro profesional (Registro Nacional de Prestadores Individuales
+#     de la Superintendencia de Salud) y emitió un código de un solo uso.
+#
+#     El código queda ligado a un correo. El médico crea su propia cuenta y
+#     su propia contraseña con él: el personal nunca conoce la clave.
+_VIGENCIA_CODIGO_DIAS = 7
+
+
+def _texto_opcional(v: str | None) -> str | None:
+    """Como _texto, pero deja pasar None y trata el texto vacío como ausente."""
+    if v is None or not v.strip():
+        return None
+    return _texto(v)
+
+
+class MedicoHabilitacionIn(BaseModel):
+    email:          str = Field(min_length=5, max_length=254)
+    license_number: str = Field(min_length=3, max_length=30)
+    specialty:      str | None = Field(default=None, max_length=60)
+
+    @field_validator("email")
+    @classmethod
+    def _correo(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", v):
+            raise ValueError("El correo no tiene un formato válido.")
+        return v
+
+    @field_validator("license_number")
+    @classmethod
+    def _registro(cls, v: str) -> str:
+        v = v.strip().upper()
+        if not re.fullmatch(r"[A-Z0-9][A-Z0-9.\-/]{2,29}", v):
+            raise ValueError("El número de registro solo admite letras, números, punto, guion y barra.")
+        return v
+
+    _s = field_validator("specialty")(_texto_opcional)
+
+
+class MedicoHabilitacionOut(BaseModel):
+    enrollment_id:    UUID
+    email:            str
+    license_number:   str
+    expires_at:       datetime
+    # El código solo se muestra esta vez: en la base queda su hash.
+    enrollment_token: str
+
+
+class MedicoOut(BaseModel):
+    user_id:        UUID
+    full_name:      str
+    email:          str
+    license_number: str
+    specialty:      str | None
+    verified_at:    datetime
+    revoked_at:     datetime | None
+
+
+class MedicosOut(BaseModel):
+    items: list[MedicoOut]
+
+
+@router.post("/doctors/enrollments", response_model=MedicoHabilitacionOut,
+             status_code=201)
+async def habilitar_medico(
+    payload: MedicoHabilitacionIn,
+    staff: StaffUser = Depends(get_staff_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Emite el código con el que un médico verificado crea su cuenta.
+
+    El personal debe haber comprobado el registro profesional ANTES de llamar
+    a este endpoint: el sistema no tiene cómo consultarlo por su cuenta.
+    """
+    if (await db.execute(
+        text("SELECT 1 FROM users WHERE lower(email) = :e"),
+        {"e": payload.email},
+    )).first():
+        raise ApiError(
+            status_code=409, code="EMAIL_ALREADY_EXISTS",
+            message="Ya existe una cuenta con ese correo. Un médico debe registrarse con un correo nuevo.",
+        )
+    if (await db.execute(
+        text("SELECT 1 FROM doctor_profiles "
+             "WHERE upper(license_number) = :l AND revoked_at IS NULL"),
+        {"l": payload.license_number},
+    )).first():
+        raise ApiError(
+            status_code=409, code="LICENSE_ALREADY_ENROLLED",
+            message="Ese número de registro ya tiene una cuenta de médico vigente.",
+        )
+
+    # Un código pendiente anterior para el mismo correo se anula: solo uno vale.
+    await db.execute(
+        text("UPDATE doctor_enrollments SET revoked_at = now() "
+             "WHERE lower(email) = :e AND accepted_at IS NULL AND revoked_at IS NULL"),
+        {"e": payload.email},
+    )
+
+    token = generate_refresh_token()
+    fila = (
+        await db.execute(
+            text(
+                """
+                INSERT INTO doctor_enrollments
+                    (email, license_number, specialty, token_hash, created_by, expires_at)
+                VALUES (:e, :l, :s, :th, :by, now() + make_interval(days => :d))
+                RETURNING id, expires_at
+                """
+            ),
+            {"e": payload.email, "l": payload.license_number,
+             "s": payload.specialty, "th": hash_token(token),
+             "by": staff.user_id, "d": _VIGENCIA_CODIGO_DIAS},
+        )
+    ).mappings().first()
+    await db.commit()
+    return MedicoHabilitacionOut(
+        enrollment_id=fila["id"], email=payload.email,
+        license_number=payload.license_number,
+        expires_at=fila["expires_at"], enrollment_token=token,
+    )
+
+
+@router.get("/doctors", response_model=MedicosOut)
+async def listar_medicos(
+    staff: StaffUser = Depends(get_staff_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Los médicos habilitados, con los revocados al final."""
+    filas = (
+        await db.execute(
+            text(
+                """
+                SELECT u.id AS user_id, u.full_name, u.email,
+                       d.license_number, d.specialty, d.verified_at, d.revoked_at
+                  FROM doctor_profiles d
+                  JOIN users u ON u.id = d.user_id
+                 ORDER BY (d.revoked_at IS NOT NULL), u.full_name
+                """
+            )
+        )
+    ).mappings().all()
+    return MedicosOut(items=[MedicoOut(**f) for f in filas])
+
+
+class MedicoRevocacionIn(BaseModel):
+    reason: str = Field(min_length=3, max_length=200)
+
+    _r = field_validator("reason")(_texto)
+
+
+@router.post("/doctors/{user_id}/revoke", response_model=MedicoOut)
+async def revocar_medico(
+    payload: MedicoRevocacionIn,
+    user_id: UUID = Path(...),
+    staff: StaffUser = Depends(get_staff_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Quita la habilitación. Desde ese momento la cuenta pierde el acceso
+    clínico a todos sus pacientes, sin tener que tocar cada membresía."""
+    res = await db.execute(
+        text("UPDATE doctor_profiles SET revoked_at = now(), revoked_reason = :r "
+             "WHERE user_id = :u AND revoked_at IS NULL"),
+        {"u": str(user_id), "r": payload.reason},
+    )
+    if res.rowcount == 0:
+        raise ApiError(status_code=404, code="NOT_FOUND",
+                       message="No hay un médico habilitado con ese identificador.")
+    await db.commit()
+    fila = (
+        await db.execute(
+            text(
+                """
+                SELECT u.id AS user_id, u.full_name, u.email,
+                       d.license_number, d.specialty, d.verified_at, d.revoked_at
+                  FROM doctor_profiles d JOIN users u ON u.id = d.user_id
+                 WHERE d.user_id = :u
+                """
+            ),
+            {"u": str(user_id)},
+        )
+    ).mappings().first()
+    return MedicoOut(**fila)

@@ -34,6 +34,8 @@ void main() {
         currentUserProvider.overrideWith((ref) => const User(
               userId: 'u-med',
               fullName: 'Dra. Carmen Orellana',
+              accountType: RoleType.doctor,
+              doctorVerified: true,
               email: 'medico@agecare.app',
               memberships: [
                 Membership(

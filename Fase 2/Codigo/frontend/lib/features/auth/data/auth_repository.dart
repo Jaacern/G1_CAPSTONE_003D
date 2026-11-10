@@ -8,11 +8,19 @@ import '../domain/models.dart';
 abstract class AuthRepository {
   Future<AuthSession> login({required String email, required String password});
 
-  Future<AuthSession> register({
+  /// [accountType] es obligatorio salvo con [invitationToken] (la invitación
+  /// ya define el rol). Para médico hace falta [doctorEnrollmentToken], el
+  /// código que entrega el personal de AgeCare tras verificar el registro.
+  Future<AuthTokens> register({
     required String firstName,
+    String? secondName,
     required String lastName,
+    String? secondLastName,
+    String? rut,
     required String email,
     required String password,
+    RoleType? accountType,
+    String? doctorEnrollmentToken,
     String? phone,
     String? invitationToken,
   });
@@ -32,7 +40,8 @@ class AuthRepositoryHttp implements AuthRepository {
   final ApiClient _api;
 
   @override
-  Future<AuthSession> login({required String email, required String password}) async {
+  Future<AuthSession> login(
+      {required String email, required String password}) async {
     final data = await _api.post<Map<String, dynamic>>('/auth/login',
         data: {'email': email, 'password': password});
     final user = User.fromJson({
@@ -47,32 +56,40 @@ class AuthRepositoryHttp implements AuthRepository {
   }
 
   @override
-  Future<AuthSession> register({
+  Future<AuthTokens> register({
     required String firstName,
+    String? secondName,
     required String lastName,
+    String? secondLastName,
+    String? rut,
     required String email,
     required String password,
+    RoleType? accountType,
+    String? doctorEnrollmentToken,
     String? phone,
     String? invitationToken,
   }) async {
-    // RegisterIn exige first_name y last_name por separado (no full_name).
+    // RegisterIn exige first_name y last_name por separado (no full_name) y
+    // el tipo de cuenta. El backend normaliza y valida los nombres.
     final data = await _api.post<Map<String, dynamic>>('/auth/register', data: {
       'first_name': firstName,
+      if (secondName != null && secondName.isNotEmpty) 'second_name': secondName,
       'last_name': lastName,
+      if (secondLastName != null && secondLastName.isNotEmpty)
+        'second_last_name': secondLastName,
+      if (rut != null && rut.isNotEmpty) 'rut': rut,
       'email': email,
       'password': password,
+      if (accountType != null) 'account_type': accountType.apiValue,
+      if (doctorEnrollmentToken != null && doctorEnrollmentToken.isNotEmpty)
+        'doctor_enrollment_token': doctorEnrollmentToken,
       if (phone != null && phone.isNotEmpty) 'phone': phone,
       if (invitationToken != null) 'invitation_token': invitationToken,
       'locale': 'es',
     });
-    return AuthSession(
-      user: User(
-        userId: data['user_id'] as String,
-        fullName: '$firstName $lastName',
-        email: email,
-        // Las membresías no vienen en RegisterOut; llegan en /users/me.
-        memberships: const [],
-      ),
+    // El usuario no se arma aquí con lo que escribió la persona: lo decide el
+    // servidor (tipo de cuenta, habilitación, membresías) y se lee con me().
+    return AuthTokens(
       accessToken: data['access_token'] as String,
       refreshToken: data['refresh_token'] as String,
     );
@@ -110,28 +127,50 @@ class AuthRepositoryMock implements AuthRepository {
 
   static const _demoUser = User(
     userId: 'u-demo-1',
-    fullName: 'María González',
+    fullName: 'María José González Pérez',
+    firstName: 'María',
+    secondName: 'José',
+    lastName: 'González',
+    secondLastName: 'Pérez',
     email: demoEmail,
+    accountType: RoleType.family,
     memberships: [
-      Membership(patientId: 'p-elena', patientName: 'Elena', role: RoleType.family),
-      Membership(patientId: 'p-jose', patientName: 'José', role: RoleType.family),
+      Membership(
+          patientId: 'p-elena', patientName: 'Elena', role: RoleType.family),
+      Membership(
+          patientId: 'p-jose', patientName: 'José', role: RoleType.family),
     ],
   );
 
   static const _demoDoctor = User(
     userId: 'u-demo-doctor',
     fullName: 'Dra. Carolina Soto',
+    firstName: 'Carolina',
+    lastName: 'Soto',
     email: demoDoctorEmail,
+    accountType: RoleType.doctor,
+    doctorVerified: true,
     memberships: [
-      Membership(patientId: 'p-elena', patientName: 'Elena Ramírez', role: RoleType.doctor),
-      Membership(patientId: 'p-jose', patientName: 'José Ramírez', role: RoleType.doctor),
+      Membership(
+          patientId: 'p-elena',
+          patientName: 'Elena Ramírez',
+          role: RoleType.doctor),
+      Membership(
+          patientId: 'p-jose',
+          patientName: 'José Ramírez',
+          role: RoleType.doctor),
     ],
   );
 
   static const _demoCaregiver = User(
     userId: 'u-demo-caregiver',
-    fullName: 'Rosa Millán',
+    fullName: 'Rosa Millán Díaz',
+    firstName: 'Rosa',
+    lastName: 'Millán',
+    secondLastName: 'Díaz',
+    rut: '15.234.567-4',
     email: demoCaregiverEmail,
+    accountType: RoleType.caregiver,
     memberships: [
       Membership(
           patientId: 'p-elena',
@@ -149,7 +188,10 @@ class AuthRepositoryMock implements AuthRepository {
   static const _demoElder = User(
     userId: 'u-demo-elder',
     fullName: 'Elena Ramírez',
+    firstName: 'Elena',
+    lastName: 'Ramírez',
     email: demoElderEmail,
+    accountType: RoleType.elder,
     memberships: [
       Membership(
           patientId: 'p-elena',
@@ -159,7 +201,8 @@ class AuthRepositoryMock implements AuthRepository {
   );
 
   @override
-  Future<AuthSession> login({required String email, required String password}) async {
+  Future<AuthSession> login(
+      {required String email, required String password}) async {
     await Future.delayed(const Duration(milliseconds: 400));
     if (password != demoPassword) {
       throw ApiException(
@@ -183,34 +226,101 @@ class AuthRepositoryMock implements AuthRepository {
       );
     }
     _currentUser = user;
-    return AuthSession(user: user, accessToken: 'mock-access', refreshToken: 'mock-refresh');
+    return AuthSession(
+        user: user, accessToken: 'mock-access', refreshToken: 'mock-refresh');
   }
 
+  /// Código de habilitación de médico que acepta el modo demo. En el backend
+  /// real lo emite el personal de AgeCare desde el panel de administración.
+  static const demoDoctorEnrollmentCode = 'MEDICO-DEMO';
+
   @override
-  Future<AuthSession> register({
+  Future<AuthTokens> register({
     required String firstName,
+    String? secondName,
     required String lastName,
+    String? secondLastName,
+    String? rut,
     required String email,
     required String password,
+    RoleType? accountType,
+    String? doctorEnrollmentToken,
     String? phone,
     String? invitationToken,
   }) async {
     await Future.delayed(const Duration(milliseconds: 400));
-    if (email.toLowerCase() == demoEmail) {
+    const conocidos = {
+      demoEmail,
+      demoDoctorEmail,
+      demoCaregiverEmail,
+      demoElderEmail,
+    };
+    if (conocidos.contains(email.toLowerCase())) {
       throw ApiException(
         statusCode: 409,
         code: 'EMAIL_ALREADY_EXISTS',
         message: 'Ya existe una cuenta con este correo electrónico.',
       );
     }
+    // Mismas reglas que POST /auth/register.
+    if (accountType == null && invitationToken == null) {
+      throw ApiException(
+        statusCode: 422,
+        code: 'VALIDATION_ERROR',
+        message: 'Indica si te registras como familiar, cuidador(a) o médico.',
+      );
+    }
+    if (accountType == RoleType.elder) {
+      throw ApiException(
+        statusCode: 422,
+        code: 'VALIDATION_ERROR',
+        message: 'La cuenta del adulto mayor la vincula su familia.',
+      );
+    }
+    // La cuidadora entra a casas ajenas: sin RUT ni teléfono no hay cuenta.
+    if (accountType == RoleType.caregiver &&
+        (rut == null || rut.isEmpty || phone == null || phone.isEmpty)) {
+      throw ApiException(
+        statusCode: 422,
+        code: 'VALIDATION_ERROR',
+        message: 'Hay datos inválidos en la solicitud.',
+        fieldErrors: {
+          if (rut == null || rut.isEmpty)
+            'rut': 'El RUT es obligatorio para cuidadores(as).',
+          if (phone == null || phone.isEmpty)
+            'phone': 'El teléfono es obligatorio para cuidadores(as).',
+        },
+      );
+    }
+    final esMedico = accountType == RoleType.doctor;
+    if (esMedico && doctorEnrollmentToken != demoDoctorEnrollmentCode) {
+      throw ApiException(
+        statusCode: 403,
+        code: doctorEnrollmentToken == null || doctorEnrollmentToken.isEmpty
+            ? 'DOCTOR_ENROLLMENT_REQUIRED'
+            : 'INVALID_DOCTOR_ENROLLMENT',
+        message: doctorEnrollmentToken == null || doctorEnrollmentToken.isEmpty
+            ? 'Las cuentas de médico las habilita el equipo de AgeCare.'
+            : 'El código de habilitación no existe, ya fue usado, venció o no corresponde a este correo.',
+      );
+    }
     _currentUser = User(
       userId: 'u-new',
-      fullName: '$firstName $lastName',
+      fullName: [firstName, secondName, lastName, secondLastName]
+          .where((p) => p != null && p.isNotEmpty)
+          .join(' '),
+      firstName: firstName,
+      secondName: secondName,
+      lastName: lastName,
+      secondLastName: secondLastName,
+      rut: rut,
       email: email,
+      accountType: accountType ?? RoleType.family,
+      doctorVerified: esMedico,
       phone: phone,
     );
-    return AuthSession(
-        user: _currentUser!, accessToken: 'mock-access', refreshToken: 'mock-refresh');
+    return const AuthTokens(
+        accessToken: 'mock-access', refreshToken: 'mock-refresh');
   }
 
   @override

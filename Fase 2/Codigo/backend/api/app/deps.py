@@ -94,6 +94,35 @@ async def get_current_user(
     )
 
 
+async def is_verified_doctor(db: AsyncSession, user_id: str) -> bool:
+    """True si la cuenta es de tipo médico y su habilitación sigue vigente.
+
+    La habilitación (doctor_profiles) la crea el personal de la empresa tras
+    verificar el registro profesional. Sin ella, la membresía con rol
+    'doctor' no vale nada: nadie se vuelve médico por declararlo ni por
+    aceptar una invitación.
+    """
+    return bool(
+        (
+            await db.execute(
+                text(
+                    """
+                    SELECT 1
+                    FROM users u
+                    JOIN doctor_profiles d ON d.user_id = u.id
+                    WHERE u.id = :uid
+                      AND u.account_type = 'doctor'
+                      AND u.is_active = true
+                      AND u.deleted_at IS NULL
+                      AND d.revoked_at IS NULL
+                    """
+                ),
+                {"uid": user_id},
+            )
+        ).first()
+    )
+
+
 def get_patient_member(
     roles: list[str] | None = None,
     require_owner: bool = False,
@@ -133,6 +162,21 @@ def get_patient_member(
                 status_code=404,
                 code="NOT_FOUND",
                 message="El recurso solicitado no existe o no está disponible.",
+            )
+
+        # Un médico solo opera si su habilitación está vigente. Va antes del
+        # chequeo de roles a propósito: aplica a TODO endpoint, incluso a los
+        # de solo lectura, porque la ficha clínica es información sensible.
+        if membership["role"] == "doctor" and not await is_verified_doctor(
+            db, user.user_id
+        ):
+            raise ApiError(
+                status_code=403,
+                code="DOCTOR_NOT_VERIFIED",
+                message=(
+                    "Tu cuenta de médico aún no está habilitada. "
+                    "Contacta al equipo de AgeCare para verificar tu registro profesional."
+                ),
             )
 
         if roles is not None and membership["role"] not in roles:

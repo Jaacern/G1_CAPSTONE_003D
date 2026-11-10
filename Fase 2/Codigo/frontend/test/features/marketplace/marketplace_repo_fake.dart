@@ -104,6 +104,7 @@ Future<MarketplaceRepoFake> montarMarketplace(
         (ref) => User(
           userId: 'u-1',
           fullName: 'Benjamín Camus',
+          accountType: rol,
           email: 'familia@agecare.app',
           memberships: [
             Membership(

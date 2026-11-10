@@ -8,20 +8,51 @@ import '../storage/token_storage.dart';
 /// Error de la API con el formato estándar del backend (sección 2.4 de la
 /// Especificación de Endpoints): { error: { code, message, details, request_id } }.
 class ApiException implements Exception {
-  ApiException({required this.statusCode, required this.code, required this.message});
+  ApiException({
+    required this.statusCode,
+    required this.code,
+    required this.message,
+    this.fieldErrors = const {},
+  });
 
   final int statusCode;
   final String code;
   final String message;
 
+  /// Detalle por campo de un 422 (`error.details`): campo → motivo. La clave
+  /// es la ruta que devuelve el backend sin el prefijo `body.`, por ejemplo
+  /// `rut` o `emergency_contact.phone`.
+  final Map<String, String> fieldErrors;
+
+  /// El motivo concreto si el backend lo dio; si no, el mensaje general.
+  /// Sirve para no dejar a la persona con "Hay datos inválidos" sin saber cuál.
+  String get detailedMessage =>
+      fieldErrors.isEmpty ? message : fieldErrors.values.first;
+
   factory ApiException.fromDio(DioException e) {
     final data = e.response?.data;
     if (data is Map && data['error'] is Map) {
       final err = data['error'] as Map;
+      final fields = <String, String>{};
+      final details = err['details'];
+      if (details is List) {
+        for (final d in details) {
+          if (d is Map && d['field'] != null) {
+            final field =
+                d['field'].toString().replaceFirst(RegExp(r'^body\.'), '');
+            // Pydantic antepone "Value error, " a los ValueError propios.
+            final msg = (d['message'] ?? '')
+                .toString()
+                .replaceFirst(RegExp(r'^Value error, '), '');
+            if (msg.isNotEmpty) fields[field] = msg;
+          }
+        }
+      }
       return ApiException(
         statusCode: e.response?.statusCode ?? 0,
         code: (err['code'] ?? 'UNKNOWN').toString(),
         message: (err['message'] ?? 'Ocurrió un error inesperado.').toString(),
+        fieldErrors: fields,
       );
     }
     if (e.type == DioExceptionType.connectionTimeout ||

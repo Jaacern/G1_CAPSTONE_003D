@@ -36,6 +36,7 @@ void main() {
         currentUserProvider.overrideWith((ref) => const User(
               userId: 'u-cuid',
               fullName: 'Rosa Fuentes',
+              accountType: RoleType.caregiver,
               email: 'cuidadora@agecare.app',
               memberships: [
                 Membership(

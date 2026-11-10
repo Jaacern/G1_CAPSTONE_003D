@@ -5,11 +5,13 @@ import '../../../core/network/api_client.dart';
 import '../domain/models.dart';
 
 abstract class ProfileRepository {
-  /// Actualiza el perfil. El backend (3.8) acepta nombre/apellido por
-  /// separado, teléfono, avatar e idioma (full_name es generado y no editable).
+  /// Actualiza el perfil. El backend (3.8) acepta el nombre en cuatro partes,
+  /// teléfono, avatar e idioma (full_name es generado y no editable).
   Future<void> updateProfile({
     String? firstName,
+    String? secondName,
     String? lastName,
+    String? secondLastName,
     String? phone,
     String? avatarUrl,
     String? locale,
@@ -33,14 +35,19 @@ class ProfileRepositoryHttp implements ProfileRepository {
   @override
   Future<void> updateProfile({
     String? firstName,
+    String? secondName,
     String? lastName,
+    String? secondLastName,
     String? phone,
     String? avatarUrl,
     String? locale,
   }) =>
       _api.patch<void>('/users/me', data: {
         if (firstName != null) 'first_name': firstName,
+        // "" quita el segundo nombre o apellido; null no lo toca.
+        if (secondName != null) 'second_name': secondName,
         if (lastName != null) 'last_name': lastName,
+        if (secondLastName != null) 'second_last_name': secondLastName,
         if (phone != null) 'phone': phone,
         if (avatarUrl != null) 'avatar_url': avatarUrl,
         if (locale != null) 'locale': locale,
@@ -92,7 +99,9 @@ class ProfileRepositoryMock implements ProfileRepository {
   @override
   Future<void> updateProfile({
     String? firstName,
+    String? secondName,
     String? lastName,
+    String? secondLastName,
     String? phone,
     String? avatarUrl,
     String? locale,

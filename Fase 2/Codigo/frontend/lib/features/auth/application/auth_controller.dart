@@ -61,30 +61,39 @@ class AuthController extends Notifier<AuthState> {
 
   Future<void> register({
     required String firstName,
+    String? secondName,
     required String lastName,
+    String? secondLastName,
+    String? rut,
     required String email,
     required String password,
+    RoleType? accountType,
+    String? doctorEnrollmentToken,
     String? phone,
     String? invitationToken,
   }) async {
-    final session = await _repo.register(
+    final tokens = await _repo.register(
       firstName: firstName,
+      secondName: secondName,
       lastName: lastName,
+      secondLastName: secondLastName,
+      rut: rut,
       email: email,
       password: password,
+      accountType: accountType,
+      doctorEnrollmentToken: doctorEnrollmentToken,
       phone: phone,
       invitationToken: invitationToken,
     );
     await ref
         .read(tokenStorageProvider)
-        .save(access: session.accessToken, refresh: session.refreshToken);
-    // Tras registro con invitación las membresías llegan en /users/me.
-    final user =
-        invitationToken != null ? await _repo.me() : session.user;
-    state = Authenticated(user);
+        .save(access: tokens.accessToken, refresh: tokens.refreshToken);
+    // El tipo de cuenta, la habilitación y las membresías vienen del servidor.
+    state = Authenticated(await _repo.me());
   }
 
-  Future<void> recoverPassword(String email) => _repo.requestPasswordRecovery(email);
+  Future<void> recoverPassword(String email) =>
+      _repo.requestPasswordRecovery(email);
 
   /// Refresca el perfil (ej. tras crear un paciente o aceptar invitación).
   Future<void> refreshProfile() async {

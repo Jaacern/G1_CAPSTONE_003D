@@ -8,8 +8,10 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/network/upload_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/validation/identity_validators.dart';
 import '../../../core/widgets/common.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../auth/domain/models.dart';
 import '../data/profile_repository.dart';
 
 /// Perfil y ajustes del usuario: edición de nombre, teléfono y avatar,
@@ -23,7 +25,11 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _picker = ImagePicker();
-  final _nameCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _firstCtrl = TextEditingController();
+  final _secondCtrl = TextEditingController();
+  final _lastCtrl = TextEditingController();
+  final _secondLastCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
 
   bool _initialized = false;
@@ -32,7 +38,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
+    _firstCtrl.dispose();
+    _secondCtrl.dispose();
+    _lastCtrl.dispose();
+    _secondLastCtrl.dispose();
     _phoneCtrl.dispose();
     super.dispose();
   }
@@ -41,26 +50,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (_initialized) return;
     final user = ref.read(currentUserProvider);
     if (user != null) {
-      _nameCtrl.text = user.fullName;
+      _firstCtrl.text = user.firstName;
+      _secondCtrl.text = user.secondName ?? '';
+      _lastCtrl.text = user.lastName;
+      _secondLastCtrl.text = user.secondLastName ?? '';
       _phoneCtrl.text = user.phone ?? '';
       _initialized = true;
     }
   }
 
   Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
-      // El backend guarda nombre y apellido por separado (full_name es
-      // generado). Partimos el campo "Nombre completo": la primera palabra es
-      // el nombre y el resto el apellido.
-      final parts = _nameCtrl.text.trim().split(RegExp(r'\s+'));
-      final firstName = parts.isNotEmpty ? parts.first : '';
-      final lastName =
-          parts.length > 1 ? parts.sublist(1).join(' ') : firstName;
+      // Cada parte del nombre va en su campo: adivinar dónde termina el
+      // nombre y empieza el apellido parte mal "María José Pérez".
+      final phone = _phoneCtrl.text.trim();
       await ref.read(profileRepositoryProvider).updateProfile(
-            firstName: firstName,
-            lastName: lastName,
-            phone: _phoneCtrl.text.trim(),
+            firstName: _firstCtrl.text.trim(),
+            secondName: _secondCtrl.text.trim(),
+            lastName: _lastCtrl.text.trim(),
+            secondLastName: _secondLastCtrl.text.trim(),
+            phone: phone.isEmpty ? null : normalizePhone(phone),
           );
       await ref.read(authControllerProvider.notifier).refreshProfile();
       if (mounted) showAppSnackBar(context, 'Perfil actualizado.');
@@ -166,25 +177,51 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 const SizedBox(height: 20),
                 AppCard(
-                  child: Column(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TextField(
-                        controller: _nameCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Nombre completo',
-                          prefixIcon: Icon(Icons.person_outline_rounded),
-                        ),
+                      _FilaNombre(
+                        izquierda: _CampoNombre(
+                            controller: _firstCtrl, label: 'Nombre'),
+                        derecha: _CampoNombre(
+                            controller: _secondCtrl,
+                            label: 'Segundo nombre',
+                            opcional: true),
                       ),
                       const SizedBox(height: 12),
-                      TextField(
+                      _FilaNombre(
+                        izquierda: _CampoNombre(
+                            controller: _lastCtrl, label: 'Apellido'),
+                        derecha: _CampoNombre(
+                            controller: _secondLastCtrl,
+                            label: 'Segundo apellido',
+                            opcional: true),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
                         controller: _phoneCtrl,
                         keyboardType: TextInputType.phone,
                         decoration: const InputDecoration(
                           labelText: 'Teléfono',
                           prefixIcon: Icon(Icons.phone_outlined),
                         ),
+                        validator: (v) => validatePhone(v,
+                            required: user.accountType == RoleType.caregiver),
                       ),
+                      if (user.rut != null) ...[
+                        const SizedBox(height: 12),
+                        InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: 'RUT',
+                            prefixIcon: Icon(Icons.badge_outlined),
+                          ),
+                          child: Text(user.rut!,
+                              style: const TextStyle(
+                                  color: AppColors.textSecondary)),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       InputDecorator(
                         decoration: const InputDecoration(
@@ -196,6 +233,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 color: AppColors.textSecondary)),
                       ),
                     ],
+                  ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -215,6 +253,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   padding: EdgeInsets.zero,
                   child: Column(
                     children: [
+                      // La cuidadora se publica para que las familias la
+                      // encuentren (RF-72, RF-75) y ve ofertas de trabajo.
+                      if (user.accountType == RoleType.caregiver) ...[
+                        ListTile(
+                          leading: const Icon(Icons.badge_outlined,
+                              color: AppColors.primary),
+                          title: const Text('Mi perfil profesional'),
+                          subtitle: const Text(
+                              'Experiencia, comunas, tarifa y publicación'),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => context.push('/cg/profile'),
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          leading: const Icon(Icons.work_outline_rounded,
+                              color: AppColors.primary),
+                          title: const Text('Ofertas de trabajo'),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => context.push('/marketplace'),
+                        ),
+                        const Divider(height: 1),
+                      ],
                       ListTile(
                         leading: const Icon(Icons.notifications_outlined,
                             color: AppColors.primary),
@@ -253,6 +313,56 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ],
             ),
+    );
+  }
+}
+
+/// Dos campos del nombre lado a lado; en pantallas angostas, uno bajo otro.
+class _FilaNombre extends StatelessWidget {
+  const _FilaNombre({required this.izquierda, required this.derecha});
+
+  final Widget izquierda;
+  final Widget derecha;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, c) {
+      if (c.maxWidth < 360) {
+        return Column(
+            children: [izquierda, const SizedBox(height: 12), derecha]);
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: izquierda),
+          const SizedBox(width: 12),
+          Expanded(child: derecha),
+        ],
+      );
+    });
+  }
+}
+
+class _CampoNombre extends StatelessWidget {
+  const _CampoNombre({
+    required this.controller,
+    required this.label,
+    this.opcional = false,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final bool opcional;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      textCapitalization: TextCapitalization.words,
+      decoration: InputDecoration(
+          labelText: opcional ? '$label (opcional)' : label),
+      validator: (v) => validatePersonName(v,
+          campo: label.toLowerCase(), required: !opcional),
     );
   }
 }

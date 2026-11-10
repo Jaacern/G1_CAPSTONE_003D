@@ -5,6 +5,7 @@ Endpoints que la aplicacion ya consume:
     GET  /caregiver/today
     GET  /caregiver/plan
     POST /caregiver/plan/upgrade
+    POST /caregiver/plan/cancel
     GET  /caregiver/reports
 
 El perfil profesional (GET/PUT /caregiver/profile) vive en
@@ -14,7 +15,8 @@ Ninguno lleva paciente en la ruta: son del usuario que pide. El de hoy
 resuelve solo cual es el paciente que corresponde mostrar.
 """
 from datetime import date, datetime, timedelta, timezone
-from uuid import UUID
+from decimal import Decimal
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -27,6 +29,7 @@ from app.errors import ApiError
 # hoy() entra con nombre propio: en este modulo 'hoy' ya es una variable.
 from app.fechas import hoy as hoy_local
 from app.fechas import instante
+from app.payment_provider import PaymentNotConfigured, get_payment_provider
 
 router = APIRouter(prefix="/api/v1/caregiver", tags=["caregiver"])
 
@@ -227,6 +230,17 @@ class PlanOut(BaseModel):
     tier:        str
     features:    list[str]
     limits_text: str
+    # Hasta cuando tiene acceso a un plan de pago. Nulo en el gratuito y en
+    # un premium sin fecha de termino.
+    valid_until: datetime | None = None
+    # El usuario pidio no renovar: conserva el acceso hasta valid_until.
+    cancel_requested: bool = False
+    # purchase | admin (cortesia del personal). Nulo en el plan gratuito.
+    source:      str | None = None
+    # Precio mensual vigente del premium, para que la pantalla de
+    # suscripcion muestre el que de verdad se cobra y no uno escrito en la app.
+    offer_amount:   Decimal | None = None
+    offer_currency: str | None = None
 
 
 async def _plan_del_usuario(db: AsyncSession, user_id: str) -> PlanOut:
@@ -240,7 +254,8 @@ async def _plan_del_usuario(db: AsyncSession, user_id: str) -> PlanOut:
         await db.execute(
             text(
                 """
-                SELECT p.id, p.code
+                SELECT p.id, p.code, s.current_period_end, s.source,
+                       (s.cancel_requested_at IS NOT NULL) AS cancel_requested
                 FROM subscriptions s
                 JOIN plans p ON p.id = s.plan_id
                 WHERE s.user_id = :uid
@@ -301,10 +316,29 @@ async def _plan_del_usuario(db: AsyncSession, user_id: str) -> PlanOut:
         )
     ).mappings().all()
 
+    de_pago = "current_period_end" in plan  # el gratuito no trae suscripcion
+    oferta = (
+        await db.execute(
+            text(
+                """
+                SELECT pr.amount, pr.currency
+                  FROM plan_prices pr JOIN plans p ON p.id = pr.plan_id
+                 WHERE p.code = 'premium' AND p.status = 'active'
+                   AND pr.period = 'monthly' AND pr.valid_to IS NULL
+                 ORDER BY pr.valid_from DESC LIMIT 1
+                """
+            )
+        )
+    ).mappings().first()
     return PlanOut(
+        offer_amount=oferta["amount"] if oferta else None,
+        offer_currency=oferta["currency"] if oferta else None,
         tier=plan["code"],
         features=list(caracteristicas),
         limits_text=" · ".join(_texto_limite(l) for l in limites),
+        valid_until=plan["current_period_end"] if de_pago else None,
+        cancel_requested=bool(plan["cancel_requested"]) if de_pago else False,
+        source=plan["source"] if de_pago else None,
     )
 
 
@@ -340,63 +374,205 @@ async def upgrade_plan(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Pasa la cuenta al plan premium.
+    """Contrata el plan premium: cobra, abre la suscripcion y deja el cobro.
 
-    No hay cobro todavia. Cuando Alloxentric conecte la pasarela, el pago
-    ocurre antes de llamar aca y este endpoint pasa a recibir la referencia
-    del proveedor, que es para lo que existe subscriptions.provider_ref. Se
-    deja el periodo en un mes, que es lo que dura el ciclo en plan_prices.
+    El cobro lo procesa el proveedor de pagos configurado
+    (app/payment_provider.py). Hoy es uno simulado porque Alloxentric aun no
+    elige pasarela; cuando la elija, se escribe su adaptador y este
+    endpoint no cambia.
 
-    No se borra ni se reemplaza la suscripcion anterior: billing_events
-    apunta a ella y el historial de cobros no se pisa. Se reusa la fila del
-    usuario si ya existe, cambiandole el plan.
+    Deja lo mismo que dejaria un pago real:
+      - una suscripcion nueva con source = 'purchase' y la referencia del
+        proveedor en provider_ref;
+      - un evento 'charge' en billing_events, con el precio con que se
+        cobro y el periodo que cubre.
+
+    La suscripcion activa anterior (por ejemplo una cortesia del personal)
+    se cierra y no se edita: asi el historial muestra cada etapa. Si la
+    cuenta ya tiene premium comprado y vigente, no se cobra de nuevo.
     """
     premium = (
-        await db.execute(text("SELECT id FROM plans WHERE code = 'premium'"))
+        await db.execute(
+            text("SELECT id FROM plans WHERE code = 'premium' AND status = 'active'")
+        )
     ).scalar()
-    if premium is None:
+    precio = None
+    if premium is not None:
+        precio = (
+            await db.execute(
+                text(
+                    """
+                    SELECT id, amount, currency FROM plan_prices
+                     WHERE plan_id = :pid AND period = 'monthly'
+                       AND valid_to IS NULL
+                     ORDER BY valid_from DESC LIMIT 1
+                    """
+                ),
+                {"pid": str(premium)},
+            )
+        ).mappings().first()
+    if premium is None or precio is None:
         raise ApiError(
             status_code=500, code="PLAN_NOT_CONFIGURED",
-            message="El plan premium no esta configurado.",
+            message="El plan premium no esta disponible para contratar.",
         )
 
-    actual = (
+    activa = (
         await db.execute(
-            text("SELECT id FROM subscriptions WHERE user_id = :uid "
-                 "ORDER BY started_at DESC LIMIT 1"),
+            text(
+                """
+                SELECT s.id, s.source, p.tier,
+                       (s.cancel_requested_at IS NOT NULL) AS cancelada
+                  FROM subscriptions s
+                  JOIN plans p ON p.id = s.plan_id
+                 WHERE s.user_id = :uid AND s.status = 'active'
+                   AND (s.current_period_end IS NULL
+                        OR s.current_period_end > now())
+                 FOR UPDATE OF s
+                """
+            ),
             {"uid": user.user_id},
         )
+    ).mappings().first()
+    if activa is not None and activa["tier"] > 0 and activa["source"] == "purchase":
+        # Ya esta pagado el periodo en curso. Si habia pedido cancelar, volver
+        # a "suscribirse" solo retoma la renovacion: no se cobra otra vez.
+        if activa["cancelada"]:
+            await db.execute(
+                text("UPDATE subscriptions SET cancel_requested_at = NULL, "
+                     "updated_at = now() WHERE id = :sid"),
+                {"sid": str(activa["id"])},
+            )
+            await db.commit()
+        return await _plan_del_usuario(db, user.user_id)
+
+    try:
+        cobro = await get_payment_provider().cobrar(
+            user_id=user.user_id, monto=precio["amount"],
+            moneda=precio["currency"], descripcion="Suscripcion premium mensual",
+        )
+    except PaymentNotConfigured as e:
+        raise ApiError(status_code=503, code="PAYMENT_NOT_CONFIGURED",
+                       message=str(e))
+    if not cobro.ok:
+        raise ApiError(
+            status_code=402, code="PAYMENT_FAILED",
+            message=cobro.failure_reason or "No se pudo procesar el pago.",
+        )
+
+    # Se cierra la suscripcion activa antes de abrir la nueva: la base solo
+    # admite una activa por usuario.
+    await db.execute(
+        text(
+            """
+            UPDATE subscriptions
+               SET status = 'cancelled', cancelled_at = now(),
+                   change_reason = 'Reemplazada por una compra',
+                   updated_at = now()
+             WHERE user_id = :uid AND status = 'active'
+            """
+        ),
+        {"uid": user.user_id},
+    )
+    sub_id = (
+        await db.execute(
+            text(
+                """
+                INSERT INTO subscriptions
+                    (user_id, plan_id, status, started_at,
+                     current_period_end, provider_ref, source)
+                VALUES (:uid, :pid, 'active', now(),
+                        now() + interval '1 month', :ref, 'purchase')
+                RETURNING id
+                """
+            ),
+            {"uid": user.user_id, "pid": str(premium), "ref": cobro.provider_ref},
+        )
     ).scalar()
+    await db.execute(
+        text(
+            """
+            INSERT INTO billing_events
+                (subscription_id, plan_price_id, type, status, amount, currency,
+                 period_start, period_end, provider_ref, provider_event_id,
+                 occurred_at)
+            VALUES (:sid, :prid, 'charge', 'succeeded', :amt, :cur,
+                    now(), now() + interval '1 month', :ref, :evt, now())
+            """
+        ),
+        {"sid": str(sub_id), "prid": str(precio["id"]), "amt": precio["amount"],
+         "cur": precio["currency"], "ref": cobro.provider_ref,
+         "evt": cobro.provider_event_id},
+    )
 
-    if actual is None:
+    await db.commit()
+    return await _plan_del_usuario(db, user.user_id)
+
+
+@router.post("/plan/cancel", response_model=PlanOut)
+async def cancel_plan(
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cancela la renovacion del premium. El acceso sigue hasta fin de periodo.
+
+    No corta el acceso en el acto ni reembolsa: el periodo en curso ya esta
+    pagado. La suscripcion queda marcada para no renovarse, y cuando vence
+    la cuenta vuelve sola al plan gratuito. Se puede retomar antes de que
+    venza volviendo a suscribirse (no se cobra de nuevo).
+
+    Solo aplica a un premium comprado. Una cortesia del personal termina en
+    la fecha que le fijaron y no se cancela desde aqui.
+    """
+    activa = (
         await db.execute(
             text(
                 """
-                INSERT INTO subscriptions (
-                    user_id, plan_id, status, started_at, current_period_end
-                ) VALUES (
-                    :uid, :pid, 'active', now(), now() + interval '1 month'
-                )
+                SELECT s.id, s.source, s.current_period_end,
+                       (s.cancel_requested_at IS NOT NULL) AS cancelada
+                  FROM subscriptions s
+                  JOIN plans p ON p.id = s.plan_id
+                 WHERE s.user_id = :uid AND s.status = 'active' AND p.tier > 0
+                   AND (s.current_period_end IS NULL
+                        OR s.current_period_end > now())
+                 ORDER BY p.tier DESC
+                 LIMIT 1
+                 FOR UPDATE OF s
                 """
             ),
-            {"uid": user.user_id, "pid": str(premium)},
+            {"uid": user.user_id},
         )
-    else:
-        await db.execute(
-            text(
-                """
-                UPDATE subscriptions
-                   SET plan_id = :pid,
-                       status = 'active',
-                       cancelled_at = NULL,
-                       current_period_end = now() + interval '1 month',
-                       updated_at = now()
-                 WHERE id = :sid
-                """
-            ),
-            {"pid": str(premium), "sid": str(actual)},
-        )
+    ).mappings().first()
 
+    if activa is None:
+        raise ApiError(status_code=409, code="NO_ACTIVE_SUBSCRIPTION",
+                       message="No tienes una suscripcion premium activa.")
+    if activa["source"] != "purchase":
+        raise ApiError(
+            status_code=409, code="COURTESY_NOT_CANCELLABLE",
+            message="Tu premium es una cortesia de AgeCare y termina en su "
+                    "fecha de vencimiento. No hay nada que cancelar.",
+        )
+    if activa["cancelada"]:
+        return await _plan_del_usuario(db, user.user_id)
+
+    await db.execute(
+        text("UPDATE subscriptions SET cancel_requested_at = now(), "
+             "updated_at = now() WHERE id = :sid"),
+        {"sid": str(activa["id"])},
+    )
+    await db.execute(
+        text(
+            """
+            INSERT INTO billing_events
+                (subscription_id, type, status, provider_ref,
+                 provider_event_id, occurred_at)
+            VALUES (:sid, 'cancelled', 'succeeded', :ref, :evt, now())
+            """
+        ),
+        {"sid": str(activa["id"]), "ref": f"user:{user.user_id}",
+         "evt": f"cancel-{uuid4()}"},
+    )
     await db.commit()
     return await _plan_del_usuario(db, user.user_id)
 

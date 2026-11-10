@@ -83,6 +83,11 @@ services:
       OCR_PROVIDER: ${OCR_PROVIDER:-tesseract}
       # Solo para 'nvidia_parse'. Sin OCR_API_KEY usa ASSISTANT_API_KEY.
       OCR_API_KEY: ${OCR_API_KEY:-}
+
+      # Cobro de la suscripcion premium. 'simulated' aprueba sin mover
+      # dinero (Alloxentric aun no elige pasarela, ver app/payment_provider.py).
+      # Con 'none' contratar responde 503. NO dejar 'simulated' en produccion.
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-simulated}
       SPEECH_REGION: ${SPEECH_REGION:-}
       SPEECH_API_KEY: ${SPEECH_API_KEY:-}
     ports:

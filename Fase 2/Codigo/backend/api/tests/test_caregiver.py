@@ -228,7 +228,23 @@ async def main(client, rr):
         else:
             print(f"  FALLA hay {cuantas} suscripciones")
 
-    # reactivar una cancelada
+    # la compra deja la suscripcion marcada y su cobro en el historial
+    async with _eng.begin() as c:
+        compra = (await c.execute(_t(
+            "SELECT s.source, s.provider_ref, "
+            "       (SELECT count(*) FROM billing_events b "
+            "         WHERE b.subscription_id = s.id AND b.type = 'charge' "
+            "           AND b.status = 'succeeded' AND b.amount > 0) AS cobros "
+            "FROM subscriptions s WHERE s.user_id=:u"),
+            {"u": str(libre)})).mappings().first()
+    n += 1
+    if compra and compra["source"] == "purchase" and compra["cobros"] == 1 \
+            and compra["provider_ref"]:
+        ok += 1; print("  OK   la compra queda como purchase con su cobro registrado")
+    else:
+        print(f"  FALLA compra: {dict(compra) if compra else None}")
+
+    # una cancelada no se reabre: la nueva compra abre otra suscripcion
     async with _eng.begin() as c:
         await c.execute(_t(
             "UPDATE subscriptions SET status='cancelled', cancelled_at=now() "
@@ -237,17 +253,24 @@ async def main(client, rr):
     n += 1
     if r.status_code == 200 and r.json()["tier"] == "premium":
         async with _eng.begin() as c:
-            canc = (await c.execute(_t(
-                "SELECT cancelled_at FROM subscriptions WHERE user_id=:u"),
-                {"u": str(libre)})).scalar()
-        if canc is None:
-            ok += 1; print("  OK   reactiva una cancelada y limpia la fecha de baja")
+            total, activas, cobros = (await c.execute(_t(
+                "SELECT count(*), count(*) FILTER (WHERE s.status='active'), "
+                "       (SELECT count(*) FROM billing_events b "
+                "         JOIN subscriptions s2 ON s2.id=b.subscription_id "
+                "        WHERE s2.user_id=:u AND b.type='charge') "
+                "FROM subscriptions s WHERE s.user_id=:u"),
+                {"u": str(libre)})).one()
+        if total == 2 and activas == 1 and cobros == 2:
+            ok += 1; print("  OK   volver a comprar abre otra suscripcion y otro cobro")
         else:
-            print("  FALLA quedo la fecha de baja")
+            print(f"  FALLA total={total} activas={activas} cobros={cobros}")
     else:
         print(f"  FALLA {r.status_code}")
 
     async with _eng.begin() as c:
+        await c.execute(_t(
+            "DELETE FROM billing_events WHERE subscription_id IN "
+            "(SELECT id FROM subscriptions WHERE user_id=:u)"), {"u": str(libre)})
         await c.execute(_t("DELETE FROM subscriptions WHERE user_id=:u"), {"u": str(libre)})
 
     check("mejorar sin autenticar", 401,

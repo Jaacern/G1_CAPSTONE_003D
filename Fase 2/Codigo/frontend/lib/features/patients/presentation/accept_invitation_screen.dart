@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../auth/application/auth_controller.dart';
+import '../application/patients_providers.dart';
 import '../data/patients_repository.dart';
 import '../domain/models.dart';
 
@@ -44,6 +46,19 @@ class _AcceptInvitationScreenState extends ConsumerState<AcceptInvitationScreen>
     try {
       final card =
           await ref.read(patientsRepositoryProvider).acceptInvitation(code);
+      // Sin esto la lista de pacientes y el perfil siguen como antes de
+      // unirse, y al volver a Inicio el paciente nuevo no aparece.
+      ref.invalidate(myPatientsProvider);
+      // Solo si la sesion ya esta cargada (siempre, en la app real). Si no,
+      // read() la crearia desde cero aqui, con su restauracion y su espera.
+      // Y si el refresco falla, la union ya ocurrio en el servidor: se
+      // muestra el exito igual y el perfil se pone al dia en la proxima carga.
+      if (ref.exists(authControllerProvider)) {
+        try {
+          await ref.read(authControllerProvider.notifier).refreshProfile();
+        } catch (_) {}
+      }
+      if (!mounted) return;
       setState(() => _joined = card);
     } on ApiException catch (e) {
       setState(() => _error = e.message);

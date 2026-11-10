@@ -9,10 +9,11 @@ Cambios 2FN aplicados al esquema:
 """
 import json
 import re
+import secrets
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -27,7 +28,8 @@ from app.deps import (
     is_verified_doctor,
 )
 from app.errors import ApiError
-from app.security import generate_refresh_token, hash_token
+from app.ratelimit import LIMIT_INVITE_CODE, limiter
+from app.security import hash_token
 from app.validators import (
     clean_person_name,
     normalize_phone,
@@ -37,6 +39,11 @@ from app.validators import (
 router = APIRouter(prefix="/api/v1", tags=["patients"])
 
 INVITATION_TTL_DAYS = 7
+# Codigo de invitacion: 6 digitos, lo que pide la app y lo que se puede dictar
+# por telefono (AGE-205). Un millon de valores alcanza porque solo compiten las
+# invitaciones pendientes (vencen a los 7 dias) y el canje tiene limite de
+# intentos por IP (ratelimit.LIMIT_INVITE_CODE).
+INVITATION_CODE_DIGITS = 6
 WEARABLE_STALE_AFTER = timedelta(hours=2)
 
 _SEX_API_TO_DB = {"female": "F", "male": "M", "other": "O"}
@@ -313,7 +320,9 @@ class InvitationCreateOut(BaseModel):
 
 
 class InvitationAcceptIn(BaseModel):
-    token: str
+    # Se reconoce el formato en el borde: algo que no son 6 digitos no llega
+    # a la base ni gasta un intento contra ella.
+    token: str = Field(pattern=r"^\d{6}$")
 
 
 class InvitationAcceptOut(BaseModel):
@@ -334,7 +343,7 @@ class MemberOut(BaseModel):
 
 class PendingInvitationOut(BaseModel):
     invitation_id: str
-    email:         str
+    email:         str | None = None   # opcional: el codigo se comparte aparte
     role:          str
     profession:    str | None = None
     expires_at:    datetime
@@ -1655,7 +1664,19 @@ async def create_invitation(
             raise ApiError(status_code=409, code="ELDER_ALREADY_LINKED",
                            message="El paciente ya tiene una cuenta de adulto mayor vinculada.")
 
-    token = generate_refresh_token()
+    # Reinvitar al mismo correo reemplaza el codigo anterior en vez de chocar
+    # con el indice ux_invitations_pending (una pendiente por correo).
+    if payload.email is not None:
+        await db.execute(
+            text(
+                "UPDATE invitations SET revoked_at = now() "
+                "WHERE patient_id = :pid AND lower(email) = lower(:email) "
+                "AND accepted_at IS NULL AND revoked_at IS NULL"
+            ),
+            {"pid": ctx.patient_id, "email": payload.email},
+        )
+
+    code = await _new_invitation_code(db)
     expires_at = datetime.now(timezone.utc) + timedelta(days=INVITATION_TTL_DAYS)
 
     invitation = (
@@ -1665,10 +1686,10 @@ async def create_invitation(
                 "VALUES (:pid, :email, :role, :prof, :rel, :th, :inviter, :exp) RETURNING id, expires_at"
             ),
             {
-                "pid": ctx.patient_id, "email": payload.email or "",
+                "pid": ctx.patient_id, "email": payload.email,
                 "role": payload.role, "prof": payload.profession,
                 "rel": payload.relationship,
-                "th": hash_token(token),
+                "th": hash_token(code),
                 "inviter": ctx.user.user_id, "exp": expires_at,
             },
         )
@@ -1677,17 +1698,42 @@ async def create_invitation(
 
     return InvitationCreateOut(
         invitation_id=str(invitation["id"]),
-        token=token,
-        invite_url=f"https://app.agecare.app/invite/{token}",
+        token=code,
+        invite_url=f"https://app.agecare.app/invite/{code}",
         expires_at=invitation["expires_at"],
     )
+
+
+async def _new_invitation_code(db: AsyncSession) -> str:
+    """Un codigo de 6 digitos que no use ninguna invitacion pendiente.
+
+    Se sortea con secrets (no random: el codigo da acceso a una ficha
+    clinica) y se revisa contra las pendientes, que son las unicas que el
+    indice ux_invitations_token obliga a ser distintas. Con un millon de
+    valores y pocas pendientes, casi siempre basta el primer intento.
+    """
+    for _ in range(20):
+        code = f"{secrets.randbelow(10 ** INVITATION_CODE_DIGITS):0{INVITATION_CODE_DIGITS}d}"
+        taken = (
+            await db.execute(
+                text("SELECT 1 FROM invitations WHERE token_hash = :th "
+                     "AND accepted_at IS NULL AND revoked_at IS NULL"),
+                {"th": hash_token(code)},
+            )
+        ).first()
+        if taken is None:
+            return code
+    raise ApiError(status_code=503, code="INVITATION_CODE_UNAVAILABLE",
+                   message="No se pudo generar el código. Intenta de nuevo en un momento.")
 
 
 # --------------------------------------------------------------------------
 # 4.6 Aceptar invitación
 # --------------------------------------------------------------------------
 @router.post("/invitations/accept", response_model=InvitationAcceptOut)
+@limiter.limit(LIMIT_INVITE_CODE)
 async def accept_invitation(
+    request: Request,
     payload: InvitationAcceptIn,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1708,6 +1754,21 @@ async def accept_invitation(
 
     if invitation is None:
         raise invalid
+
+    # Quien ya esta en el circulo no se une de nuevo: el ON CONFLICT de abajo
+    # le cambiaria el rol (un familiar administrador quedaria como cuidadora
+    # de su propio paciente). El codigo no se gasta y sigue sirviendo para
+    # la persona a quien iba dirigido.
+    already = (
+        await db.execute(
+            text("SELECT 1 FROM patient_members WHERE patient_id = :pid "
+                 "AND user_id = :uid AND removed_at IS NULL"),
+            {"pid": str(invitation["patient_id"]), "uid": user.user_id},
+        )
+    ).first()
+    if already:
+        raise ApiError(status_code=409, code="MEMBER_ALREADY_EXISTS",
+                       message="Ya formas parte del círculo de cuidado de este paciente.")
 
     # Invitar "como médico" no vuelve médico a nadie: solo puede aceptar quien
     # tenga una habilitación vigente. Si no, el familiar administrador podría

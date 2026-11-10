@@ -44,6 +44,8 @@ pytesseract==0.3.13
 # Abre la imagen, corrige la orientacion que guarda la camara en el EXIF y la
 # pasa a escala de grises antes de leerla.
 Pillow==11.0.0
+# Cliente HTTP del OCR de NVIDIA (Nemotron Parse).
+httpx==0.27.2
 
 # Rate limiting (DevSecOps — hallazgo F3/F4 de la auditoria de seguridad).
 # Pone un limite por IP a los endpoints sensibles (login, refresh, vinculacion

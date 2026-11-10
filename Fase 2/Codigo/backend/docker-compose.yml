@@ -81,6 +81,8 @@ services:
       # Con 'none' los endpoints responden 503 con un codigo que la
       # aplicacion distingue, igual que el asistente y la voz.
       OCR_PROVIDER: ${OCR_PROVIDER:-tesseract}
+      # Solo para 'nvidia_parse'. Sin OCR_API_KEY usa ASSISTANT_API_KEY.
+      OCR_API_KEY: ${OCR_API_KEY:-}
       SPEECH_REGION: ${SPEECH_REGION:-}
       SPEECH_API_KEY: ${SPEECH_API_KEY:-}
     ports:

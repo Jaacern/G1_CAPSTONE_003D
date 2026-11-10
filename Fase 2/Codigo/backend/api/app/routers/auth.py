@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.deps import CurrentUser, get_current_user, is_verified_doctor
 from app.errors import ApiError
-from app.ratelimit import LIMIT_LOGIN, LIMIT_REFRESH, limiter
+from app.ratelimit import LIMIT_INVITE_CODE, LIMIT_LOGIN, LIMIT_REFRESH, limiter
 from app.validators import clean_person_name, normalize_phone, parse_rut
 from app.security import (
     create_access_token,
@@ -269,7 +269,11 @@ class DeviceOut(BaseModel):
 # 3.1 Registrar cuenta
 # --------------------------------------------------------------------------
 @router.post("/auth/register", response_model=RegisterOut, status_code=201)
-async def register(payload: RegisterIn, db: AsyncSession = Depends(get_db)):
+# El registro acepta un codigo de invitacion de 6 digitos: sin limite seria
+# la forma de probar codigos al azar sin pasar por /invitations/accept.
+@limiter.limit(LIMIT_INVITE_CODE)
+async def register(request: Request, payload: RegisterIn,
+                   db: AsyncSession = Depends(get_db)):
     if not _PASSWORD_RE.match(payload.password):
         raise ApiError(
             status_code=400,

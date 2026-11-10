@@ -38,5 +38,9 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["240/minute"])
 LIMIT_LOGIN = "10/minute"        # F4: fuerza bruta de credenciales.
 LIMIT_REFRESH = "60/minute"      # rotacion normal; corta el abuso.
 LIMIT_DEVICE_LINK = "12/minute"  # F1/F3: fuerza bruta del codigo de 6 digitos.
+# Canje del codigo de invitacion al circulo de cuidado (6 digitos). Cubre
+# /invitations/accept y /auth/register, que tambien acepta el codigo: sin
+# limite en las dos puertas, cerrar una sola no serviria de nada.
+LIMIT_INVITE_CODE = "12/minute"
 LIMIT_SOS = "20/minute"          # evita spam de alertas criticas.
 LIMIT_AI = "20/minute"           # IA/voz: tienen costo por uso del proveedor.

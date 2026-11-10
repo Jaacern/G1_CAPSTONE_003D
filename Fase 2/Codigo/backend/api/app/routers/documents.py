@@ -14,15 +14,17 @@ switch sobre sus propias claves. Si la API devolviera los codigos de la
 base, todos los documentos caerian en el grupo 'Otros' y la pantalla
 perderia lo unico que hace.
 """
+import logging
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import get_db
+from app.db import SessionLocal, get_db
+from app.ocr_provider import get_ocr
 from app.deps import CurrentUser, PatientContext, get_current_user, get_patient_member
 from app.errors import ApiError
 from app.routers.logbook import (
@@ -34,6 +36,7 @@ from app.routers.logbook import (
 from app.storage import DOWNLOAD_TTL_MINUTES, get_storage
 
 router = APIRouter(prefix="/api/v1", tags=["documents"])
+log = logging.getLogger(__name__)
 
 # De la clave de la pantalla al codigo de la base.
 _A_BASE = {
@@ -144,6 +147,7 @@ class DocumentIn(BaseModel):
              status_code=201)
 async def add_document(
     payload: DocumentIn,
+    background: BackgroundTasks,
     ctx: PatientContext = Depends(get_patient_member(["family", "caregiver", "doctor"])),
     db: AsyncSession = Depends(get_db),
 ):
@@ -194,7 +198,61 @@ async def add_document(
     ).mappings().first()
     await db.commit()
 
+    # La lectura corre despues de responder: el modelo tarda segundos y la
+    # pantalla no debe esperar. Si falla, el documento queda igual en el
+    # expediente y el texto se puede pedir luego con POST /files/{id}/ocr.
+    #
+    # Solo las recetas (RF-31). Es una decision de minimizacion de datos: el
+    # OCR puede mandar la imagen a un tercero, y un documento de identidad o
+    # un informe no lo necesitan para nada de lo que la aplicacion hace hoy.
+    # El resto se puede leer a pedido con POST /files/{id}/ocr.
+    if categoria == "prescription":
+        background.add_task(_leer_documento, str(file_id))
+
     return _salida({**dict(fila), "full_name": ctx.user.full_name})
+
+
+async def _leer_documento(file_id: str) -> None:
+    """OCR de un documento recien agregado. Nunca propaga errores."""
+    ocr = get_ocr()
+    if not ocr.disponible:
+        return
+    try:
+        async with SessionLocal() as db:
+            f = (
+                await db.execute(
+                    text(
+                        """
+                        SELECT f.storage_key, f.mime_type
+                        FROM files f
+                        WHERE f.id = :fid AND f.status = 'stored'
+                          AND f.scope = 'patient'
+                          AND NOT EXISTS (SELECT 1 FROM file_ocr o WHERE o.file_id = f.id)
+                        """
+                    ),
+                    {"fid": file_id},
+                )
+            ).mappings().first()
+            if f is None or not f["mime_type"].startswith("image/"):
+                return
+            contenido = await get_storage().load(storage_key=f["storage_key"])
+            r = await ocr.extraer(contenido=contenido, mime_type=f["mime_type"])
+            await db.execute(
+                text(
+                    """
+                    INSERT INTO file_ocr
+                        (file_id, texto, motor, idioma, confianza, caracteres)
+                    VALUES (:fid, :txt, :motor, :idioma, :conf, :chars)
+                    ON CONFLICT (file_id) DO NOTHING
+                    """
+                ),
+                {"fid": file_id, "txt": r.texto, "motor": r.motor,
+                 "idioma": r.idioma, "conf": r.confianza, "chars": r.caracteres},
+            )
+            await db.commit()
+    except Exception as e:
+        # Solo el tipo: el mensaje puede traer fragmentos del documento.
+        log.warning("OCR automatico fallo para %s: %s", file_id, type(e).__name__)
 
 
 # ---------------------------------------------------------------------------

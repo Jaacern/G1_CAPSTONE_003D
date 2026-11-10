@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -30,7 +31,11 @@ class PremiumScreen extends ConsumerStatefulWidget {
 class _PremiumScreenState extends ConsumerState<PremiumScreen> {
   static const String _kProductId = 'agecare_premium_monthly';
 
-  final InAppPurchase _iap = InAppPurchase.instance;
+  // in_app_purchase no tiene implementación web: tocar InAppPurchase.instance
+  // en el navegador lanza LateInitializationError y deja la pantalla en rojo.
+  // En web y en modo demo no hay tienda; la compra se simula.
+  static const bool _hayTienda = !kIsWeb && !AppConfig.useMocks;
+  final InAppPurchase? _iap = _hayTienda ? InAppPurchase.instance : null;
   StreamSubscription<List<PurchaseDetails>>? _sub;
 
   bool _loading = true;
@@ -43,7 +48,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
   @override
   void initState() {
     super.initState();
-    _sub = _iap.purchaseStream.listen(
+    _sub = _iap?.purchaseStream.listen(
       _onPurchaseUpdate,
       onError: (e) {
         if (mounted) setState(() => _error = e.toString());
@@ -64,15 +69,16 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
       _error = null;
     });
     try {
-      // En modo demo no dependemos de la tienda.
-      if (AppConfig.useMocks) {
+      // En demo y en web no hay tienda.
+      final iap = _iap;
+      if (iap == null) {
         setState(() {
           _storeAvailable = false;
           _loading = false;
         });
         return;
       }
-      final available = await _iap.isAvailable();
+      final available = await iap.isAvailable();
       if (!available) {
         setState(() {
           _storeAvailable = false;
@@ -80,7 +86,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
         });
         return;
       }
-      final response = await _iap.queryProductDetails({_kProductId});
+      final response = await iap.queryProductDetails({_kProductId});
       setState(() {
         _storeAvailable = true;
         _product = response.productDetails.isNotEmpty
@@ -106,7 +112,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
           p.status == PurchaseStatus.restored) {
         await _activateOnBackend();
         if (p.pendingCompletePurchase) {
-          await _iap.completePurchase(p);
+          await _iap?.completePurchase(p);
         }
       } else if (p.status == PurchaseStatus.error) {
         if (mounted) {
@@ -152,7 +158,8 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
     });
 
     // Demo / tienda no disponible: simulamos la compra y activamos el plan.
-    if (AppConfig.useMocks || !_storeAvailable || _product == null) {
+    final iap = _iap;
+    if (iap == null || !_storeAvailable || _product == null) {
       await Future.delayed(const Duration(milliseconds: 700));
       await _activateOnBackend();
       return;
@@ -161,7 +168,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
     try {
       final param = PurchaseParam(productDetails: _product!);
       // Suscripción -> se trata como non-consumable en in_app_purchase.
-      await _iap.buyNonConsumable(purchaseParam: param);
+      await iap.buyNonConsumable(purchaseParam: param);
       // El resultado llega por purchaseStream (_onPurchaseUpdate).
     } catch (e) {
       if (mounted) {

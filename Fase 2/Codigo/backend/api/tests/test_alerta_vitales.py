@@ -144,12 +144,25 @@ async def main():
         check("solo mira la ultima medicion de cada tipo",
               len(await alerta_de(c, tapada)) == 0, r5)
 
-        # Un tipo sin umbral configurado no alerta nunca.
+        # Un tipo sin umbral configurado no alerta nunca. La semilla puede
+        # traer umbral de glucosa: se da de baja mientras dura este caso y
+        # se restaura despues, para no depender de los datos de prueba.
+        baja_glucosa = [str(x) for x in (await c.execute(text(
+            "UPDATE vital_thresholds SET deleted_at = now() "
+            "WHERE patient_id = :p AND type = 'glucose' AND deleted_at IS NULL "
+            "RETURNING id"), {"p": PAC})).scalars().all()]
         sin_umbral = await medir(c, "glucose", 400)
     r6 = await alertar_vitales_fuera_de_rango(verbose=False)
     async with engine.begin() as c:
         check("un tipo sin umbral no alerta",
               len(await alerta_de(c, sin_umbral)) == 0, r6)
+        # La medicion de prueba se va antes de devolver el umbral: si no,
+        # vuelve a contar en las corridas siguientes de este mismo test.
+        await c.execute(text("DELETE FROM vital_readings WHERE id = :i"),
+                        {"i": sin_umbral})
+        for tid in baja_glucosa:
+            await c.execute(text("UPDATE vital_thresholds SET deleted_at = NULL "
+                                 "WHERE id = :i"), {"i": tid})
 
         # La ventana frena, pero no descarta.
         await c.execute(text("UPDATE system_parameters SET value = '30' "

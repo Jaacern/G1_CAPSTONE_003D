@@ -48,6 +48,11 @@ async def vital(db):
 async def main():
     async with engine.begin() as c:
         await limpiar(c)
+        # Cuantos umbrales tiene el paciente antes de empezar: la semilla
+        # puede crecer y el test solo debe comprobar que no deja nada suyo.
+        base = (await c.execute(text(
+            "SELECT count(*) FROM vital_thresholds WHERE patient_id = :p"),
+            {"p": PAC})).scalar()
         await c.execute(text(
             "INSERT INTO vital_thresholds (patient_id, type, min_value, "
             "  max_value, updated_by) VALUES (:p, :t, 70, 180, :u)"),
@@ -117,7 +122,7 @@ async def main():
         quedan = (await c.execute(text(
             "SELECT count(*) FROM vital_thresholds WHERE patient_id = :p"),
             {"p": PAC})).scalar()
-        check("la prueba no deja nada suyo atras", quedan == 2, quedan)
+        check("la prueba no deja nada suyo atras", quedan == base, (quedan, base))
 
     await engine.dispose()
     print(f"\n{ok} ok, {fallo} fallas")

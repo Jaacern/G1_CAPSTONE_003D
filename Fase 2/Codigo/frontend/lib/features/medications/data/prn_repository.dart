@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
-import '../domain/prn.dart';
+import '../domain/_prn.dart';
 
 /// Indicaciones SOS del paciente y el registro de cada uso.
 abstract class PrnRepository {

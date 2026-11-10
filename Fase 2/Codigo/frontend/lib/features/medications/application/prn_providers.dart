@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/prn_repository.dart';
-import '../domain/prn.dart';
+import '../domain/_prn.dart';
 
 /// SOS vigentes de un paciente con su estado (último uso, lo dado en 24 h).
 final prnItemsProvider = FutureProvider.autoDispose

@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../application/prn_providers.dart';
-import '../domain/prn.dart';
+import '../domain/_prn.dart';
 
 /// Aviso de medicamentos SOS disponibles para un paciente.
 ///

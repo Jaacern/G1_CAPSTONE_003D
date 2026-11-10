@@ -6,7 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../application/prn_providers.dart';
 import '../data/prn_repository.dart';
-import '../domain/prn.dart';
+import '../domain/_prn.dart';
 
 /// Medicamentos SOS del paciente: qué hay indicado "solo si se necesita",
 /// cuándo se usó por última vez y cuánto se lleva en 24 h.

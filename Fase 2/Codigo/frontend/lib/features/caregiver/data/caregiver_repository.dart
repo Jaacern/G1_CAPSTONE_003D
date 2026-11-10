@@ -14,6 +14,7 @@ abstract class CaregiverRepository {
   // Freemium
   Future<CaregiverPlan> getPlan();
   Future<CaregiverPlan> upgradePlan();
+  Future<CaregiverPlan> cancelPlan();
 
   // Reportes. [days] es 7, 30 o 90; más de 7 es Premium (402 si no).
   // El perfil profesional vive en ProfessionalProfileRepository.
@@ -89,6 +90,13 @@ class CaregiverRepositoryHttp implements CaregiverRepository {
   Future<CaregiverPlan> upgradePlan() async {
     final res =
         await _api.post<Map<String, dynamic>>('/caregiver/plan/upgrade');
+    return CaregiverPlan.fromJson(res);
+  }
+
+  @override
+  Future<CaregiverPlan> cancelPlan() async {
+    final res =
+        await _api.post<Map<String, dynamic>>('/caregiver/plan/cancel');
     return CaregiverPlan.fromJson(res);
   }
 
@@ -321,7 +329,7 @@ class CaregiverRepositoryMock implements CaregiverRepository {
   @override
   Future<CaregiverPlan> upgradePlan() async {
     await Future.delayed(const Duration(milliseconds: 600));
-    _plan = const CaregiverPlan(
+    _plan = CaregiverPlan(
       tier: PlanTier.premium,
       features: [
         'Pacientes ilimitados',
@@ -330,6 +338,22 @@ class CaregiverRepositoryMock implements CaregiverRepository {
         'Soporte prioritario',
       ],
       limitsText: 'Sin límites',
+      validUntil: DateTime.now().add(const Duration(days: 30)),
+      source: 'purchase',
+    );
+    return _plan;
+  }
+
+  @override
+  Future<CaregiverPlan> cancelPlan() async {
+    await Future.delayed(const Duration(milliseconds: 400));
+    _plan = CaregiverPlan(
+      tier: _plan.tier,
+      features: _plan.features,
+      limitsText: _plan.limitsText,
+      validUntil: _plan.validUntil,
+      source: _plan.source,
+      cancelRequested: true,
     );
     return _plan;
   }

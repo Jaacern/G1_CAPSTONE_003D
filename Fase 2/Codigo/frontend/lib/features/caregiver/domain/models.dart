@@ -379,11 +379,31 @@ class CaregiverPlan {
     required this.tier,
     this.features = const [],
     required this.limitsText,
+    this.validUntil,
+    this.cancelRequested = false,
+    this.source,
+    this.offerAmount,
+    this.offerCurrency,
   });
 
   final PlanTier tier;
   final List<String> features;
   final String limitsText;
+
+  /// Hasta cuándo tiene acceso a un plan de pago (null si no vence).
+  final DateTime? validUntil;
+
+  /// Pidió no renovar: conserva el acceso hasta [validUntil].
+  final bool cancelRequested;
+
+  /// 'purchase' (la compró) o 'admin' (cortesía de AgeCare).
+  final String? source;
+
+  /// Precio mensual vigente del premium, según el catálogo del backend.
+  final num? offerAmount;
+  final String? offerCurrency;
+
+  bool get isCourtesy => source == 'admin';
 
   factory CaregiverPlan.fromJson(Map<String, dynamic> json) => CaregiverPlan(
         tier: PlanTier.fromApi((json['tier'] ?? 'free') as String),
@@ -391,12 +411,25 @@ class CaregiverPlan {
             .map((e) => e.toString())
             .toList(),
         limitsText: (json['limits_text'] ?? json['limits'] ?? '').toString(),
+        validUntil: json['valid_until'] == null
+            ? null
+            : DateTime.tryParse(json['valid_until'].toString())?.toLocal(),
+        cancelRequested: (json['cancel_requested'] ?? false) as bool,
+        source: json['source'] as String?,
+        // El backend serializa los decimales como texto ("5990.00").
+        offerAmount: json['offer_amount'] == null
+            ? null
+            : num.tryParse(json['offer_amount'].toString()),
+        offerCurrency: json['offer_currency'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
         'tier': tier.apiValue,
         'features': features,
         'limits_text': limitsText,
+        'valid_until': validUntil?.toIso8601String(),
+        'cancel_requested': cancelRequested,
+        'source': source,
       };
 }
 

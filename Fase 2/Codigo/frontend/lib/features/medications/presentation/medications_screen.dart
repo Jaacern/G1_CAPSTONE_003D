@@ -11,6 +11,8 @@ import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/models.dart';
 import '../../patients/application/patients_providers.dart';
 import '../application/medications_providers.dart';
+import '../application/treatments_providers.dart';
+import '../domain/treatment.dart';
 import '../domain/models.dart';
 import 'dose_actions.dart';
 
@@ -66,9 +68,9 @@ class MedicationsScreen extends ConsumerWidget {
           ? null
           : FloatingActionButton.extended(
               onPressed: () =>
-                  context.push('/meds/plan?patient=${patient.patientId}'),
+                  indicarTratamiento(context, ref, patient.patientId),
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Agregar'),
+              label: const Text('Indicar tratamiento'),
             ),
       body: const MedicationsBody(),
     );
@@ -83,7 +85,6 @@ class MedicationsBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final patient = ref.watch(selectedPatientProvider);
-    final meds = ref.watch(medicationsProvider);
     final canManage = _canManageMeds(ref);
 
     if (patient == null) {
@@ -95,7 +96,7 @@ class MedicationsBody extends ConsumerWidget {
 
     return RefreshIndicator(
       onRefresh: () async {
-        ref.invalidate(medicationsProvider);
+        ref.invalidate(treatmentsProvider);
         ref.invalidate(todayDosesProvider);
         ref.invalidate(adherenceProvider);
       },
@@ -115,8 +116,8 @@ class MedicationsBody extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleMedium),
               ),
-              // El familiar ve el plan en solo lectura (lo gestiona la
-              // cuidadora o el médico).
+              // Familia y cuidadora ven el plan en solo lectura: lo indica
+              // y lo cambia el médico.
               if (!canManage)
                 Container(
                   padding:
@@ -134,43 +135,8 @@ class MedicationsBody extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 8),
-          meds.when(
-            loading: () => const Padding(
-                padding: EdgeInsets.only(top: 24), child: LoadingView()),
-            error: (e, _) => ErrorView(
-                message: e.toString(),
-                onRetry: () => ref.invalidate(medicationsProvider)),
-            data: (list) => list.isEmpty
-                ? EmptyView(
-                    icon: Icons.medication_rounded,
-                    title: 'Sin medicamentos',
-                    subtitle: canManage
-                        ? (AppConfig.hasPrescriptionScan
-                            ? 'Agrega uno o escanea una receta para empezar.'
-                            : 'Agrega el primer medicamento para empezar.')
-                        : 'El plan lo configuran la cuidadora o el médico.',
-                    action: canManage
-                        ? FilledButton.icon(
-                            onPressed: () => context.push(
-                                '/meds/plan?patient=${patient.patientId}'),
-                            icon: const Icon(Icons.add_rounded),
-                            label: const Text('Agregar medicamento'),
-                          )
-                        : null,
-                  )
-                : Column(
-                    children: [
-                      for (final m in list)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _MedicationCard(
-                            medication: m,
-                            patientId: patient.patientId,
-                          ),
-                        ),
-                    ],
-                  ),
-          ),
+          _PlanDesdeTratamientos(
+              patientId: patient.patientId, canManage: canManage),
         ],
       ),
     );
@@ -469,56 +435,186 @@ class _StatusChip extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Tarjeta de medicamento
+// Plan de medicación: los tratamientos vigentes
 // ---------------------------------------------------------------------------
-class _MedicationCard extends ConsumerWidget {
-  const _MedicationCard({required this.medication, required this.patientId});
 
-  final Medication medication;
+/// Abre el editor de tratamientos de la especialidad que el médico elija.
+///
+/// Es el único camino para indicar o cambiar un medicamento: el editor usa el
+/// catálogo de fármacos (unidad fija y dosis dentro del rango seguro), cruza
+/// alergias y deja la versión anterior en el historial. La antigua pantalla
+/// "Agregar medicamento" escribía un nombre libre en otra tabla y, si el
+/// paciente ya tenía tratamiento, esas dosis nunca se generaban.
+Future<void> indicarTratamiento(
+    BuildContext context, WidgetRef ref, String patientId) async {
+  final vigentes =
+      ref.read(treatmentsProvider).valueOrNull?.vigentes ?? const [];
+  final conTratamiento = {for (final g in vigentes) g.specialty};
+  final elegida = await showModalBottomSheet<String>(
+    context: context,
+    showDragHandle: true,
+    builder: (ctx) => SafeArea(
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+            child: Text('¿De qué especialidad es el tratamiento?',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          ),
+          for (final sp in kEspecialidades)
+            ListTile(
+              leading: Icon(conTratamiento.contains(sp)
+                  ? Icons.edit_note_rounded
+                  : Icons.add_rounded),
+              title: Text(specialtyLabel(sp)),
+              subtitle: Text(conTratamiento.contains(sp)
+                  ? 'Tiene tratamiento vigente: se abre para cambiarlo'
+                  : 'Nuevo tratamiento'),
+              onTap: () => Navigator.of(ctx).pop(sp),
+            ),
+        ],
+      ),
+    ),
+  );
+  if (elegida != null && context.mounted) {
+    await context.push('/treatment?patient=$patientId&specialty=$elegida');
+    ref.invalidate(treatmentsProvider);
+  }
+}
+
+class _PlanDesdeTratamientos extends ConsumerWidget {
+  const _PlanDesdeTratamientos(
+      {required this.patientId, required this.canManage});
+
   final String patientId;
+  final bool canManage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final canManage = _canManageMeds(ref);
+    final bundle = ref.watch(treatmentsProvider);
+    return bundle.when(
+      loading: () => const Padding(
+          padding: EdgeInsets.only(top: 24), child: LoadingView()),
+      error: (e, _) => ErrorView(
+          message: 'No se pudo cargar el plan de medicación.',
+          onRetry: () => ref.invalidate(treatmentsProvider)),
+      data: (b) {
+        final grupos = b.vigentes;
+        if (grupos.isEmpty) {
+          return EmptyView(
+            icon: Icons.medication_rounded,
+            title: 'Sin tratamiento indicado',
+            subtitle: canManage
+                ? 'Indica el primer tratamiento para empezar.'
+                : 'El plan lo indica el médico.',
+            action: canManage
+                ? FilledButton.icon(
+                    onPressed: () =>
+                        indicarTratamiento(context, ref, patientId),
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Indicar tratamiento'),
+                  )
+                : null,
+          );
+        }
+        return Column(
+          children: [
+            for (final g in grupos)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _TratamientoCard(
+                    grupo: g, patientId: patientId, canManage: canManage),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _TratamientoCard extends ConsumerWidget {
+  const _TratamientoCard(
+      {required this.grupo, required this.patientId, required this.canManage});
+
+  final SpecialtyGroup grupo;
+  final String patientId;
+  final bool canManage;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = grupo.current!;
+    final items = t.items.where((i) => i.action != 'removed').toList();
     return AppCard(
-      // El familiar ve el plan en solo lectura; no navega a edición.
+      // El médico abre el editor de esta especialidad; el resto solo lee.
       onTap: canManage
-          ? () => context
-              .push('/meds/plan?patient=$patientId&medication=${medication.id}')
+          ? () async {
+              await context.push(
+                  '/treatment?patient=$patientId&specialty=${grupo.specialty}');
+              ref.invalidate(treatmentsProvider);
+            }
           : null,
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.medication_liquid_rounded, color: AppColors.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(medication.name,
+          Row(
+            children: [
+              Expanded(
+                child: Text(specialtyLabel(grupo.specialty),
                     style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 2),
-                Text(medication.doseLabel,
-                    style: const TextStyle(color: AppColors.textSecondary)),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.schedule_rounded,
-                        size: 14, color: AppColors.textSecondary),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(medication.scheduleLabel,
-                          style: const TextStyle(
-                              fontSize: 13, color: AppColors.textSecondary)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                        fontSize: 15, fontWeight: FontWeight.w800)),
+              ),
+              if (canManage)
+                const Icon(Icons.chevron_right_rounded,
+                    color: AppColors.textSecondary),
+            ],
           ),
-          if (canManage)
-            const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textSecondary),
+          if ((t.prescriberName ?? '').isNotEmpty)
+            Text('Indicado por ${t.prescriberName}',
+                style: const TextStyle(
+                    fontSize: 12.5, color: AppColors.textSecondary)),
+          const SizedBox(height: 8),
+          for (final it in items)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                      it.isPrn
+                          ? Icons.emergency_rounded
+                          : Icons.medication_liquid_rounded,
+                      size: 20,
+                      color: it.isPrn
+                          ? AppColors.statusWarning
+                          : AppColors.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(it.name,
+                            style: const TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w700)),
+                        Text(
+                          it.isPrn
+                              ? '${it.dose} · SOS, solo si se necesita'
+                              : '${it.dose} · ${it.times.join(', ')}'
+                                  '${(it.scheduleLabel ?? '').isNotEmpty ? ' (${it.scheduleLabel})' : ''}',
+                          style: const TextStyle(
+                              fontSize: 13, color: AppColors.textSecondary),
+                        ),
+                        if ((it.instructions ?? '').isNotEmpty)
+                          Text(it.instructions!,
+                              style: const TextStyle(
+                                  fontSize: 12.5,
+                                  color: AppColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

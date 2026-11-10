@@ -21,6 +21,7 @@ class TreatmentEditorScreen extends ConsumerStatefulWidget {
     super.key,
     required this.patientId,
     this.specialty = 'general',
+    this.agregados = const [],
   });
 
   final String patientId;
@@ -29,13 +30,17 @@ class TreatmentEditorScreen extends ConsumerStatefulWidget {
   /// especialidad; si no existe, parte vacío (tratamiento nuevo de esa área).
   final String specialty;
 
+  /// Indicaciones nuevas que se suman a las vigentes al abrir, por ejemplo
+  /// las que leyó el escaneo de una receta. El médico las revisa (fármaco
+  /// del catálogo, dosis, horarios) antes de guardar.
+  final List<TreatmentItemDraft> agregados;
+
   @override
   ConsumerState<TreatmentEditorScreen> createState() =>
       _TreatmentEditorScreenState();
 }
 
-class _TreatmentEditorScreenState
-    extends ConsumerState<TreatmentEditorScreen> {
+class _TreatmentEditorScreenState extends ConsumerState<TreatmentEditorScreen> {
   List<TreatmentItemDraft>? _drafts;
   final _noteCtrl = TextEditingController();
   bool _saving = false;
@@ -57,7 +62,10 @@ class _TreatmentEditorScreenState
         .toList();
     final actual = grupo.isNotEmpty ? grupo.first.current : null;
     final List<TreatmentItem> items = actual?.items ?? const [];
-    _drafts = items.map(TreatmentItemDraft.fromItem).toList();
+    _drafts = [
+      ...items.map(TreatmentItemDraft.fromItem),
+      ...widget.agregados,
+    ];
     // Precarga la duración del tratamiento vigente de esta especialidad.
     if (actual?.reviewDate != null) {
       _permanente = false;
@@ -68,8 +76,8 @@ class _TreatmentEditorScreenState
   Future<void> _guardar() async {
     final activos = (_drafts ?? []).where((d) => !d.removed).toList();
     if (activos.isEmpty) {
-      showAppSnackBar(context,
-          'El tratamiento debe tener al menos una indicación.',
+      showAppSnackBar(
+          context, 'El tratamiento debe tener al menos una indicación.',
           error: true);
       return;
     }
@@ -77,7 +85,8 @@ class _TreatmentEditorScreenState
       // Un item SOS no exige horario; uno programado sí.
       final faltaHorario = !d.isPrn && d.times.isEmpty;
       if (d.name.trim().length < 2 || d.doseAmount <= 0 || faltaHorario) {
-        showAppSnackBar(context,
+        showAppSnackBar(
+            context,
             'Revisa ${d.name.isEmpty ? "una indicación" : d.name}: '
             'nombre, dosis y ${d.isPrn ? "datos" : "al menos un horario"}.',
             error: true);
@@ -155,7 +164,8 @@ class _TreatmentEditorScreenState
                 onPressed: () => Navigator.of(ctx).pop(false),
                 child: const Text('Cancelar')),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.critical),
+              style:
+                  FilledButton.styleFrom(backgroundColor: AppColors.critical),
               onPressed: () => Navigator.of(ctx).pop(true),
               child: const Text('Prescribir igual'),
             ),
@@ -238,8 +248,8 @@ class _TreatmentEditorScreenState
                           final hoy = DateTime.now();
                           final picked = await showDatePicker(
                             context: context,
-                            initialDate: _reviewDate ??
-                                hoy.add(const Duration(days: 7)),
+                            initialDate:
+                                _reviewDate ?? hoy.add(const Duration(days: 7)),
                             firstDate: hoy,
                             lastDate: hoy.add(const Duration(days: 3650)),
                           );
@@ -282,8 +292,8 @@ class _TreatmentEditorScreenState
                         strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.save_rounded),
             label: const Text('Guardar tratamiento'),
-            style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(52)),
+            style:
+                FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           ),
         ),
       ),
@@ -320,7 +330,16 @@ class _ItemCard extends ConsumerWidget {
   final VoidCallback onRestore;
 
   static const _units = [
-    'mg', 'g', 'ml', 'mcg', 'UI', 'gotas', 'comprimido', 'cápsula', 'puff', 'parche'
+    'mg',
+    'g',
+    'ml',
+    'mcg',
+    'UI',
+    'gotas',
+    'comprimido',
+    'cápsula',
+    'puff',
+    'parche'
   ];
 
   /// Fármaco del catálogo elegido para este borrador (o null si texto libre).
@@ -353,8 +372,8 @@ class _ItemCard extends ConsumerWidget {
       );
     }
 
-    final catalogo =
-        ref.watch(drugCatalogProvider).asData?.value ?? const <DrugCatalogItem>[];
+    final catalogo = ref.watch(drugCatalogProvider).asData?.value ??
+        const <DrugCatalogItem>[];
     final elegido = _elegido(catalogo);
 
     // ¿La dosis actual está fuera del rango seguro del fármaco del catálogo?
@@ -471,8 +490,7 @@ class _ItemCard extends ConsumerWidget {
                   color: fueraDeRango
                       ? AppColors.critical
                       : AppColors.textSecondary,
-                  fontWeight:
-                      fueraDeRango ? FontWeight.w600 : FontWeight.w400,
+                  fontWeight: fueraDeRango ? FontWeight.w600 : FontWeight.w400,
                 ),
               ),
             ),
@@ -501,14 +519,16 @@ class _ItemCard extends ConsumerWidget {
                 helperText: 'Avisa a quien cuida si lo usa antes de tiempo.',
               ),
               items: const [
-                DropdownMenuItem<int?>(value: null, child: Text('Sin intervalo')),
+                DropdownMenuItem<int?>(
+                    value: null, child: Text('Sin intervalo')),
                 DropdownMenuItem<int?>(value: 60, child: Text('Cada 1 h')),
                 DropdownMenuItem<int?>(value: 120, child: Text('Cada 2 h')),
                 DropdownMenuItem<int?>(value: 240, child: Text('Cada 4 h')),
                 DropdownMenuItem<int?>(value: 360, child: Text('Cada 6 h')),
                 DropdownMenuItem<int?>(value: 480, child: Text('Cada 8 h')),
                 DropdownMenuItem<int?>(value: 720, child: Text('Cada 12 h')),
-                DropdownMenuItem<int?>(value: 1440, child: Text('Una vez al día')),
+                DropdownMenuItem<int?>(
+                    value: 1440, child: Text('Una vez al día')),
               ],
               onChanged: (v) {
                 draft.prnMinIntervalMin = v;
@@ -569,8 +589,8 @@ class _FarmacoElegido extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text('${_forma(elegido.form)} · ${_via(elegido.route)}',
-            style: const TextStyle(
-                fontSize: 12, color: AppColors.textSecondary)),
+            style:
+                const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
       ],
     );
   }

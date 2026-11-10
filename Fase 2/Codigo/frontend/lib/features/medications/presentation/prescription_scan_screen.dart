@@ -10,9 +10,9 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/upload_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
-import '../application/medications_providers.dart';
 import '../data/medications_repository.dart';
 import '../domain/models.dart';
+import '../domain/treatment.dart' show TreatmentItemDraft;
 import 'dose_unit_field.dart';
 
 /// Escaneo de receta con OCR (ticket AGE-405): foto -> subida -> borrador
@@ -33,7 +33,6 @@ class _PrescriptionScanScreenState
 
   File? _image;
   bool _scanning = false;
-  bool _saving = false;
   String? _error;
   List<_DraftEntry>? _drafts;
 
@@ -101,30 +100,37 @@ class _PrescriptionScanScreenState
     return 'No se pudo leer la receta. Intenta de nuevo.';
   }
 
+  /// Lleva lo leído al editor de tratamientos, donde el médico lo revisa.
+  ///
+  /// Antes se guardaba directo como "medicamento" con el nombre que leyó el
+  /// OCR: sin catálogo de fármacos, sin rango de dosis, sin cruce de alergias
+  /// y en una tabla que el generador de dosis ignora si el paciente ya tiene
+  /// tratamiento. Una lectura automática de un papel no puede entrar al plan
+  /// sin que el médico la confirme.
   Future<void> _saveAll() async {
     final drafts = _drafts;
     if (drafts == null || drafts.isEmpty) return;
-    setState(() => _saving = true);
-    final repo = ref.read(medicationsRepositoryProvider);
-    try {
-      for (final d in drafts) {
-        await repo.createMedication(widget.patientId, d.toNewMedication());
-      }
-      ref.invalidate(medicationsProvider);
-      ref.invalidate(todayDosesProvider);
-      if (mounted) {
-        showAppSnackBar(
-            context,
-            drafts.length == 1
-                ? 'Se guardó 1 indicación de la receta.'
-                : 'Se guardaron ${drafts.length} indicaciones de la receta.');
-        context.pop();
-      }
-    } catch (e) {
-      if (mounted) showAppSnackBar(context, e.toString(), error: true);
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
+    final indicaciones = [
+      for (final d in drafts)
+        TreatmentItemDraft(
+          name: d.name.text.trim(),
+          doseAmount:
+              double.tryParse(d.dose.text.trim().replaceAll(',', '.')) ?? 0,
+          doseUnit: d.unit,
+          times: d.schedule.text
+              .split(',')
+              .map((t) => t.trim())
+              .where((t) => RegExp(r'^\d{1,2}:\d{2}$').hasMatch(t))
+              .toList(),
+          instructions: d.instructions.text.trim().isEmpty
+              ? null
+              : d.instructions.text.trim(),
+        ),
+    ];
+    context.pushReplacement(
+      '/treatment?patient=${widget.patientId}&specialty=general',
+      extra: indicaciones,
+    );
   }
 
   @override
@@ -184,9 +190,8 @@ class _PrescriptionScanScreenState
                   children: [
                     Expanded(
                       child: FilledButton.icon(
-                        onPressed: _scanning || _saving
-                            ? null
-                            : () => _pick(ImageSource.camera),
+                        onPressed:
+                            _scanning ? null : () => _pick(ImageSource.camera),
                         icon: const Icon(Icons.photo_camera_rounded),
                         label: const Text('Cámara'),
                       ),
@@ -194,9 +199,8 @@ class _PrescriptionScanScreenState
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: _scanning || _saving
-                            ? null
-                            : () => _pick(ImageSource.gallery),
+                        onPressed:
+                            _scanning ? null : () => _pick(ImageSource.gallery),
                         icon: const Icon(Icons.photo_library_rounded),
                         label: const Text('Galería'),
                         style: OutlinedButton.styleFrom(
@@ -243,17 +247,11 @@ class _PrescriptionScanScreenState
               ),
             const SizedBox(height: 8),
             FilledButton.icon(
-              onPressed: _saving ? null : _saveAll,
-              icon: _saving
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.save_rounded),
+              onPressed: _saveAll,
+              icon: const Icon(Icons.assignment_rounded),
               label: Text(_drafts!.length == 1
-                  ? 'Guardar 1 indicación'
-                  : 'Guardar ${_drafts!.length} indicaciones'),
+                  ? 'Revisar 1 indicación en el tratamiento'
+                  : 'Revisar ${_drafts!.length} indicaciones en el tratamiento'),
             ),
           ],
         ],

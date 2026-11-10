@@ -221,6 +221,31 @@ async def _load_medication(db: AsyncSession, patient_id: str,
     return await _build_medication_item(db, row)
 
 
+async def _exigir_sin_tratamiento_vigente(db: AsyncSession, patient_id: str) -> None:
+    """Corta el camino viejo cuando el paciente ya está en el modelo de tratamientos.
+
+    El modelo vigente es el de tratamientos (306 y 960): catálogo de fármacos,
+    rango de dosis, cruce de alergias y versionado. Si el paciente tiene un
+    tratamiento vigente, el generador de dosis ignora la tabla medications, así
+    que un medicamento creado o editado aquí quedaba en el plan pero NUNCA
+    generaba dosis, y nadie se enteraba. Mejor un 409 que lo diga.
+    """
+    vigente = (
+        await db.execute(
+            text("SELECT 1 FROM treatments WHERE patient_id = :pid "
+                 "AND status = 'vigente' LIMIT 1"),
+            {"pid": patient_id},
+        )
+    ).first()
+    if vigente:
+        raise ApiError(
+            status_code=409,
+            code="USE_TREATMENTS",
+            message=("Este paciente tiene tratamiento vigente. Los medicamentos "
+                     "se indican y se cambian desde Tratamientos."),
+        )
+
+
 # --------------------------------------------------------------------------
 # 6.1 Crear medicamento
 # --------------------------------------------------------------------------
@@ -231,6 +256,7 @@ async def create_medication(
     ctx: PatientContext = Depends(get_patient_member(roles=["doctor"])),
     db: AsyncSession = Depends(get_db),
 ):
+    await _exigir_sin_tratamiento_vigente(db, ctx.patient_id)
     if payload.end_date is not None and payload.end_date < payload.start_date:
         raise ApiError(status_code=400, code="INVALID_DATE_RANGE",
                        message="La fecha de fin no puede ser anterior a la de inicio.")
@@ -307,6 +333,7 @@ async def update_medication(
     ctx: PatientContext = Depends(get_patient_member(roles=["doctor"])),
     db: AsyncSession = Depends(get_db),
 ):
+    await _exigir_sin_tratamiento_vigente(db, ctx.patient_id)
     current = await _load_medication(db, ctx.patient_id, medication_id)
     fields  = payload.model_dump(exclude_unset=True)
 

@@ -26,7 +26,8 @@ import '../../features/health/presentation/thresholds_screen.dart';
 import '../../features/marketplace/presentation/caregiver_profile_screen.dart';
 import '../../features/marketplace/presentation/marketplace_screen.dart';
 import '../../features/medications/presentation/dose_confirm_screen.dart';
-import '../../features/medications/presentation/medication_plan_screen.dart';
+import '../../features/medications/domain/treatment.dart'
+    show TreatmentItemDraft;
 import '../../features/medications/presentation/prescription_scan_screen.dart';
 import '../../features/medications/presentation/prn_screen.dart';
 import '../../features/medications/presentation/treatment_editor_screen.dart';
@@ -118,13 +119,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           builder: (_, __) => const AcceptInvitationScreen()),
 
       // --- Medicamentos ---
-      GoRoute(
-        path: '/meds/plan',
-        builder: (_, st) => MedicationPlanScreen(
-          patientId: st.uri.queryParameters['patient']!,
-          medicationId: st.uri.queryParameters['medication'],
-        ),
-      ),
+      // No hay pantalla aparte para "agregar medicamento": un medicamento se
+      // indica dentro de un tratamiento (/treatment), con el catálogo de
+      // fármacos, la dosis segura y el cruce de alergias.
       GoRoute(
         path: '/meds/scan',
         builder: (_, st) => PrescriptionScanScreen(
@@ -140,6 +137,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, st) => TreatmentEditorScreen(
           patientId: st.uri.queryParameters['patient']!,
           specialty: st.uri.queryParameters['specialty'] ?? 'general',
+          // Indicaciones leídas de una receta escaneada, para revisar.
+          agregados: st.extra is List<TreatmentItemDraft>
+              ? st.extra! as List<TreatmentItemDraft>
+              : const [],
         ),
       ),
       GoRoute(

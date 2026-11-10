@@ -22,8 +22,7 @@ void main() {
 
     await tester.pumpWidget(ProviderScope(
       overrides: [
-        patientsRepositoryProvider
-            .overrideWithValue(PatientsRepositoryMock()),
+        patientsRepositoryProvider.overrideWithValue(PatientsRepositoryMock()),
         medicationsRepositoryProvider
             .overrideWithValue(MedicationsRepositoryMock()),
         currentUserProvider.overrideWith((ref) => const User(

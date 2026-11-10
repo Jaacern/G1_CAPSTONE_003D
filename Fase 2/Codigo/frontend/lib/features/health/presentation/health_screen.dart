@@ -7,11 +7,14 @@ import 'package:intl/intl.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../auth/domain/models.dart' show RoleType;
 import '../../medications/presentation/medications_screen.dart';
 import '../../patients/application/patients_providers.dart';
+import '../../patients/presentation/patient_timeline.dart';
 import '../../wearable/application/watch_link_service.dart';
 import '../application/health_providers.dart';
 import '../domain/models.dart';
+import 'manual_vital_sheet.dart';
 
 /// Pantalla Salud con sub-pestañas (fiel al wireframe Suite/Familiar v1):
 /// Vitales · Medicinas. Las medicinas se muestran embebidas, reutilizando
@@ -30,15 +33,19 @@ class HealthScreen extends ConsumerWidget {
           subtitle: 'Crea o selecciona un paciente para ver su salud.');
     }
 
-    // Sub-pestañas fieles al wireframe: Vitals · Medicinas · Bitácora · Docs.
-    // Bitácora no tiene backend aún (Próximamente). Docs solo si hasDocuments.
+    // Sub-pestañas: Vitals · Medicinas · Historial · Docs. Historial es la
+    // línea de tiempo con scroll del paciente. Docs solo si hasDocuments.
     final showDocs = AppConfig.hasDocuments;
     final tabs = <Tab>[
-      const Tab(text: 'Vitals', icon: Text('❤️', style: TextStyle(fontSize: 18))),
-      const Tab(text: 'Medicinas', icon: Text('💊', style: TextStyle(fontSize: 18))),
-      const Tab(text: 'Bitácora', icon: Text('📝', style: TextStyle(fontSize: 18))),
+      const Tab(
+          text: 'Vitals', icon: Text('❤️', style: TextStyle(fontSize: 18))),
+      const Tab(
+          text: 'Medicinas', icon: Text('💊', style: TextStyle(fontSize: 18))),
+      const Tab(
+          text: 'Historial', icon: Text('📝', style: TextStyle(fontSize: 18))),
       if (showDocs)
-        const Tab(text: 'Docs', icon: Text('📄', style: TextStyle(fontSize: 18))),
+        const Tab(
+            text: 'Docs', icon: Text('📄', style: TextStyle(fontSize: 18))),
     ];
 
     return DefaultTabController(
@@ -60,30 +67,17 @@ class HealthScreen extends ConsumerWidget {
               children: [
                 const _VitalsTab(),
                 const MedicationsBody(),
-                const _BitacoraTab(),
+                // La key cambia con el paciente: al elegir otro en el
+                // selector, el historial empieza de nuevo y no mezcla.
+                PatientTimeline(
+                    key: ValueKey('historial-${patient.patientId}'),
+                    patientId: patient.patientId),
                 if (showDocs) const _DocsTab(),
               ],
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Bitácora / observaciones de la cuidadora. Sin backend todavía.
-/// PENDIENTE BACKEND: tabla `observations` + GET /patients/{id}/observations.
-class _BitacoraTab extends StatelessWidget {
-  const _BitacoraTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return const ComingSoonView(
-      icon: Icons.edit_note_rounded,
-      title: 'Bitácora de cuidado',
-      subtitle:
-          'Aquí verás las observaciones de la cuidadora (ánimo, apetito, '
-          'sueño, notas y fotos) y el check-in del paciente.',
     );
   }
 }
@@ -99,8 +93,8 @@ class _DocsTab extends ConsumerWidget {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: FilledButton.icon(
-          onPressed: () => context.push(
-              '/documents?patient=${patient?.patientId ?? ''}'),
+          onPressed: () =>
+              context.push('/documents?patient=${patient?.patientId ?? ''}'),
           icon: const Icon(Icons.folder_open_rounded),
           label: const Text('Abrir expediente'),
         ),
@@ -172,66 +166,83 @@ class _VitalsTabState extends ConsumerState<_VitalsTab> {
       child: Builder(
         builder: (context) {
           return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // Estado del wearable (ticket AGE-306, criterio de visibilidad de sync)
-            // Estado del Reloj AgeCare en Salud: conectado / desconectado /
-            // sin vincular + aviso de batería baja. Usa watchStatusProvider,
-            // la misma fuente de verdad que el panel de Dispositivos.
-            const _WatchStatusBanner(),
-            // Fila: interruptor "En vivo" (auto-refresco) + sincronizar reloj.
-            // En un teléfono de 320 dp no cabe todo en una línea, así que los
-            // botones bajan solos en vez de desbordar la pantalla.
-            Wrap(
-              spacing: 4,
-              runSpacing: 4,
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                const _LiveToggle(),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: 'Rangos de alerta',
-                      onPressed: () => context.push('/health/thresholds'),
-                      icon: const Icon(Icons.tune_rounded, size: 20),
-                    ),
-                    TextButton.icon(
-                      onPressed: () {
-                        final p = ref.read(selectedPatientProvider);
-                        if (p != null) {
-                          context.push('/wearable/link/${p.patientId}');
-                        }
-                      },
-                      icon: const Text('⌚'),
-                      label: const Text('Sincronizar'),
-                    ),
-                  ],
+            padding: const EdgeInsets.all(16),
+            children: [
+              // Estado del wearable (ticket AGE-306, criterio de visibilidad de sync)
+              // Estado del Reloj AgeCare en Salud: conectado / desconectado /
+              // sin vincular + aviso de batería baja. Usa watchStatusProvider,
+              // la misma fuente de verdad que el panel de Dispositivos.
+              const _WatchStatusBanner(),
+              // Fila: interruptor "En vivo" (auto-refresco) + sincronizar reloj.
+              // En un teléfono de 320 dp no cabe todo en una línea, así que los
+              // botones bajan solos en vez de desbordar la pantalla.
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const _LiveToggle(),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Rangos de alerta',
+                        onPressed: () => context.push('/health/thresholds'),
+                        icon: const Icon(Icons.tune_rounded, size: 20),
+                      ),
+                      TextButton.icon(
+                        onPressed: () {
+                          final p = ref.read(selectedPatientProvider);
+                          if (p != null) {
+                            context.push('/wearable/link/${p.patientId}');
+                          }
+                        },
+                        icon: const Text('⌚'),
+                        label: const Text('Sincronizar'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              // La cuidadora anota lo que el reloj no mide (presión con el
+              // tensiómetro, temperatura, glucosa). Solo ella: es quien está
+              // con el paciente y el backend no acepta otro rol.
+              if (ref.watch(selectedPatientProvider)?.role ==
+                  RoleType.caregiver) ...[
+                const SizedBox(height: 4),
+                FilledButton.icon(
+                  onPressed: () {
+                    final p = ref.read(selectedPatientProvider);
+                    if (p != null) {
+                      showManualVitalSheet(context, patientId: p.patientId);
+                    }
+                  },
+                  icon: const Icon(Icons.edit_note_rounded),
+                  label: const Text('Registrar medición'),
                 ),
               ],
-            ),
-            const SizedBox(height: 4),
-            // Mostramos TODOS los vitales esperados (transparencia: no
-            // escondemos un signo solo porque hoy no llegó dato). Los que el
-            // backend ya tiene muestran su valor; el resto, "sin datos aún".
-            ...() {
-              final byType = {for (final v in vitals) v.type: v};
-              final cards = [
-                for (final t in VitalType.expected)
-                  byType[t] ?? LatestVital.empty(t),
-              ];
-              return [
-                _VitalGroup(
-                  title: 'Vitales',
-                  vitals: cards.where((v) => v.type.isCoreVital).toList(),
-                ),
-                _VitalGroup(
-                  title: 'Actividad',
-                  vitals: cards.where((v) => !v.type.isCoreVital).toList(),
-                ),
-              ];
-            }(),
+              const SizedBox(height: 4),
+              // Mostramos TODOS los vitales esperados (transparencia: no
+              // escondemos un signo solo porque hoy no llegó dato). Los que el
+              // backend ya tiene muestran su valor; el resto, "sin datos aún".
+              ...() {
+                final byType = {for (final v in vitals) v.type: v};
+                final cards = [
+                  for (final t in VitalType.expected)
+                    byType[t] ?? LatestVital.empty(t),
+                ];
+                return [
+                  _VitalGroup(
+                    title: 'Vitales',
+                    vitals: cards.where((v) => v.type.isCoreVital).toList(),
+                  ),
+                  _VitalGroup(
+                    title: 'Actividad',
+                    vitals: cards.where((v) => !v.type.isCoreVital).toList(),
+                  ),
+                ];
+              }(),
             ],
           );
         },
@@ -322,8 +333,8 @@ class _LiveToggleState extends ConsumerState<_LiveToggle>
             const SizedBox(width: 6),
             Text(
               '· ${DateFormat('HH:mm:ss').format(live.lastRefresh!)}',
-              style: const TextStyle(
-                  fontSize: 11, color: AppColors.textSecondary),
+              style:
+                  const TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
           ],
         ],
@@ -371,7 +382,8 @@ class _VitalCard extends ConsumerWidget {
     if (!vital.hasData) return _EmptyVitalCard(type: vital.type);
 
     // Número en estado (verde/rojo); la tendencia usa el color fijo del vital.
-    final color = vital.inRange ? AppColors.textPrimary : AppColors.statusAttention;
+    final color =
+        vital.inRange ? AppColors.textPrimary : AppColors.statusAttention;
     final sparkColor = vital.type.seriesColor;
     final spark = ref.watch(sparkSeriesProvider(vital.type));
     return AppCard(
@@ -396,11 +408,19 @@ class _VitalCard extends ConsumerWidget {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(vital.displayValue,
-                            style: TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w800,
-                                color: color)),
+                        // "128/80" es más ancho que un número solo: en
+                        // pantallas angostas se achica en vez de desbordar.
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(vital.displayValue,
+                                style: TextStyle(
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w800,
+                                    color: color)),
+                          ),
+                        ),
                         const SizedBox(width: 4),
                         Padding(
                           padding: const EdgeInsets.only(bottom: 4),
@@ -515,8 +535,8 @@ class _EmptyVitalCard extends StatelessWidget {
                         color: AppColors.textSecondary)),
                 const SizedBox(height: 2),
                 const Text('Sin datos aún',
-                    style:
-                        TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                    style: TextStyle(
+                        fontSize: 13, color: AppColors.textSecondary)),
               ],
             ),
           ),
@@ -566,8 +586,7 @@ class _Sparkline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spots = [
-      for (var i = 0; i < values.length; i++)
-        FlSpot(i.toDouble(), values[i]),
+      for (var i = 0; i < values.length; i++) FlSpot(i.toDouble(), values[i]),
     ];
     final minY = values.reduce((a, b) => a < b ? a : b);
     final maxY = values.reduce((a, b) => a > b ? a : b);
@@ -621,7 +640,8 @@ class _WatchStatusBanner extends ConsumerWidget {
       return AppCard(
         child: Row(
           children: [
-            const Icon(Icons.watch_off_outlined, color: AppColors.textSecondary),
+            const Icon(Icons.watch_off_outlined,
+                color: AppColors.textSecondary),
             const SizedBox(width: 10),
             const Expanded(
               child: Text('Sin reloj vinculado',

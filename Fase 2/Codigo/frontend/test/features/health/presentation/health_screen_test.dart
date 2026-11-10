@@ -120,9 +120,11 @@ void main() {
     await tester.tap(find.byKey(const Key('switchPatient')));
     await asentar(tester);
 
-    // 'p-jose' simula SpO2 91 (bajo el mínimo normal de 92): debe verse el
-    // ícono de alerta en su tarjeta, sin refrescar nada a mano (el provider
-    // de vitals observa selectedPatientProvider y se reconstruye solo).
-    expect(find.byIcon(Icons.error_rounded), findsOneWidget);
+    // 'p-jose' simula SpO2 91 (bajo el mínimo normal de 92) y glucosa 196
+    // (sobre 180): deben verse los íconos de alerta de esas dos tarjetas, sin
+    // refrescar nada a mano (el provider de vitals observa
+    // selectedPatientProvider y se reconstruye solo). Presión y el resto
+    // siguen en rango.
+    expect(find.byIcon(Icons.error_rounded), findsNWidgets(2));
   });
 }

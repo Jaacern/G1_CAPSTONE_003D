@@ -183,6 +183,7 @@ class LatestVital {
     required this.type,
     required this.value,
     required this.measuredAt,
+    this.valueSecondary,
     this.inRange = true,
     this.source = VitalSource.unknown,
     this.hasData = true,
@@ -200,6 +201,9 @@ class LatestVital {
 
   final VitalType type;
   final double value;
+
+  /// Solo presión arterial: la diastólica (value es la sistólica).
+  final double? valueSecondary;
   final DateTime measuredAt;
   final bool inRange;
 
@@ -212,6 +216,7 @@ class LatestVital {
   factory LatestVital.fromJson(Map<String, dynamic> json) => LatestVital(
         type: VitalType.fromApi(json['type'] as String),
         value: (json['value'] as num).toDouble(),
+        valueSecondary: (json['value_secondary'] as num?)?.toDouble(),
         measuredAt: DateTime.parse(json['measured_at'] as String),
         inRange: (json['in_range'] ?? true) as bool,
         source: VitalSource.resolve(
@@ -220,6 +225,13 @@ class LatestVital {
 
   String get displayValue {
     switch (type) {
+      case VitalType.bloodPressure:
+        // Una presión se lee "sistólica/diastólica". Solo la sistólica
+        // ("148") no es una presión.
+        final dia = valueSecondary;
+        return dia == null
+            ? value.toStringAsFixed(0)
+            : '${value.toStringAsFixed(0)}/${dia.toStringAsFixed(0)}';
       case VitalType.steps:
       case VitalType.sedentaryMin:
       case VitalType.fallEvent:
@@ -234,4 +246,55 @@ class LatestVital {
         return value.toStringAsFixed(0);
     }
   }
+}
+
+/// Signos vitales que una persona puede medir y anotar a mano (la cuidadora
+/// con el tensiómetro, el termómetro o el glucómetro). Coincide con
+/// ManualVitalType del backend.
+const manualVitalTypes = [
+  VitalType.bloodPressure,
+  VitalType.temperature,
+  VitalType.glucose,
+  VitalType.heartRate,
+  VitalType.spo2,
+];
+
+/// Rango físicamente posible por tipo, igual que _RANGO_POSIBLE del backend.
+/// No es el rango normal (eso son los umbrales): es lo que una persona puede
+/// marcar. Fuera de aquí casi siempre es un error al escribir.
+const rangoPosibleManual = <VitalType, (double, double)>{
+  VitalType.heartRate: (25, 250),
+  VitalType.spo2: (50, 100),
+  VitalType.bloodPressure: (50, 260),
+  VitalType.temperature: (30, 45),
+  VitalType.glucose: (20, 600),
+};
+const rangoPosibleDiastolica = (30.0, 160.0);
+
+/// Una medición tomada a mano, para POST /patients/{id}/vitals/manual.
+class ManualVitalEntry {
+  const ManualVitalEntry({
+    required this.type,
+    required this.value,
+    this.valueSecondary,
+    this.measuredAt,
+    this.note,
+  });
+
+  final VitalType type;
+  final double value;
+
+  /// Diastólica, obligatoria en presión arterial.
+  final double? valueSecondary;
+  final DateTime? measuredAt;
+  final String? note;
+
+  Map<String, dynamic> toJson() => {
+        'type': type.apiValue,
+        'value': value,
+        if (valueSecondary != null) 'value_secondary': valueSecondary,
+        if (measuredAt != null)
+          'measured_at': measuredAt!.toUtc().toIso8601String(),
+        if (note != null && note!.trim().isNotEmpty) 'note': note!.trim(),
+      };
 }

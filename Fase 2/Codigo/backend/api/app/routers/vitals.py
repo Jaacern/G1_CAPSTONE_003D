@@ -7,7 +7,7 @@ Cambios 2FN aplicados:
 """
 import json
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from enum import Enum
 
 from fastapi import APIRouter, Depends, Query
@@ -100,7 +100,22 @@ class ManualIn(BaseModel):
     value: float
     value_secondary: float | None = None
     measured_at: datetime | None = None
-    note: str | None = None
+    note: str | None = Field(default=None, max_length=200)
+
+
+# Rango fisiologicamente posible por tipo. No es el rango "normal" (eso son
+# los umbrales del paciente): es lo que una persona viva puede marcar. Un
+# valor fuera de aqui es un error de digitacion (180 en vez de 18,0) y no se
+# guarda, porque terminaria disparando alertas y moviendo el semaforo.
+_RANGO_POSIBLE: dict[str, tuple[float, float]] = {
+    "heart_rate":     (25, 250),
+    "spo2":           (50, 100),
+    "blood_pressure": (50, 260),   # sistolica
+    "temperature":    (30, 45),
+    "glucose":        (20, 600),
+}
+_RANGO_DIASTOLICA = (30, 160)
+_ATRASO_MAXIMO = timedelta(days=30)
 
 
 class ManualOut(BaseModel):
@@ -141,6 +156,9 @@ class SeriesOut(BaseModel):
 class LatestItem(BaseModel):
     type: str
     value: float
+    # Solo presión arterial: la diastólica. Sin ella la tarjeta mostraba
+    # "148 mmHg", que no es una presión.
+    value_secondary: float | None = None
     unit: str
     measured_at: datetime
     in_range: bool
@@ -250,7 +268,7 @@ async def _latest_items(db: AsyncSession, patient_id: str) -> list[LatestItem]:
             text(
                 """
                 SELECT DISTINCT ON (type)
-                       type, value, measured_at, source, meta
+                       type, value, value_secondary, measured_at, source, meta
                 FROM vital_readings
                 WHERE patient_id = :pid
                 ORDER BY type, measured_at DESC
@@ -278,6 +296,8 @@ async def _latest_items(db: AsyncSession, patient_id: str) -> list[LatestItem]:
             LatestItem(
                 type=r["type"],
                 value=float(r["value"]),
+                value_secondary=float(r["value_secondary"])
+                if r["value_secondary"] is not None else None,
                 unit=await _get_unit(db, r["type"]),
                 measured_at=r["measured_at"],
                 in_range=in_range,
@@ -485,17 +505,48 @@ async def ingest_manual(
     ctx: PatientContext = Depends(get_patient_member(roles=["caregiver"])),
     db: AsyncSession = Depends(get_db),
 ):
-    # value_secondary sólo es válido en presión arterial (CHECK en BD).
-    if payload.value_secondary is not None and payload.type != ManualVitalType.blood_pressure:
-        raise ApiError(
+    def invalido(campo: str, motivo: str) -> ApiError:
+        return ApiError(
             status_code=422,
             code="VALIDATION_ERROR",
             message="Hay datos inválidos en la solicitud. Revisa los campos marcados.",
+            details=[{"field": campo, "message": motivo}],
         )
 
+    es_presion = payload.type == ManualVitalType.blood_pressure
+    # value_secondary sólo es válido en presión arterial (CHECK en BD), y la
+    # presión sin diastólica no es una presión: "140" no dice nada.
+    if payload.value_secondary is not None and not es_presion:
+        raise invalido("value_secondary", "Solo la presión arterial lleva un segundo valor.")
+    if es_presion and payload.value_secondary is None:
+        raise invalido("value_secondary", "Indica la presión diastólica (el valor de abajo).")
+
+    minimo, maximo = _RANGO_POSIBLE[payload.type.value]
+    if not minimo <= payload.value <= maximo:
+        raise invalido("value", f"El valor debe estar entre {_n(minimo)} y {_n(maximo)}. "
+                                "Revisa que esté bien escrito.")
+    if es_presion:
+        dmin, dmax = _RANGO_DIASTOLICA
+        if not dmin <= payload.value_secondary <= dmax:
+            raise invalido("value_secondary",
+                           f"La diastólica debe estar entre {dmin} y {dmax}.")
+        if payload.value_secondary >= payload.value:
+            raise invalido("value_secondary",
+                           "La diastólica (abajo) tiene que ser menor que la sistólica (arriba).")
+
+    ahora = datetime.now(timezone.utc)
+    measured_at = payload.measured_at or ahora
+    if measured_at.tzinfo is None:
+        measured_at = measured_at.replace(tzinfo=timezone.utc)
+    if measured_at > ahora + timedelta(minutes=5):
+        raise invalido("measured_at", "La medición no puede ser en el futuro.")
+    if measured_at < ahora - _ATRASO_MAXIMO:
+        raise invalido("measured_at", "Solo se pueden registrar mediciones de los últimos 30 días.")
+
     reading_id = str(uuid.uuid4())
-    measured_at = payload.measured_at or datetime.now(timezone.utc)
-    meta = json.dumps({"note": payload.note}) if payload.note is not None else None
+    nota = (payload.note or "").strip() or None
+    # Quién la tomó queda con la lectura: el historial lo muestra.
+    meta = json.dumps({"note": nota, "recorded_by": ctx.user.user_id})
 
     row = (
         await db.execute(
@@ -521,8 +572,82 @@ async def ingest_manual(
             },
         )
     ).mappings().first()
+    # Lectura y alerta en la misma transacción: o quedan las dos o ninguna.
+    alerta = await _alertar_si_fuera_de_rango(
+        db, ctx.patient_id, str(row["id"]), payload.type.value,
+        payload.value, measured_at)
     await db.commit()
-    return ManualOut(reading_id=str(row["id"]), alert_triggered=False)
+    return ManualOut(reading_id=str(row["id"]), alert_triggered=alerta)
+
+
+def _n(v: float) -> str:
+    return str(int(v)) if float(v) == int(v) else str(v)
+
+
+async def _alertar_si_fuera_de_rango(db: AsyncSession, patient_id: str,
+                                     reading_id: str, tipo: str, valor: float,
+                                     measured_at: datetime) -> bool:
+    """Avisa al círculo si una medición manual sale del rango del paciente.
+
+    Las del reloj las revisa el mantenimiento cada hora. Una medición manual
+    la tomó una persona que está con el paciente, y si sale alterada el aviso
+    no puede esperar a la próxima pasada. Usa el mismo título, detalle,
+    payload y clave de deduplicación que maintenance.alertar_vitales_fuera_de_rango:
+    así el mantenimiento reconoce la alerta por su reading_id y no la repite.
+    """
+    th = (
+        await db.execute(
+            text("SELECT t.min_value, t.max_value, vt.label, vt.unit "
+                 "FROM vital_thresholds t JOIN vital_types vt ON vt.code = t.type "
+                 "WHERE t.patient_id = :pid AND t.type = :t AND t.deleted_at IS NULL"),
+            {"pid": patient_id, "t": tipo},
+        )
+    ).mappings().first()
+    if th is None:
+        return False
+    bajo = th["min_value"] is not None and valor < float(th["min_value"])
+    alto = th["max_value"] is not None and valor > float(th["max_value"])
+    if not (bajo or alto):
+        return False
+
+    clave = f"{tipo}_{'low' if bajo else 'high'}"
+    ventana = (
+        await db.execute(text("SELECT value FROM system_parameters "
+                              "WHERE key = 'alert_dedup_minutes'"))
+    ).scalar()
+    try:
+        ventana = int(ventana)
+    except (TypeError, ValueError):
+        ventana = 30
+    reciente = (
+        await db.execute(
+            text("SELECT 1 FROM alerts WHERE patient_id = :pid AND dedup_key = :c "
+                 "AND created_at > now() - make_interval(mins => CAST(:v AS integer)) LIMIT 1"),
+            {"pid": patient_id, "c": clave, "v": ventana},
+        )
+    ).first()
+    if reciente is not None:
+        return False
+
+    unidad = f" {th['unit']}" if th["unit"] else ""
+    limite = th["min_value"] if bajo else th["max_value"]
+    titulo = f"{th['label']} bajo el mínimo" if bajo else f"{th['label']} sobre el máximo"
+    detalle = (f"{th['label']} {_n(valor)}{unidad} "
+               f"({'mínimo' if bajo else 'máximo'} configurado {_n(float(limite))}{unidad}). "
+               "Medición manual.")
+    await db.execute(
+        text("INSERT INTO alerts (patient_id, type, severity, title, detail, payload, "
+             "dedup_key, status) VALUES (:pid, 'vital_out_of_range', 'warning', :ti, :de, "
+             "CAST(:pl AS jsonb), :c, 'active')"),
+        {"pid": patient_id, "ti": titulo[:120], "de": detalle, "c": clave,
+         "pl": json.dumps({
+             "reading_id": reading_id, "type": tipo, "value": valor,
+             "min_value": float(th["min_value"]) if th["min_value"] is not None else None,
+             "max_value": float(th["max_value"]) if th["max_value"] is not None else None,
+             "measured_at": measured_at.isoformat(),
+         })},
+    )
+    return True
 
 
 # --------------------------------------------------------------------------

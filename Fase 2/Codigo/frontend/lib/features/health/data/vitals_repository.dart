@@ -33,6 +33,10 @@ abstract class VitalsRepository {
     double? minValue,
     double? maxValue,
   });
+
+  /// Registra una medición tomada a mano (endpoint 5.2, solo la cuidadora).
+  /// Devuelve true si salió del rango del paciente y se avisó al círculo.
+  Future<bool> addManual(String patientId, ManualVitalEntry entry);
 }
 
 // ---------------------------------------------------------------------------
@@ -125,6 +129,15 @@ class VitalsRepositoryHttp implements VitalsRepository {
     );
     return Threshold.fromJson(res);
   }
+
+  @override
+  Future<bool> addManual(String patientId, ManualVitalEntry entry) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/patients/$patientId/vitals/manual',
+      data: entry.toJson(),
+    );
+    return (res['alert_triggered'] ?? false) as bool;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -133,11 +146,33 @@ class VitalsRepositoryHttp implements VitalsRepository {
 class VitalsRepositoryMock implements VitalsRepository {
   final _uploaded = <String, List<VitalReading>>{};
 
+  /// Mediciones manuales hechas en modo prueba, por paciente: la última de
+  /// cada tipo reemplaza al valor simulado en getLatest.
+  final _manuales = <String, Map<VitalType, LatestVital>>{};
+
   static const _thresholds = [
     Threshold(type: VitalType.heartRate, minValue: 50, maxValue: 110),
     Threshold(type: VitalType.spo2, minValue: 92),
     Threshold(type: VitalType.temperature, minValue: 36.1, maxValue: 37.2),
+    // En presión el umbral es de la sistólica, como en el backend.
+    Threshold(type: VitalType.bloodPressure, minValue: 90, maxValue: 140),
+    Threshold(type: VitalType.glucose, minValue: 70, maxValue: 180),
   ];
+
+  @override
+  Future<bool> addManual(String patientId, ManualVitalEntry entry) async {
+    await Future.delayed(const Duration(milliseconds: 250));
+    final fuera = !_inRange(patientId, entry.type, entry.value);
+    _manuales.putIfAbsent(patientId, () => {})[entry.type] = LatestVital(
+      type: entry.type,
+      value: entry.value,
+      valueSecondary: entry.valueSecondary,
+      measuredAt: entry.measuredAt ?? DateTime.now(),
+      inRange: !fuera,
+      source: VitalSource.manual,
+    );
+    return fuera;
+  }
 
   Random _rng(String patientId, VitalType type) =>
       Random(patientId.hashCode ^ type.index);
@@ -309,7 +344,27 @@ class VitalsRepositoryMock implements VitalsRepository {
           value: 2840,
           measuredAt: now.subtract(const Duration(minutes: 30)),
           source: VitalSource.simulator),
-    ];
+      // Presión y glucosa del tensiómetro y el glucómetro conectados.
+      // 'p-jose' es diabético y marca alta la glucosa.
+      LatestVital(
+          type: VitalType.bloodPressure,
+          value: lowSpo2 ? 138 : 132,
+          valueSecondary: lowSpo2 ? 86 : 82,
+          measuredAt: now.subtract(const Duration(hours: 3)),
+          inRange:
+              _inRange(patientId, VitalType.bloodPressure, lowSpo2 ? 138 : 132),
+          source: VitalSource.healthConnect),
+      LatestVital(
+          type: VitalType.glucose,
+          value: lowSpo2 ? 196 : 112,
+          measuredAt: now.subtract(const Duration(hours: 4)),
+          inRange: _inRange(patientId, VitalType.glucose, lowSpo2 ? 196 : 112),
+          source: VitalSource.healthConnect),
+    ]
+        // Una medición manual reciente reemplaza al valor simulado de su tipo.
+        // Los cinco tipos manuales ya están en esta lista.
+        .map((v) => _manuales[patientId]?[v.type] ?? v)
+        .toList();
   }
 
   /// Umbrales editados en modo prueba (sobrescriben los `_thresholds` base),

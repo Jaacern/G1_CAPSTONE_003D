@@ -32,6 +32,7 @@ from app.routers import (
     reports,
     speech,
     tasks,
+    timeline,
     treatments,
     vitals,
 )
@@ -191,6 +192,8 @@ app.include_router(reports.router)
 app.include_router(alerts.router)
 app.include_router(files.router)
 app.include_router(logbook.router)
+# Historial unificado del paciente (bitácora, dosis, alertas, vitales...).
+app.include_router(timeline.router)
 app.include_router(tasks.router)
 app.include_router(documents.router)
 app.include_router(caregiver.router)

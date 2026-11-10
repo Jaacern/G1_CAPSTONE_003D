@@ -1,0 +1,25 @@
+name: admin_web
+description: "Panel de administración web de Alloxentric para AgeCare."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Mismo stack que la app móvil (frontend/).
+  flutter_riverpod: ^2.5.1
+  go_router: ^14.2.0
+  dio: ^5.5.0
+  flutter_secure_storage: ^9.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

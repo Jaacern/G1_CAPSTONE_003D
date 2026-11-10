@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/validation/identity_validators.dart' show formatRut;
 import '../../auth/domain/models.dart';
 import '../../home/domain/models.dart' show humanizeReason;
 import '../domain/models.dart';
@@ -45,7 +46,8 @@ abstract class PatientsRepository {
 
   /// Registra una alergia descubierta (al diagnosticar, por test, o por una
   /// reacción en tratamiento). Devuelve la lista vigente de alergias.
-  Future<List<AllergyDetail>> addAllergy(String patientId, AllergyDetail allergy);
+  Future<List<AllergyDetail>> addAllergy(
+      String patientId, AllergyDetail allergy);
 
   /// Da de baja una alergia (baja lógica). Devuelve la lista vigente.
   Future<List<AllergyDetail>> removeAllergy(String patientId, String substance);
@@ -65,12 +67,13 @@ abstract class PatientsRepository {
   Future<List<EmergencyContact>> emergencyContacts(String patientId);
 
   /// Agrega un contacto eligiendo un miembro del grupo. Solo el administrador.
-  Future<List<EmergencyContact>> addEmergencyContact(
-      String patientId, {required String memberUserId, String? notes});
+  Future<List<EmergencyContact>> addEmergencyContact(String patientId,
+      {required String memberUserId, String? notes});
 
   /// Activa/desactiva un contacto (rotación). Sin orden/prioridad.
   Future<List<EmergencyContact>> updateEmergencyContact(
-      String patientId, String contactId, {required bool isActive});
+      String patientId, String contactId,
+      {required bool isActive});
 
   /// Da de baja un contacto de emergencia.
   Future<List<EmergencyContact>> removeEmergencyContact(
@@ -230,8 +233,8 @@ class PatientsRepositoryHttp implements PatientsRepository {
   }
 
   @override
-  Future<List<EmergencyContact>> addEmergencyContact(
-      String patientId, {required String memberUserId, String? notes}) async {
+  Future<List<EmergencyContact>> addEmergencyContact(String patientId,
+      {required String memberUserId, String? notes}) async {
     final data = await _api.post<Map<String, dynamic>>(
       '/patients/$patientId/emergency-contacts',
       data: {
@@ -244,7 +247,8 @@ class PatientsRepositoryHttp implements PatientsRepository {
 
   @override
   Future<List<EmergencyContact>> updateEmergencyContact(
-      String patientId, String contactId, {required bool isActive}) async {
+      String patientId, String contactId,
+      {required bool isActive}) async {
     final data = await _api.patch<Map<String, dynamic>>(
       '/patients/$patientId/emergency-contacts/$contactId',
       data: {'is_active': isActive},
@@ -336,9 +340,40 @@ class PatientsRepositoryMock implements PatientsRepository {
     'p-elena': Patient(
       patientId: 'p-elena',
       fullName: 'Elena Ramírez',
+      firstName: 'Elena',
+      lastName: 'Ramírez',
       birthDate: DateTime(1948, 3, 12),
       sex: 'F',
       conditions: const ['Hipertensión', 'Artrosis'],
+      // 5.123.456 lleva dígito verificador 1.
+      rut: '5.123.456-1',
+      address: 'Los Aromos 1234, La Florida',
+      insurance: 'fonasa',
+      maritalStatus: 'viudo',
+      rcvLevel: 'alto',
+      complexity: 'alta',
+      priority: 'media',
+      allergies: const [
+        AllergyDetail(
+          substance: 'penicilina',
+          label: 'Penicilina',
+          category: 'medicamento',
+          severity: 'severa',
+          reaction: 'Urticaria generalizada',
+          source: 'reportada',
+        ),
+      ],
+      latestMeasurement: PatientMeasurement(
+        weightKg: 64.5,
+        heightCm: 158,
+        bmi: 25.8,
+        measuredAt: DateTime.now().subtract(const Duration(days: 12)),
+      ),
+      lastSeenBy: LastSeenBy(
+        name: 'Dra. Carolina Soto',
+        specialty: 'general',
+        date: DateTime.now().subtract(const Duration(days: 20)),
+      ),
       wearable: WearableStatus(
         wearableId: 'w-1',
         lastSyncAt: DateTime.now().subtract(const Duration(minutes: 18)),
@@ -417,6 +452,16 @@ class PatientsRepositoryMock implements PatientsRepository {
   @override
   Future<Patient> createPatient(NewPatient data) async {
     await Future.delayed(const Duration(milliseconds: 400));
+    // Mismo control que el backend: un RUT identifica a una sola persona.
+    final rutNuevo = formatRut(data.rut);
+    if (_patients.values.any((p) => p.rut == rutNuevo)) {
+      throw ApiException(
+        statusCode: 409,
+        code: 'PATIENT_RUT_EXISTS',
+        message: 'Ya existe un paciente registrado con ese RUT. '
+            'Pide al familiar administrador que te invite a su círculo de cuidado.',
+      );
+    }
     final id = 'p-${DateTime.now().millisecondsSinceEpoch}';
     final patient = Patient(
       patientId: id,
@@ -424,6 +469,9 @@ class PatientsRepositoryMock implements PatientsRepository {
       birthDate: data.birthDate,
       sex: data.sex,
       conditions: data.conditions,
+      rut: rutNuevo,
+      address: data.address,
+      insurance: data.insurance,
     );
     _patients[id] = patient;
     return patient;
@@ -519,21 +567,37 @@ class PatientsRepositoryMock implements PatientsRepository {
       String patientId, Map<String, dynamic> fields) async {
     final p = _patients[patientId];
     if (p == null) throw StateError('paciente no encontrado');
-    final actualizado = Patient(
-      patientId: p.patientId,
-      fullName: p.fullName,
-      birthDate: p.birthDate,
-      sex: p.sex,
-      photoUrl: p.photoUrl,
-      conditions: p.conditions,
-      wearable: p.wearable,
-      rut: p.rut,
-      address: fields['address'] as String? ?? p.address,
-      maritalStatus: fields['marital_status'] as String? ?? p.maritalStatus,
-      insurance: fields['insurance'] as String? ?? p.insurance,
-      rcvLevel: fields['rcv_level'] as String? ?? p.rcvLevel,
-      latestMeasurement: p.latestMeasurement,
+    String? opcional(String k) {
+      final v = (fields[k] as String?)?.trim();
+      return v == null || v.isEmpty ? null : v;
+    }
+
+    var actualizado = p.copyWith(
+      firstName: fields['first_name'] as String?,
+      secondName: fields.containsKey('second_name')
+          ? () => opcional('second_name')
+          : null,
+      lastName: fields['last_name'] as String?,
+      secondLastName: fields.containsKey('second_last_name')
+          ? () => opcional('second_last_name')
+          : null,
+      address: fields['address'] as String?,
+      maritalStatus: fields['marital_status'] as String?,
+      insurance: fields['insurance'] as String?,
+      rcvLevel: fields['rcv_level'] as String?,
+      complexity: fields['complexity'] as String?,
+      priority: fields['priority'] as String?,
     );
+    // El nombre completo se arma igual que la columna generada de la base.
+    if (actualizado.firstName != null && actualizado.lastName != null) {
+      actualizado = actualizado.copyWith(
+          fullName: [
+        actualizado.firstName,
+        actualizado.secondName,
+        actualizado.lastName,
+        actualizado.secondLastName,
+      ].where((s) => s != null && s.isNotEmpty).join(' '));
+    }
     _patients[patientId] = actualizado;
     return actualizado;
   }
@@ -548,19 +612,7 @@ class PatientsRepositoryMock implements PatientsRepository {
       final m = heightCm / 100.0;
       bmi = double.parse((weightKg / (m * m)).toStringAsFixed(1));
     }
-    final actualizado = Patient(
-      patientId: p.patientId,
-      fullName: p.fullName,
-      birthDate: p.birthDate,
-      sex: p.sex,
-      photoUrl: p.photoUrl,
-      conditions: p.conditions,
-      wearable: p.wearable,
-      rut: p.rut,
-      address: p.address,
-      maritalStatus: p.maritalStatus,
-      insurance: p.insurance,
-      rcvLevel: p.rcvLevel,
+    final actualizado = p.copyWith(
       latestMeasurement: PatientMeasurement(
           weightKg: weightKg,
           heightCm: heightCm,
@@ -596,7 +648,9 @@ class PatientsRepositoryMock implements PatientsRepository {
         AllergenCatalogItem(
             code: 'penicilina', label: 'Penicilina', category: 'medicamento'),
         AllergenCatalogItem(
-            code: 'aines', label: 'AINEs (antiinflamatorios)', category: 'medicamento'),
+            code: 'aines',
+            label: 'AINEs (antiinflamatorios)',
+            category: 'medicamento'),
         AllergenCatalogItem(
             code: 'mariscos', label: 'Mariscos', category: 'alimento'),
         AllergenCatalogItem(
@@ -674,8 +728,8 @@ class PatientsRepositoryMock implements PatientsRepository {
   }
 
   @override
-  Future<List<EmergencyContact>> addEmergencyContact(
-      String patientId, {required String memberUserId, String? notes}) async {
+  Future<List<EmergencyContact>> addEmergencyContact(String patientId,
+      {required String memberUserId, String? notes}) async {
     await Future.delayed(const Duration(milliseconds: 150));
     final lista = _contacts.putIfAbsent(patientId, () => []);
     lista.add(EmergencyContact(
@@ -690,7 +744,8 @@ class PatientsRepositoryMock implements PatientsRepository {
 
   @override
   Future<List<EmergencyContact>> updateEmergencyContact(
-      String patientId, String contactId, {required bool isActive}) async {
+      String patientId, String contactId,
+      {required bool isActive}) async {
     await Future.delayed(const Duration(milliseconds: 150));
     final lista = _contacts.putIfAbsent(patientId, () => []);
     final i = lista.indexWhere((c) => c.id == contactId);

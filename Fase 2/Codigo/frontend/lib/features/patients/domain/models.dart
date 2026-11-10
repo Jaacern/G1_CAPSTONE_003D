@@ -41,9 +41,9 @@ class CareMember {
   final String userId;
   final String fullName;
   final String email;
-  final String role;           // permiso: family/caregiver/doctor/elder
-  final String? profession;    // rol clínico real
-  final String? relationship;  // parentesco (hijo, hija, conyuge...)
+  final String role; // permiso: family/caregiver/doctor/elder
+  final String? profession; // rol clínico real
+  final String? relationship; // parentesco (hijo, hija, conyuge...)
   final bool isOwner;
 
   /// Etiqueta legible del rol en el equipo: prioriza la profesión clínica.
@@ -145,10 +145,10 @@ class AllergyDetail {
 
   final String substance;
   final String label;
-  final String category;   // medicamento|alimento|ambiental|otra
-  final String severity;   // leve|moderada|severa|anafilaxia
+  final String category; // medicamento|alimento|ambiental|otra
+  final String severity; // leve|moderada|severa|anafilaxia
   final String? reaction;
-  final String? source;    // reportada|test|reaccion_tratamiento
+  final String? source; // reportada|test|reaccion_tratamiento
   final DateTime? notedOn;
 
   /// Las severas saltan primero y con color fuerte.
@@ -213,7 +213,7 @@ class Immunization {
 
   final String vaccine;
   final String label;
-  final String kind;          // preventiva | post_exposicion
+  final String kind; // preventiva | post_exposicion
   final DateTime? administeredOn;
   final DateTime? nextDueOn;
   final int? doseNumber;
@@ -223,8 +223,7 @@ class Immunization {
   bool get esPostExposicion => kind == 'post_exposicion';
 
   /// La próxima dosis ya venció (recordatorio en rojo).
-  bool get vencida =>
-      nextDueOn != null && nextDueOn!.isBefore(DateTime.now());
+  bool get vencida => nextDueOn != null && nextDueOn!.isBefore(DateTime.now());
 
   factory Immunization.fromJson(Map<String, dynamic> j) => Immunization(
         vaccine: j['vaccine'] as String,
@@ -334,13 +333,15 @@ String allergySourceLabel(String code) => switch (code) {
     };
 
 class PatientMeasurement {
-  const PatientMeasurement({this.weightKg, this.heightCm, this.bmi, required this.measuredAt});
+  const PatientMeasurement(
+      {this.weightKg, this.heightCm, this.bmi, required this.measuredAt});
   final double? weightKg;
   final double? heightCm;
   final double? bmi;
   final DateTime measuredAt;
 
-  factory PatientMeasurement.fromJson(Map<String, dynamic> j) => PatientMeasurement(
+  factory PatientMeasurement.fromJson(Map<String, dynamic> j) =>
+      PatientMeasurement(
         weightKg: (j['weight_kg'] as num?)?.toDouble(),
         heightCm: (j['height_cm'] as num?)?.toDouble(),
         bmi: (j['bmi'] as num?)?.toDouble(),
@@ -352,6 +353,10 @@ class Patient {
   const Patient({
     required this.patientId,
     required this.fullName,
+    this.firstName,
+    this.secondName,
+    this.lastName,
+    this.secondLastName,
     required this.birthDate,
     this.sex,
     this.photoUrl,
@@ -373,6 +378,15 @@ class Patient {
 
   final String patientId;
   final String fullName;
+
+  /// Las cuatro partes del nombre como se identifica a una persona en Chile:
+  /// primer nombre, segundo nombre, primer apellido y segundo apellido.
+  /// Las segundas son opcionales. Pueden faltar en datos de demostración que
+  /// solo traen [fullName].
+  final String? firstName;
+  final String? secondName;
+  final String? lastName;
+  final String? secondLastName;
   final DateTime birthDate;
   final String? sex;
   final String? photoUrl;
@@ -387,8 +401,8 @@ class Patient {
   final String? maritalStatus;
   final String? insurance;
   final String? rcvLevel;
-  final String? complexity;   // baja|moderada|alta (Fase 6)
-  final String? priority;     // baja|media|alta (Fase 6)
+  final String? complexity; // baja|moderada|alta (Fase 6)
+  final String? priority; // baja|media|alta (Fase 6)
   final LastSeenBy? lastSeenBy;
   final PatientMeasurement? latestMeasurement;
 
@@ -402,14 +416,78 @@ class Patient {
     return years;
   }
 
+  /// Copia con cambios. Los demás campos se conservan tal cual: armar un
+  /// Patient a mano en cada edición iba perdiendo alergias y niveles.
+  Patient copyWith({
+    String? fullName,
+    String? firstName,
+    String? Function()? secondName,
+    String? lastName,
+    String? Function()? secondLastName,
+    String? address,
+    String? maritalStatus,
+    String? insurance,
+    String? rcvLevel,
+    String? complexity,
+    String? priority,
+    List<String>? conditions,
+    PatientMeasurement? latestMeasurement,
+  }) =>
+      Patient(
+        patientId: patientId,
+        fullName: fullName ?? this.fullName,
+        firstName: firstName ?? this.firstName,
+        secondName: secondName != null ? secondName() : this.secondName,
+        lastName: lastName ?? this.lastName,
+        secondLastName:
+            secondLastName != null ? secondLastName() : this.secondLastName,
+        birthDate: birthDate,
+        sex: sex,
+        photoUrl: photoUrl,
+        conditions: conditions ?? this.conditions,
+        conditionsDetail: conditionsDetail,
+        allergies: allergies,
+        immunizations: immunizations,
+        wearable: wearable,
+        rut: rut,
+        address: address ?? this.address,
+        maritalStatus: maritalStatus ?? this.maritalStatus,
+        insurance: insurance ?? this.insurance,
+        rcvLevel: rcvLevel ?? this.rcvLevel,
+        complexity: complexity ?? this.complexity,
+        priority: priority ?? this.priority,
+        lastSeenBy: lastSeenBy,
+        latestMeasurement: latestMeasurement ?? this.latestMeasurement,
+      );
+
+  /// Nombres (primer y segundo nombre) y apellidos, para mostrarlos por
+  /// separado. Sin las partes, se cae al nombre completo.
+  String get givenNames => [firstName, secondName]
+      .where((s) => s != null && s.trim().isNotEmpty)
+      .join(' ');
+  String get surnames => [lastName, secondLastName]
+      .where((s) => s != null && s.trim().isNotEmpty)
+      .join(' ');
+
+  /// Las condiciones con nombre legible. El backend guarda códigos
+  /// (`hipertension`) y manda la etiqueta aparte en `conditions_detail`.
+  List<String> get conditionLabels => conditionsDetail.isNotEmpty
+      ? conditionsDetail.map((c) => c.label).toList()
+      : conditions;
+
   factory Patient.fromJson(Map<String, dynamic> json) => Patient(
         patientId: json['patient_id'] as String,
         fullName: json['full_name'] as String,
+        firstName: json['first_name'] as String?,
+        secondName: json['second_name'] as String?,
+        lastName: json['last_name'] as String?,
+        secondLastName: json['second_last_name'] as String?,
         birthDate: DateTime.parse(json['birth_date'] as String),
         sex: json['sex'] as String?,
         photoUrl: json['photo_url'] as String?,
-        conditions:
-            ((json['conditions'] ?? []) as List).map((e) => e.toString()).toList(),
+        conditions: ((json['conditions'] ?? []) as List)
+            .map((e) => e.toString())
+            .toList(),
         conditionsDetail: ((json['conditions_detail'] ?? []) as List)
             .map((e) => ConditionDetail.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -521,8 +599,8 @@ class PatientCard {
         fullName: json['full_name'] as String,
         photoUrl: json['photo_url'] as String?,
         role: RoleType.fromApi((json['role'] ?? 'family') as String),
-        wellbeingStatus:
-            WellbeingStatus.fromApi((json['wellbeing_status'] ?? 'ok') as String),
+        wellbeingStatus: WellbeingStatus.fromApi(
+            (json['wellbeing_status'] ?? 'ok') as String),
         activeAlertsCount: (json['active_alerts_count'] ?? 0) as int,
         criticalAlertsCount: (json['critical_alerts_count'] ?? 0) as int,
         topReason: json['top_reason'] as String?,
@@ -577,7 +655,9 @@ class VitalMini {
       };
 
   String get display {
-    final v = value == value.roundToDouble() ? value.toInt().toString() : value.toStringAsFixed(1);
+    final v = value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value.toStringAsFixed(1);
     return '$label $v$unit';
   }
 
@@ -606,49 +686,118 @@ class AllergyMini {
       );
 }
 
-/// Solicitud de creación de paciente.
-///
-/// La UI captura un único campo "Nombre completo", pero el backend exige
-/// `first_name` + `last_name` por separado (esquema 2FN). Al serializar se
-/// divide el nombre: la primera palabra es el nombre y el resto el apellido.
-class NewPatient {
-  const NewPatient({
-    required this.fullName,
-    required this.birthDate,
-    required this.sex,
-    this.conditions = const [],
+/// Contacto de emergencia que se declara al crear el paciente. Es un
+/// contacto libre (nombre + teléfono) porque el círculo de cuidado aún no
+/// existe; después se pueden sumar miembros del grupo como contactos.
+class NewEmergencyContact {
+  const NewEmergencyContact({
+    required this.firstName,
+    required this.lastName,
+    required this.relationship,
+    required this.phone,
   });
 
-  final String fullName;
+  final String firstName;
+  final String lastName;
+  final String relationship;
+
+  /// En E.164 (+56912345678).
+  final String phone;
+
+  Map<String, dynamic> toJson() => {
+        'first_name': firstName.trim(),
+        'last_name': lastName.trim(),
+        'relationship': relationship.trim(),
+        'phone': phone,
+      };
+}
+
+/// Alergia conocida al crear el paciente.
+class NewAllergy {
+  const NewAllergy({
+    required this.substance,
+    required this.category,
+    this.severity = 'moderada',
+  });
+
+  final String substance; // code del catálogo o texto libre
+  final String category; // medicamento|alimento|ambiental|otra
+  final String severity; // leve|moderada|severa|anafilaxia
+
+  Map<String, dynamic> toJson() =>
+      {'substance': substance, 'category': category, 'severity': severity};
+}
+
+/// Solicitud de creación de paciente (`POST /patients`).
+///
+/// Cada parte del nombre va en su propio campo, igual que en el backend
+/// (first_name, second_name, last_name, second_last_name). Antes se pedía un
+/// "nombre completo" y se partía por el primer espacio, lo que guardaba mal
+/// a "María José Pérez" (apellido "José Pérez") y duplicaba nombres sueltos.
+///
+/// Obligatorios: nombre, apellido, RUT, nacimiento, sexo, domicilio y un
+/// contacto de emergencia. Opcionales: segundo nombre y apellido,
+/// condiciones, alergias, previsión. Una lista vacía de alergias NO viaja: el
+/// backend la interpreta como "no informado", no como "sin alergias".
+class NewPatient {
+  const NewPatient({
+    required this.firstName,
+    this.secondName,
+    required this.lastName,
+    this.secondLastName,
+    required this.rut,
+    required this.birthDate,
+    required this.sex,
+    required this.address,
+    required this.emergencyContact,
+    this.conditions = const [],
+    this.allergies = const [],
+    this.insurance,
+  });
+
+  final String firstName;
+  final String? secondName;
+  final String lastName;
+  final String? secondLastName;
+  final String rut;
   final DateTime birthDate;
 
-  /// `female`, `male` u `other`. No es opcional: `patients.sex` es NOT NULL y
-  /// `POST /patients` responde 422 si falta.
+  /// `female`, `male` u `other`. `patients.sex` es NOT NULL.
   final String sex;
+  final String address;
+  final NewEmergencyContact emergencyContact;
   final List<String> conditions;
+  final List<NewAllergy> allergies;
 
-  /// Divide el nombre completo en (first_name, last_name) para el backend.
-  /// Si solo hay una palabra, se usa como nombre y el apellido queda igual
-  /// (el backend exige ambos con min_length 1).
-  (String, String) get _splitName {
-    final parts =
-        fullName.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return ('', '');
-    if (parts.length == 1) return (parts.first, parts.first);
-    return (parts.first, parts.sublist(1).join(' '));
-  }
+  /// fonasa | isapre | particular | otra
+  final String? insurance;
 
-  Map<String, dynamic> toJson() {
-    final (firstName, lastName) = _splitName;
-    return {
-      'first_name': firstName,
-      'last_name': lastName,
-      'birth_date':
-          '${birthDate.year.toString().padLeft(4, '0')}-${birthDate.month.toString().padLeft(2, '0')}-${birthDate.day.toString().padLeft(2, '0')}',
-      'sex': sex,
-      if (conditions.isNotEmpty) 'conditions': conditions,
-    };
-  }
+  /// Nombre completo, igual a como lo arma la columna generada de la base.
+  String get fullName => [firstName, secondName, lastName, secondLastName]
+      .where((p) => p != null && p.trim().isNotEmpty)
+      .map((p) => p!.trim())
+      .join(' ');
+
+  static String? _opcional(String? v) =>
+      v == null || v.trim().isEmpty ? null : v.trim();
+
+  Map<String, dynamic> toJson() => {
+        'first_name': firstName.trim(),
+        if (_opcional(secondName) != null) 'second_name': _opcional(secondName),
+        'last_name': lastName.trim(),
+        if (_opcional(secondLastName) != null)
+          'second_last_name': _opcional(secondLastName),
+        'rut': rut.trim(),
+        'birth_date':
+            '${birthDate.year.toString().padLeft(4, '0')}-${birthDate.month.toString().padLeft(2, '0')}-${birthDate.day.toString().padLeft(2, '0')}',
+        'sex': sex,
+        'address': address.trim(),
+        'emergency_contact': emergencyContact.toJson(),
+        if (conditions.isNotEmpty) 'conditions': conditions,
+        if (allergies.isNotEmpty)
+          'allergies': allergies.map((a) => a.toJson()).toList(),
+        if (insurance != null) 'insurance': insurance,
+      };
 }
 
 /// Invitación al círculo de cuidado (AGE-205 / DAC05-7).

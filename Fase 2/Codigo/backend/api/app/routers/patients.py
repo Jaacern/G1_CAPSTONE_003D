@@ -8,17 +8,31 @@ Cambios 2FN aplicados al esquema:
 - scheduled_doses ya no tiene patient_id: las consultas por paciente hacen JOIN.
 """
 import json
+import re
 from datetime import date, datetime, timedelta, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Response, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
-from app.deps import CurrentUser, PatientContext, get_current_user, get_patient_member
+from app.deps import (
+    CurrentUser,
+    PatientContext,
+    get_current_user,
+    get_patient_member,
+    is_verified_doctor,
+)
 from app.errors import ApiError
 from app.security import generate_refresh_token, hash_token
+from app.validators import (
+    clean_person_name,
+    normalize_phone,
+    parse_rut,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["patients"])
 
@@ -32,14 +46,106 @@ _SEX_DB_TO_API = {v: k for k, v in _SEX_API_TO_DB.items()}
 # --------------------------------------------------------------------------
 # Schemas
 # --------------------------------------------------------------------------
+class EmergencyContactNewIn(BaseModel):
+    """Contacto de emergencia que se declara al crear el paciente.
+
+    En ese momento el círculo de cuidado todavía no existe, así que no se
+    puede elegir a un miembro del grupo (decisión de la ficha clínica): se
+    guarda como contacto libre, que el modelo ya contempla. Más adelante el
+    familiar puede sumar miembros como contactos rotativos.
+    """
+    first_name:   str = Field(min_length=1, max_length=60)
+    last_name:    str = Field(min_length=1, max_length=60)
+    relationship: str = Field(min_length=2, max_length=40)
+    phone:        str
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def _nombre_valido(cls, v: str) -> str:
+        return clean_person_name(v)
+
+    @field_validator("relationship")
+    @classmethod
+    def _parentesco_valido(cls, v: str) -> str:
+        return clean_person_name(v)
+
+    @field_validator("phone")
+    @classmethod
+    def _telefono_valido(cls, v: str) -> str:
+        return normalize_phone(v)
+
+
 class PatientCreateIn(BaseModel):
-    first_name: str = Field(min_length=1, max_length=60)
-    last_name:  str = Field(min_length=1, max_length=60)
-    birth_date: date
-    sex: str                        # female | male | other
-    photo_url: str | None = None
-    conditions: list[str] | None = None
-    allergies: list["AllergyIn"] | None = None
+    """Alta de paciente.
+
+    OBLIGATORIOS (identifican a la persona y permiten actuar en una urgencia):
+    nombre, apellido, RUT, fecha de nacimiento, sexo, domicilio y un contacto
+    de emergencia con su teléfono.
+
+    OPCIONALES (no toda persona los tiene; se pueden completar después):
+    segundo nombre, segundo apellido, condiciones crónicas, alergias, previsión
+    y estado civil. Omitirlos NO significa "sin alergias": significa que aún no
+    se informaron.
+    """
+    first_name:       str = Field(min_length=1, max_length=60)
+    second_name:      str | None = Field(default=None, max_length=60)
+    last_name:        str = Field(min_length=1, max_length=60)
+    second_last_name: str | None = Field(default=None, max_length=60)
+    rut:              str
+    birth_date:       date
+    sex:              str                  # female | male | other
+    address:          str = Field(min_length=5, max_length=200)
+    emergency_contact: EmergencyContactNewIn
+    photo_url:        str | None = None
+    conditions:       list[str] | None = Field(default=None, max_length=30)
+    allergies:        list["AllergyIn"] | None = Field(default=None, max_length=30)
+    insurance:        Literal["fonasa", "isapre", "particular", "otra"] | None = None
+    marital_status:   Literal["soltero", "casado", "viudo", "divorciado",
+                              "conviviente", "separado"] | None = None
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def _nombre_valido(cls, v: str) -> str:
+        return clean_person_name(v)
+
+    @field_validator("second_name", "second_last_name")
+    @classmethod
+    def _segundo_nombre_valido(cls, v: str | None) -> str | None:
+        # Opcionales: vacío equivale a no informado.
+        if v is None or not v.strip():
+            return None
+        return clean_person_name(v)
+
+    @field_validator("rut")
+    @classmethod
+    def _rut_valido(cls, v: str) -> str:
+        parse_rut(v)  # lanza ValueError con el motivo si no corresponde
+        return v
+
+    @field_validator("birth_date")
+    @classmethod
+    def _nacimiento_valido(cls, v: date) -> date:
+        if v <= date(1900, 1, 1) or v > date.today():
+            raise ValueError("La fecha de nacimiento no es válida.")
+        return v
+
+    @field_validator("address")
+    @classmethod
+    def _domicilio_valido(cls, v: str) -> str:
+        v = re.sub(r"\s+", " ", v.strip())
+        if len(v) < 5:
+            raise ValueError("Escribe el domicilio completo (calle, número y comuna).")
+        return v
+
+    @field_validator("conditions")
+    @classmethod
+    def _condiciones_validas(cls, v: list[str] | None) -> list[str] | None:
+        if not v:
+            return None
+        limpias = [re.sub(r"\s+", " ", c.strip()) for c in v if c and c.strip()]
+        if any(len(c) < 2 or len(c) > 80 for c in limpias):
+            raise ValueError("Cada condición debe tener entre 2 y 80 caracteres.")
+        return limpias or None
 
 
 class AllergyIn(BaseModel):
@@ -82,7 +188,10 @@ class PatientCreateOut(BaseModel):
 
 class PatientPatchIn(BaseModel):
     first_name:     str | None = Field(default=None, min_length=1, max_length=60)
+    # Segundo nombre y segundo apellido: enviar "" (o null) los borra.
+    second_name:    str | None = Field(default=None, max_length=60)
     last_name:      str | None = Field(default=None, min_length=1, max_length=60)
+    second_last_name: str | None = Field(default=None, max_length=60)
     birth_date:     date | None = None
     sex:            str | None = None
     photo_url:      str | None = None
@@ -94,6 +203,21 @@ class PatientPatchIn(BaseModel):
     rcv_level:      str | None = None
     complexity:     str | None = None   # baja|moderada|alta (Fase 6)
     priority:       str | None = None   # baja|media|alta (Fase 6)
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def _nombre_valido(cls, v: str | None) -> str | None:
+        # null en un obligatorio no se acepta: no se puede dejar sin nombre.
+        if v is None:
+            raise ValueError("No puede quedar vacío.")
+        return clean_person_name(v)
+
+    @field_validator("second_name", "second_last_name")
+    @classmethod
+    def _segundo_nombre_valido(cls, v: str | None) -> str | None:
+        if v is None or not v.strip():
+            return None
+        return clean_person_name(v)
 
 
 class PatientListItem(BaseModel):
@@ -148,8 +272,12 @@ class MeasurementOut(BaseModel):
 class PatientDetailOut(BaseModel):
     patient_id:     str
     full_name:      str
+    # Las cuatro partes del nombre, por separado: primer nombre, segundo
+    # nombre, primer apellido y segundo apellido (las dos opcionales).
     first_name:     str
+    second_name:    str | None = None
     last_name:      str
+    second_last_name: str | None = None
     birth_date:     date
     sex:            str
     photo_url:      str | None = None
@@ -660,7 +788,8 @@ async def _load_patient_detail(db: AsyncSession, patient_id: str) -> PatientDeta
         await db.execute(
             text(
                 """
-                SELECT id, first_name, last_name, full_name,
+                SELECT id, first_name, second_name, last_name,
+                       second_last_name, full_name,
                        birth_date, sex, photo_url,
                        rut_number, rut_dv, address, marital_status,
                        insurance, rcv_level, complexity, priority
@@ -734,7 +863,9 @@ async def _load_patient_detail(db: AsyncSession, patient_id: str) -> PatientDeta
     return PatientDetailOut(
         patient_id=str(patient["id"]),
         first_name=patient["first_name"],
+        second_name=patient["second_name"],
         last_name=patient["last_name"],
+        second_last_name=patient["second_last_name"],
         full_name=patient["full_name"],
         birth_date=patient["birth_date"],
         sex=_SEX_DB_TO_API.get(patient["sex"], patient["sex"]),
@@ -1026,28 +1157,93 @@ async def create_patient(
     sex_db = _SEX_API_TO_DB.get(payload.sex)
     if sex_db is None:
         raise ApiError(status_code=422, code="VALIDATION_ERROR",
-                       message="Hay datos inválidos en la solicitud. Revisa los campos marcados.")
+                       message="Hay datos inválidos en la solicitud. Revisa los campos marcados.",
+                       details=[{"field": "sex",
+                                 "message": "Debe ser female, male u other."}])
 
-    patient = (
-        await db.execute(
-            text(
-                """
-                INSERT INTO patients (first_name, last_name, birth_date, sex, photo_url)
-                VALUES (:fn, :ln, :bd, :sex, :photo)
-                RETURNING id, full_name, created_at
-                """
+    # Quien crea el perfil queda como familiar administrador. Si lo pudiera
+    # crear una cuenta de cuidador(a) o médico, terminaría siendo "familiar" de
+    # alguien que no es su familia: esos perfiles llegan por invitación.
+    account_type = (
+        await db.execute(text("SELECT account_type FROM users WHERE id = :u"),
+                         {"u": user.user_id})
+    ).scalar()
+    if account_type != "family":
+        raise ApiError(
+            status_code=403,
+            code="ONLY_FAMILY_CREATES_PATIENTS",
+            message=(
+                "Solo una cuenta de familiar puede crear el perfil de un paciente. "
+                "Si eres cuidador(a) o médico, pide a la familia que te invite."
             ),
-            {
-                "fn":    payload.first_name,
-                "ln":    payload.last_name,
-                "bd":    payload.birth_date,
-                "sex":   sex_db,
-                "photo": payload.photo_url,
-            },
         )
-    ).mappings().first()
+
+    rut_number, rut_dv = parse_rut(payload.rut)
+    ya_existe = (
+        await db.execute(
+            text("SELECT 1 FROM patients WHERE rut_number = :n AND deleted_at IS NULL"),
+            {"n": rut_number},
+        )
+    ).first()
+    rut_repetido = ApiError(
+        status_code=409,
+        code="PATIENT_RUT_EXISTS",
+        message=(
+            "Ya existe un paciente registrado con ese RUT. "
+            "Pide al familiar administrador que te invite a su círculo de cuidado."
+        ),
+    )
+    if ya_existe:
+        raise rut_repetido
+
+    try:
+        patient = (
+            await db.execute(
+                text(
+                    """
+                    INSERT INTO patients (first_name, second_name, last_name,
+                                          second_last_name, rut_number, rut_dv,
+                                          birth_date, sex, photo_url, address,
+                                          insurance, marital_status)
+                    VALUES (:fn, :sn, :ln, :sln, :rn, :rdv,
+                            :bd, :sex, :photo, :addr, :ins, :mar)
+                    RETURNING id, full_name, created_at
+                    """
+                ),
+                {
+                    "fn":    payload.first_name,
+                    "sn":    payload.second_name,
+                    "ln":    payload.last_name,
+                    "sln":   payload.second_last_name,
+                    "rn":    rut_number,
+                    "rdv":   rut_dv,
+                    "bd":    payload.birth_date,
+                    "sex":   sex_db,
+                    "photo": payload.photo_url,
+                    "addr":  payload.address,
+                    "ins":   payload.insurance,
+                    "mar":   payload.marital_status,
+                },
+            )
+        ).mappings().first()
+    except IntegrityError:
+        # Dos altas simultáneas con el mismo RUT: gana la primera.
+        await db.rollback()
+        raise rut_repetido
 
     pid = str(patient["id"])
+
+    # Contacto de emergencia obligatorio (contacto libre: el círculo aún no existe).
+    ec = payload.emergency_contact
+    await db.execute(
+        text(
+            "INSERT INTO emergency_contacts "
+            "(patient_id, first_name, last_name, relationship, phone) "
+            "VALUES (:pid, :fn, :ln, :rel, :phone)"
+        ),
+        {"pid": pid, "fn": ec.first_name, "ln": ec.last_name,
+         "rel": ec.relationship, "phone": ec.phone},
+    )
 
     # Condiciones en tabla normalizada
     if payload.conditions:
@@ -1147,6 +1343,10 @@ async def list_patients(
                 WHERE pm.user_id = :uid
                   AND pm.removed_at IS NULL
                   AND p.deleted_at IS NULL
+                  -- Una membresía 'doctor' solo cuenta con habilitación vigente.
+                  AND (pm.role <> 'doctor' OR EXISTS (
+                        SELECT 1 FROM doctor_profiles d
+                        WHERE d.user_id = pm.user_id AND d.revoked_at IS NULL))
                 """
             ),
             {"uid": user.user_id},
@@ -1352,6 +1552,13 @@ async def update_patient(
         sets.append("first_name = :first_name"); params["first_name"] = fields["first_name"]
     if "last_name" in fields:
         sets.append("last_name = :last_name");   params["last_name"]  = fields["last_name"]
+    # Opcionales: None (o "") los deja vacíos.
+    if "second_name" in fields:
+        sets.append("second_name = :second_name")
+        params["second_name"] = fields["second_name"]
+    if "second_last_name" in fields:
+        sets.append("second_last_name = :second_last_name")
+        params["second_last_name"] = fields["second_last_name"]
     if "birth_date" in fields:
         sets.append("birth_date = :birth_date"); params["birth_date"] = fields["birth_date"]
     if "sex" in fields:
@@ -1501,6 +1708,19 @@ async def accept_invitation(
 
     if invitation is None:
         raise invalid
+
+    # Invitar "como médico" no vuelve médico a nadie: solo puede aceptar quien
+    # tenga una habilitación vigente. Si no, el familiar administrador podría
+    # otorgar poder de receta a cualquier correo.
+    if invitation["role"] == "doctor" and not await is_verified_doctor(db, user.user_id):
+        raise ApiError(
+            status_code=403,
+            code="DOCTOR_NOT_VERIFIED",
+            message=(
+                "Solo un médico habilitado por AgeCare puede unirse con este rol. "
+                "Si eres médico, pide tu código de habilitación al equipo de AgeCare."
+            ),
+        )
 
     # Si el miembro ya existía (reingreso tras removed_at), reactiva y actualiza
     # su profesión; si no, inserta. Copia la profesión de la invitación.

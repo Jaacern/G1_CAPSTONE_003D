@@ -382,13 +382,21 @@
           <div class="card">
             <div class="card-head"><h2>Crear paciente</h2><span class="badge badge-info">POST /api/v1/patients</span></div>
             <div class="form-grid">
-              <div class="field"><label>Nombre(s)</label><input id="p-first-name" value="María" placeholder="Nombre(s)"></div>
-              <div class="field"><label>Apellido(s)</label><input id="p-last-name" value="González" placeholder="Apellido(s)"></div>
-              <div class="field"><label>Fecha de nacimiento</label><input type="date" id="p-birth" value="1948-06-15"></div>
-              <div class="field"><label>Sexo</label>
+              <div class="field"><label>Nombre *</label><input id="p-first-name" value="María" placeholder="Nombre"></div>
+              <div class="field"><label>Segundo nombre</label><input id="p-second-name" value="" placeholder="Opcional"></div>
+              <div class="field"><label>Apellido *</label><input id="p-last-name" value="González" placeholder="Apellido"></div>
+              <div class="field"><label>Segundo apellido</label><input id="p-second-last-name" value="" placeholder="Opcional"></div>
+              <div class="field"><label>RUT *</label><input id="p-rut" value="" placeholder="12.345.678-5"></div>
+              <div class="field"><label>Fecha de nacimiento *</label><input type="date" id="p-birth" value="1948-06-15"></div>
+              <div class="field"><label>Sexo *</label>
                 <select id="p-sex"><option value="female">female</option><option value="male">male</option><option value="other">other</option></select>
               </div>
-              <div class="field"><label>Condiciones (separadas por coma)</label><input id="p-conditions" value="hipertension,diabetes_tipo_2" placeholder="hipertension,diabetes_tipo_2"></div>
+              <div class="field"><label>Domicilio *</label><input id="p-address" value="" placeholder="Calle 123, Comuna"></div>
+              <div class="field"><label>Contacto emergencia: nombre *</label><input id="p-ec-first" value="" placeholder="Nombre"></div>
+              <div class="field"><label>Contacto emergencia: apellido *</label><input id="p-ec-last" value="" placeholder="Apellido"></div>
+              <div class="field"><label>Contacto emergencia: parentesco *</label><input id="p-ec-rel" value="Hijo" placeholder="Hijo, Hija, Cónyuge..."></div>
+              <div class="field"><label>Contacto emergencia: teléfono *</label><input id="p-ec-phone" value="" placeholder="+56912345678"></div>
+              <div class="field"><label>Condiciones (separadas por coma)</label><input id="p-conditions" value="hipertension,diabetes_tipo_2" placeholder="Opcional"></div>
             </div>
             <div class="btn-group"><button class="btn btn-primary" onclick="createPatient()">Crear paciente</button></div>
           </div>
@@ -1025,11 +1033,22 @@ async function loadPatients() {
 async function createPatient() {
   const conditions = document.getElementById('p-conditions').value
     .split(',').map(s => s.trim()).filter(Boolean);
+  const v = id => document.getElementById(id).value.trim();
   await api('POST', '/api/v1/patients', {
-    first_name: document.getElementById('p-first-name').value,
-    last_name:  document.getElementById('p-last-name').value,
-    birth_date: document.getElementById('p-birth').value,
-    sex: document.getElementById('p-sex').value,
+    first_name: v('p-first-name'),
+    second_name: v('p-second-name') || null,
+    last_name:  v('p-last-name'),
+    second_last_name: v('p-second-last-name') || null,
+    rut: v('p-rut'),
+    birth_date: v('p-birth'),
+    sex: v('p-sex'),
+    address: v('p-address'),
+    emergency_contact: {
+      first_name: v('p-ec-first'),
+      last_name: v('p-ec-last'),
+      relationship: v('p-ec-rel'),
+      phone: v('p-ec-phone'),
+    },
     conditions
   }, 'patients-create-response');
 }

@@ -49,7 +49,8 @@ final selectedPatientDetailProvider = FutureProvider<Patient?>((ref) async {
 });
 
 /// Equipo de cuidado del paciente seleccionado (miembros con su profesión).
-final careTeamProvider = FutureProvider.autoDispose<List<CareMember>>((ref) async {
+final careTeamProvider =
+    FutureProvider.autoDispose<List<CareMember>>((ref) async {
   final selected = ref.watch(selectedPatientProvider);
   if (selected == null) return const [];
   return ref.watch(patientsRepositoryProvider).listMembers(selected.patientId);
@@ -60,3 +61,11 @@ final emergencyContactsProvider = FutureProvider.autoDispose
     .family<List<EmergencyContact>, String>((ref, patientId) async {
   return ref.watch(patientsRepositoryProvider).emergencyContacts(patientId);
 });
+
+/// Catálogo de patologías (para marcar las crónicas al crear un paciente).
+final conditionCatalogProvider = FutureProvider<List<ConditionDetail>>(
+    (ref) => ref.watch(patientsRepositoryProvider).conditionCatalog());
+
+/// Catálogo de alérgenos (para marcar las alergias al crear un paciente).
+final allergenCatalogProvider = FutureProvider<List<AllergenCatalogItem>>(
+    (ref) => ref.watch(patientsRepositoryProvider).allergenCatalog());

@@ -7,12 +7,10 @@ import 'package:agecare_app/features/patients/data/patients_repository.dart';
 import 'package:agecare_app/features/patients/domain/models.dart';
 import 'package:agecare_app/features/patients/presentation/create_patient_screen.dart';
 
-/// Repositorio que sólo cuenta los altos que le piden.
+/// Repositorio que solo cuenta las altas que le piden.
 class _RepoEspia implements PatientsRepository {
-
-  // Los metodos de la ficha clinica (alergias, vacunas, contactos,
-  // tratamientos...) no se usan en esta prueba: si alguno se llamara,
-  // falla con NoSuchMethodError en vez de devolver datos inventados.
+  // Los métodos de la ficha clínica no se usan en esta prueba: si alguno se
+  // llamara, falla con NoSuchMethodError en vez de devolver datos inventados.
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
   int altos = 0;
@@ -24,6 +22,12 @@ class _RepoEspia implements PatientsRepository {
   }
 
   @override
+  Future<List<ConditionDetail>> conditionCatalog() async => const [];
+
+  @override
+  Future<List<AllergenCatalogItem>> allergenCatalog() async => const [];
+
+  @override
   Future<List<PatientCard>> listMyPatients() async => const [];
 
   @override
@@ -31,9 +35,7 @@ class _RepoEspia implements PatientsRepository {
 
   @override
   Future<Invitation> invite(
-          {required String patientId,
-          required RoleType role,
-          String? email}) =>
+          {required String patientId, required RoleType role, String? email}) =>
       throw UnimplementedError();
 
   @override
@@ -56,16 +58,54 @@ void main() {
     return repo;
   }
 
-  testWidgets('sin sexo el formulario avisa y no llama al alta',
+  Finder campo(String etiqueta) => find.widgetWithText(TextFormField, etiqueta);
+
+  Future<void> enviar(WidgetTester tester) async {
+    final boton = find.widgetWithText(FilledButton, 'Crear perfil');
+    await tester.ensureVisible(boton);
+    await tester.tap(boton);
+    await tester.pump();
+  }
+
+  testWidgets('formulario vacío: marca los obligatorios y no llama al alta',
       (tester) async {
     final repo = await montar(tester);
+    await enviar(tester);
 
-    await tester.enterText(find.byType(TextFormField).first, 'Elena Ramírez');
-    await tester.tap(find.widgetWithText(FilledButton, 'Crear perfil'));
-    await tester.pump();
-
+    expect(find.text('Escribe el RUT'), findsOne);
     expect(find.text('Selecciona el sexo'), findsOne);
-    // El 422 del backend llegaba después de rellenar todo; ahora corta acá.
+    expect(find.text('Selecciona la fecha de nacimiento'), findsOne);
+    expect(find.text('Escribe el domicilio completo (calle, número y comuna)'),
+        findsOne);
+    expect(find.text('Escribe el teléfono'), findsOne);
     expect(repo.altos, 0);
+  });
+
+  testWidgets('un RUT con dígito verificador malo no pasa', (tester) async {
+    final repo = await montar(tester);
+    // 5.123.456 lleva dígito 1, no K.
+    await tester.enterText(campo('RUT *'), '5.123.456-K');
+    await enviar(tester);
+
+    expect(find.text('El dígito verificador no corresponde'), findsOne);
+    expect(repo.altos, 0);
+  });
+
+  testWidgets('un nombre con números no pasa', (tester) async {
+    final repo = await montar(tester);
+    await tester.enterText(campo('Nombre *').first, 'Elena2');
+    await enviar(tester);
+
+    expect(find.text('Solo letras, espacios, apóstrofe o guion'), findsWidgets);
+    expect(repo.altos, 0);
+  });
+
+  testWidgets('el segundo nombre y el segundo apellido no son obligatorios',
+      (tester) async {
+    await montar(tester);
+    await enviar(tester);
+
+    expect(find.text('Escribe el segundo nombre'), findsNothing);
+    expect(find.text('Escribe el segundo apellido'), findsNothing);
   });
 }

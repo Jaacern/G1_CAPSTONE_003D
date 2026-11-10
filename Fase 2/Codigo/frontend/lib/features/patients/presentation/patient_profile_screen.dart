@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/util/save_pdf.dart';
+import '../../../core/validation/identity_validators.dart';
 import '../../../core/widgets/common.dart';
 import '../application/patients_providers.dart';
 import '../data/patients_repository.dart';
@@ -42,11 +44,33 @@ class PatientProfileScreen extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: [
               _Cabecera(patient: p),
-              const _SectionLabel('Identidad'),
+              Row(
+                children: [
+                  const Expanded(child: _SectionLabel('Identidad')),
+                  TextButton.icon(
+                    onPressed: () => _editarNombre(context, ref, p),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Editar nombre'),
+                  ),
+                ],
+              ),
               AppCard(
                 padding: EdgeInsets.zero,
                 child: Column(
                   children: [
+                    // Nombres y apellidos por separado: así se identifica a
+                    // una persona en Chile (Elena Rosa / Rosales Riquelme).
+                    _DataRow(
+                        icon: Icons.person_outline_rounded,
+                        label: 'Nombres',
+                        value:
+                            p.givenNames.isEmpty ? p.fullName : p.givenNames),
+                    const Divider(height: 1),
+                    _DataRow(
+                        icon: Icons.people_outline_rounded,
+                        label: 'Apellidos',
+                        value: p.surnames.isEmpty ? '—' : p.surnames),
+                    const Divider(height: 1),
                     if ((p.rut ?? '').isNotEmpty) ...[
                       _DataRow(
                           icon: Icons.badge_outlined,
@@ -243,7 +267,8 @@ class PatientProfileScreen extends ConsumerWidget {
               _EquipoCard(patientId: patientId),
               Row(
                 children: [
-                  const Expanded(child: _SectionLabel('Contactos de emergencia')),
+                  const Expanded(
+                      child: _SectionLabel('Contactos de emergencia')),
                   TextButton.icon(
                     onPressed: () => _editarContactos(context, ref, p),
                     icon: const Icon(Icons.edit_outlined, size: 18),
@@ -277,8 +302,8 @@ class PatientProfileScreen extends ConsumerWidget {
                       title: const Text('Historial de tratamientos'),
                       trailing: const Icon(Icons.chevron_right_rounded,
                           color: AppColors.textSecondary),
-                      onTap: () => context
-                          .push('/treatment/history?patient=$patientId'),
+                      onTap: () =>
+                          context.push('/treatment/history?patient=$patientId'),
                     ),
                   ],
                 ),
@@ -315,12 +340,16 @@ class PatientProfileScreen extends ConsumerWidget {
     return buf.toString();
   }
 
-  static String _sexo(String? s) => switch (s) {
-        'male' => 'Masculino',
-        'female' => 'Femenino',
-        'other' => 'Otro',
-        _ => '—',
-      };
+  /// La API manda `female`/`male`/`other`, pero hay datos con una sola letra
+  /// (la base guarda F, M u O). Se mira la inicial para aceptar ambas.
+  static String _sexo(String? s) {
+    if (s == null || s.isEmpty) return '—';
+    return switch (s[0].toUpperCase()) {
+      'M' => 'Masculino',
+      'F' => 'Femenino',
+      _ => 'Otro',
+    };
+  }
 
   static String _civil(String? s) => switch (s) {
         'soltero' => 'Soltero(a)',
@@ -344,8 +373,14 @@ class PatientProfileScreen extends ConsumerWidget {
   static Map<String, List<ConditionDetail>> _agruparPorSistema(
       List<ConditionDetail> items) {
     const orden = [
-      'cardiovascular', 'metabolico', 'respiratorio', 'neuropsiquiatrico',
-      'osteomuscular', 'sensorial', 'geriatrico', 'otras',
+      'cardiovascular',
+      'metabolico',
+      'respiratorio',
+      'neuropsiquiatrico',
+      'osteomuscular',
+      'sensorial',
+      'geriatrico',
+      'otras',
     ];
     final mapa = <String, List<ConditionDetail>>{};
     for (final c in items) {
@@ -359,7 +394,6 @@ class PatientProfileScreen extends ConsumerWidget {
 
   static String _fecha(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-
 }
 
 /// Diálogo para editar la lista de enfermedades: quitar las que remitieron y
@@ -407,17 +441,24 @@ Future<void> _editarEnfermedades(
                       onSubmitted: (_) {
                         final v = nueva.text.trim();
                         if (v.length >= 2 && !lista.contains(v)) {
-                          setLocal(() { lista.add(v); nueva.clear(); });
+                          setLocal(() {
+                            lista.add(v);
+                            nueva.clear();
+                          });
                         }
                       },
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.add_rounded, color: AppColors.primary),
+                    icon:
+                        const Icon(Icons.add_rounded, color: AppColors.primary),
                     onPressed: () {
                       final v = nueva.text.trim();
                       if (v.length >= 2 && !lista.contains(v)) {
-                        setLocal(() { lista.add(v); nueva.clear(); });
+                        setLocal(() {
+                          lista.add(v);
+                          nueva.clear();
+                        });
                       }
                     },
                   ),
@@ -525,7 +566,11 @@ class _TelefonosEmergencia extends StatelessWidget {
     ('SAMU', '131', Icons.local_hospital_outlined),
     ('Carabineros', '133', Icons.local_police_outlined),
     ('Bomberos', '132', Icons.local_fire_department_outlined),
-    ('Ambulancia / Salud Responde', '600 360 7777', Icons.phone_in_talk_outlined),
+    (
+      'Ambulancia / Salud Responde',
+      '600 360 7777',
+      Icons.phone_in_talk_outlined
+    ),
   ];
 
   @override
@@ -563,7 +608,8 @@ class _RcvRow extends StatelessWidget {
       _ => ('No evaluado', AppColors.textSecondary),
     };
     return ListTile(
-      leading: const Icon(Icons.monitor_heart_outlined, color: AppColors.primary),
+      leading:
+          const Icon(Icons.monitor_heart_outlined, color: AppColors.primary),
       title: const Text('Riesgo cardiovascular',
           style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
       trailing: Container(
@@ -582,7 +628,9 @@ class _RcvRow extends StatelessWidget {
 
 // Textos y colores de complejidad y prioridad (chips de la ficha social).
 const _complejidadTextos = {
-  'baja': 'Baja', 'moderada': 'Moderada', 'alta': 'Alta',
+  'baja': 'Baja',
+  'moderada': 'Moderada',
+  'alta': 'Alta',
 };
 const _complejidadColores = {
   'baja': AppColors.statusOk,
@@ -662,8 +710,8 @@ class _MeasurementView extends StatelessWidget {
                     fontSize: 12, color: AppColors.textSecondary)),
             const SizedBox(height: 2),
             Text(value,
-                style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w700)),
+                style:
+                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
           ],
         ),
       );
@@ -673,6 +721,88 @@ class _MeasurementView extends StatelessWidget {
     if (bmi < 25) return '(normal)';
     if (bmi < 30) return '(sobrepeso)';
     return '(obesidad)';
+  }
+}
+
+/// Diálogo para corregir las cuatro partes del nombre. Solo el familiar
+/// administrador puede guardarlo (lo controla el backend).
+Future<void> _editarNombre(
+    BuildContext context, WidgetRef ref, Patient p) async {
+  // Datos antiguos que solo traen el nombre completo: se ofrece partido por
+  // el primer espacio como punto de partida, para corregir a mano.
+  final partes = p.fullName.trim().split(RegExp(r'\s+'));
+  final primer = TextEditingController(
+      text: p.firstName ?? (partes.isNotEmpty ? partes.first : ''));
+  final segundo = TextEditingController(text: p.secondName ?? '');
+  final apellido = TextEditingController(
+      text: p.lastName ?? (partes.length > 1 ? partes[1] : ''));
+  final segundoApellido = TextEditingController(text: p.secondLastName ?? '');
+  final formKey = GlobalKey<FormState>();
+
+  Widget campo(
+          TextEditingController c, String label, String? Function(String?) v) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: TextFormField(
+          controller: c,
+          textCapitalization: TextCapitalization.words,
+          decoration: InputDecoration(labelText: label),
+          validator: v,
+        ),
+      );
+
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Nombre del paciente'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              campo(primer, 'Primer nombre *',
+                  (v) => validatePersonName(v, campo: 'el primer nombre')),
+              campo(segundo, 'Segundo nombre',
+                  (v) => validatePersonName(v, required: false)),
+              campo(apellido, 'Primer apellido *',
+                  (v) => validatePersonName(v, campo: 'el primer apellido')),
+              campo(segundoApellido, 'Segundo apellido',
+                  (v) => validatePersonName(v, required: false)),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar')),
+        FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.of(ctx).pop(true);
+              }
+            },
+            child: const Text('Guardar')),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  try {
+    await ref.read(patientsRepositoryProvider).updateProfile(p.patientId, {
+      'first_name': primer.text.trim(),
+      // Vacío borra el segundo nombre o el segundo apellido.
+      'second_name': segundo.text.trim(),
+      'last_name': apellido.text.trim(),
+      'second_last_name': segundoApellido.text.trim(),
+    });
+    ref.invalidate(selectedPatientDetailProvider);
+    ref.invalidate(myPatientsProvider);
+    if (context.mounted) showAppSnackBar(context, 'Nombre actualizado.');
+  } on ApiException catch (e) {
+    if (context.mounted) {
+      showAppSnackBar(context, e.detailedMessage, error: true);
+    }
   }
 }
 
@@ -707,9 +837,12 @@ Future<void> _editarPerfil(
                   DropdownMenuItem(value: 'soltero', child: Text('Soltero(a)')),
                   DropdownMenuItem(value: 'casado', child: Text('Casado(a)')),
                   DropdownMenuItem(value: 'viudo', child: Text('Viudo(a)')),
-                  DropdownMenuItem(value: 'divorciado', child: Text('Divorciado(a)')),
-                  DropdownMenuItem(value: 'conviviente', child: Text('Conviviente')),
-                  DropdownMenuItem(value: 'separado', child: Text('Separado(a)')),
+                  DropdownMenuItem(
+                      value: 'divorciado', child: Text('Divorciado(a)')),
+                  DropdownMenuItem(
+                      value: 'conviviente', child: Text('Conviviente')),
+                  DropdownMenuItem(
+                      value: 'separado', child: Text('Separado(a)')),
                 ],
                 onChanged: (v) => setLocal(() => civil = v),
               ),
@@ -720,7 +853,8 @@ Future<void> _editarPerfil(
                 items: const [
                   DropdownMenuItem(value: 'fonasa', child: Text('Fonasa')),
                   DropdownMenuItem(value: 'isapre', child: Text('Isapre')),
-                  DropdownMenuItem(value: 'particular', child: Text('Particular')),
+                  DropdownMenuItem(
+                      value: 'particular', child: Text('Particular')),
                   DropdownMenuItem(value: 'otra', child: Text('Otra')),
                 ],
                 onChanged: (v) => setLocal(() => prev = v),
@@ -752,8 +886,8 @@ Future<void> _editarPerfil(
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 initialValue: prioridad,
-                decoration: const InputDecoration(
-                    labelText: 'Prioridad de atención'),
+                decoration:
+                    const InputDecoration(labelText: 'Prioridad de atención'),
                 items: const [
                   DropdownMenuItem(value: 'baja', child: Text('Baja')),
                   DropdownMenuItem(value: 'media', child: Text('Media')),
@@ -868,10 +1002,14 @@ class _Cabecera extends StatelessWidget {
                   Text(patient.fullName,
                       style: const TextStyle(
                           fontSize: 18, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 2),
-                  Text('${patient.age} años',
-                      style: const TextStyle(
-                          fontSize: 14, color: AppColors.textSecondary)),
+                  // La edad ya está en Identidad, con su rótulo. Aquí va el
+                  // RUT, que es lo que distingue a dos personas homónimas.
+                  if ((patient.rut ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text('RUT ${patient.rut}',
+                        style: const TextStyle(
+                            fontSize: 14, color: AppColors.textSecondary)),
+                  ],
                 ],
               ),
             ),
@@ -940,7 +1078,8 @@ class _AlergiaTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = allergy.esGrave ? AppColors.critical : AppColors.statusWarning;
+    final color =
+        allergy.esGrave ? AppColors.critical : AppColors.statusWarning;
     final detalle = <String>[
       allergySeverityLabel(allergy.severity),
       if (allergy.reaction != null && allergy.reaction!.trim().isNotEmpty)
@@ -967,7 +1106,9 @@ class _AlergiaTile extends StatelessWidget {
               children: [
                 Text(allergy.label,
                     style: TextStyle(
-                        fontWeight: FontWeight.w700, color: color, fontSize: 14)),
+                        fontWeight: FontWeight.w700,
+                        color: color,
+                        fontSize: 14)),
                 if (detalle.isNotEmpty)
                   Text(detalle,
                       style: const TextStyle(
@@ -1034,7 +1175,8 @@ Future<void> _editarAlergias(
 
         Future<void> quitar(AllergyDetail a) async {
           try {
-            final actualizada = await repo.removeAllergy(p.patientId, a.substance);
+            final actualizada =
+                await repo.removeAllergy(p.patientId, a.substance);
             setLocal(() => lista = actualizada);
           } on Object catch (e) {
             if (ctx.mounted) showAppSnackBar(ctx, e.toString(), error: true);
@@ -1064,7 +1206,8 @@ Future<void> _editarAlergias(
                                 '${a.label} (${allergySeverityLabel(a.severity)})'),
                             backgroundColor: a.esGrave
                                 ? AppColors.critical.withValues(alpha: .10)
-                                : AppColors.statusWarning.withValues(alpha: .12),
+                                : AppColors.statusWarning
+                                    .withValues(alpha: .12),
                             onDeleted: () => quitar(a),
                           ),
                       ],
@@ -1085,7 +1228,8 @@ Future<void> _editarAlergias(
                       for (final c in catalogo)
                         DropdownMenuItem(
                             value: c,
-                            child: Text('${c.label} · ${allergyCategoryLabel(c.category)}')),
+                            child: Text(
+                                '${c.label} · ${allergyCategoryLabel(c.category)}')),
                     ],
                     onChanged: (v) => setLocal(() => elegido = v),
                   ),
@@ -1126,12 +1270,14 @@ Future<void> _editarAlergias(
                       DropdownMenuItem(
                           value: 'anafilaxia', child: Text('Anafilaxia')),
                     ],
-                    onChanged: (v) => setLocal(() => severidad = v ?? 'moderada'),
+                    onChanged: (v) =>
+                        setLocal(() => severidad = v ?? 'moderada'),
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     initialValue: origen,
-                    decoration: const InputDecoration(labelText: 'Cómo se supo'),
+                    decoration:
+                        const InputDecoration(labelText: 'Cómo se supo'),
                     items: const [
                       DropdownMenuItem(
                           value: 'reportada', child: Text('Reportada')),
@@ -1497,8 +1643,8 @@ class _ContactosEmergenciaCard extends ConsumerWidget {
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Sin contactos de emergencia. Agrégalos desde "Gestionar".',
-                    style: TextStyle(color: AppColors.textSecondary)),
+                      'Sin contactos de emergencia. Agrégalos desde "Gestionar".',
+                      style: TextStyle(color: AppColors.textSecondary)),
                 ),
               ],
             ),
@@ -1571,8 +1717,7 @@ class _ContactoTile extends StatelessWidget {
             IconButton(
               tooltip: 'Llamar',
               icon: const Icon(Icons.call_rounded, color: AppColors.statusOk),
-              onPressed: () =>
-                  launchUrl(Uri.parse('tel:${contacto.phone}')),
+              onPressed: () => launchUrl(Uri.parse('tel:${contacto.phone}')),
             ),
         ],
       ),
@@ -1617,8 +1762,8 @@ Future<void> _editarContactos(
 
         Future<void> toggle(EmergencyContact c) async {
           try {
-            contactos = await repo.updateEmergencyContact(
-                p.patientId, c.id, isActive: !c.isActive);
+            contactos = await repo.updateEmergencyContact(p.patientId, c.id,
+                isActive: !c.isActive);
             setLocal(() {});
           } on Object catch (e) {
             if (ctx.mounted) showAppSnackBar(ctx, e.toString(), error: true);
@@ -1646,7 +1791,8 @@ Future<void> _editarContactos(
                   const Text(
                     'Se eligen del grupo de cuidado. Activa quién está '
                     'disponible ahora; desactiva a quien no pueda responder.',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    style:
+                        TextStyle(fontSize: 12, color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 10),
                   if (contactos.isEmpty)
@@ -1790,7 +1936,8 @@ class _HojaEmergenciaCardState extends ConsumerState<_HojaEmergenciaCard> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.picture_as_pdf_rounded),
-              label: Text(_generando ? 'Generando…' : 'Generar hoja de emergencia'),
+              label: Text(
+                  _generando ? 'Generando…' : 'Generar hoja de emergencia'),
             ),
           ),
         ],
@@ -1825,10 +1972,9 @@ class _DataRow extends StatelessWidget {
   Widget build(BuildContext context) => ListTile(
         leading: Icon(icon, color: AppColors.primary),
         title: Text(label,
-            style: const TextStyle(
-                fontSize: 13, color: AppColors.textSecondary)),
+            style:
+                const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
         trailing: Text(value,
-            style: const TextStyle(
-                fontSize: 15, fontWeight: FontWeight.w600)),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
       );
 }

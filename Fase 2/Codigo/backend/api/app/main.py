@@ -4,6 +4,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from slowapi.errors import RateLimitExceeded
 
@@ -11,6 +12,7 @@ from app.errors import register_error_handlers
 from app.ratelimit import limiter
 from app.routers import (
     admin,
+    admin_users,
     alerts,
     assistant,
     auth,
@@ -179,6 +181,7 @@ app.include_router(auth.router)
 # Administracion del catalogo comercial. Va aparte del resto porque su
 # permiso no es una membresia en un paciente sino ser personal de la empresa.
 app.include_router(admin.router)
+app.include_router(admin_users.router)
 app.include_router(patients.router)
 app.include_router(vitals.router)
 app.include_router(medications.router)
@@ -212,19 +215,29 @@ async def custom_swagger_ui():
     return HTMLResponse(_custom_swagger_html())
 
 
-# ── Panel de administracion de planes (personal de Alloxentric) ──
-@app.get("/admin", include_in_schema=False)
-async def admin_web():
-    """Panel de administracion de planes, para el personal de Alloxentric.
+# ── Panel de administracion (personal de Alloxentric) ──
+# Es la app Flutter Web de admin_web/, compilada con --base-href /admin/ y
+# copiada a static/admin_web. Se sirve desde la misma API para que no pueda
+# quedar apuntando a otra version de ella.
+_ADMIN_DIR = os.environ.get(
+    "AGECARE_ADMIN_DIR", os.path.join(_FRONT_DIR, "admin_web")
+)
 
-    Se sirve desde la misma API y no como aplicacion aparte: no agrega
-    infraestructura, se despliega con el backend y no puede quedar
-    apuntando a una version del API distinta de la que esta corriendo.
-    """
-    path = os.path.join(_FRONT_DIR, "admin.html")
-    if os.path.exists(path):
-        return FileResponse(path, media_type="text/html")
-    return HTMLResponse("<h1>admin.html no encontrado</h1>", status_code=404)
+if os.path.isfile(os.path.join(_ADMIN_DIR, "index.html")):
+    app.mount(
+        "/admin",
+        StaticFiles(directory=_ADMIN_DIR, html=True),
+        name="admin_web",
+    )
+else:
+    @app.get("/admin", include_in_schema=False)
+    async def admin_web_no_compilado():
+        return HTMLResponse(
+            "<h1>Panel de administracion no compilado</h1>"
+            "<p>Compila admin_web con <code>flutter build web --base-href /admin/</code> "
+            "y copia build/web a app/static/admin_web.</p>",
+            status_code=404,
+        )
 
 
 # ── Cliente de prueba: sirve el HTML y los assets desde /front ───

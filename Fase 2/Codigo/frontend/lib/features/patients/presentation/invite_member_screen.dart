@@ -123,11 +123,14 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
                           ),
                           const SizedBox(height: 16),
                           Center(
+                            // 6 digitos grandes y espaciados: se leen de un
+                            // vistazo y se pueden dictar por telefono.
                             child: SelectableText(
                               _created!.token,
                               textAlign: TextAlign.center,
                               style: const TextStyle(
-                                fontSize: 15,
+                                fontSize: 36,
+                                letterSpacing: 8,
                                 fontWeight: FontWeight.w700,
                                 fontFamily: 'monospace',
                                 color: AppColors.primaryDark,
@@ -137,7 +140,8 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
                           const SizedBox(height: 8),
                           const Center(
                             child: Text(
-                              'Vence en 7 días · compártelo solo con esa persona',
+                              'Vence en 7 días · compártelo solo con esa persona.\n'
+                              'La persona lo ingresa en Más → Unirme con un código.',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                   color: AppColors.textSecondary, fontSize: 13),

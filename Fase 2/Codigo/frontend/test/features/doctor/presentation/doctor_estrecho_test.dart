@@ -13,6 +13,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import '../tratamiento_fijo.dart';
+
 /// Las dos pantallas del rol médico en un teléfono de 320 dp. La ficha del
 /// paciente es la que más filas comprimidas tiene: signo vital + unidad +
 /// ícono de alerta en la misma línea, y receta con dos botones a la derecha.
@@ -24,8 +26,8 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(ProviderScope(
       overrides: [
-        patientsRepositoryProvider
-            .overrideWithValue(PatientsRepositoryMock()),
+        patientsRepositoryProvider.overrideWithValue(PatientsRepositoryMock()),
+        tratamientoFijoOverride,
         vitalsRepositoryProvider.overrideWithValue(VitalsRepositoryMock()),
         medicationsRepositoryProvider
             .overrideWithValue(MedicationsRepositoryMock()),

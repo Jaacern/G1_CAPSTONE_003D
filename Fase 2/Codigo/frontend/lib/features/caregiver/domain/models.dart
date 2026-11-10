@@ -401,78 +401,6 @@ class CaregiverPlan {
 }
 
 // ---------------------------------------------------------------------------
-// Perfil de la cuidadora
-// ---------------------------------------------------------------------------
-
-/// Perfil profesional de la cuidadora (marketplace).
-class CaregiverProfile {
-  const CaregiverProfile({
-    this.headline = '',
-    this.bio = '',
-    this.yearsExperience = 0,
-    this.specialties = const [],
-    this.languages = const [],
-    this.zones = const [],
-    this.certifications = const [],
-  });
-
-  final String headline;
-  final String bio;
-  final int yearsExperience;
-  final List<String> specialties;
-  final List<String> languages;
-  final List<String> zones;
-  final List<String> certifications;
-
-  CaregiverProfile copyWith({
-    String? headline,
-    String? bio,
-    int? yearsExperience,
-    List<String>? specialties,
-    List<String>? languages,
-    List<String>? zones,
-    List<String>? certifications,
-  }) =>
-      CaregiverProfile(
-        headline: headline ?? this.headline,
-        bio: bio ?? this.bio,
-        yearsExperience: yearsExperience ?? this.yearsExperience,
-        specialties: specialties ?? this.specialties,
-        languages: languages ?? this.languages,
-        zones: zones ?? this.zones,
-        certifications: certifications ?? this.certifications,
-      );
-
-  factory CaregiverProfile.fromJson(Map<String, dynamic> json) =>
-      CaregiverProfile(
-        headline: (json['headline'] ?? '') as String,
-        bio: (json['bio'] ?? '') as String,
-        yearsExperience: (json['years_experience'] ?? 0) as int,
-        specialties: ((json['specialties'] ?? []) as List)
-            .map((e) => e.toString())
-            .toList(),
-        languages: ((json['languages'] ?? []) as List)
-            .map((e) => e.toString())
-            .toList(),
-        zones:
-            ((json['zones'] ?? []) as List).map((e) => e.toString()).toList(),
-        certifications: ((json['certifications'] ?? []) as List)
-            .map((e) => e.toString())
-            .toList(),
-      );
-
-  Map<String, dynamic> toJson() => {
-        'headline': headline,
-        'bio': bio,
-        'years_experience': yearsExperience,
-        'specialties': specialties,
-        'languages': languages,
-        'zones': zones,
-        'certifications': certifications,
-      };
-}
-
-// ---------------------------------------------------------------------------
 // Reporte de desempeño
 // ---------------------------------------------------------------------------
 
@@ -480,6 +408,7 @@ class CaregiverProfile {
 class CaregiverReport {
   const CaregiverReport({
     required this.period,
+    this.days = 7,
     this.tasksCompleted = 0,
     this.punctualityPct = 0,
     this.checkinsOnTime = 0,
@@ -488,17 +417,22 @@ class CaregiverReport {
   });
 
   final String period;
+
+  /// Largo del periodo: 7, 30 o 90 días.
+  final int days;
   final int tasksCompleted;
   final double punctualityPct;
   final int checkinsOnTime;
   final int observationsLogged;
 
-  /// Serie semanal de tareas completadas (para la gráfica).
+  /// Serie de tareas completadas para la gráfica: por día hasta 30 días,
+  /// por semana en 90.
   final List<ReportPoint> weeklyTasks;
 
   factory CaregiverReport.fromJson(Map<String, dynamic> json) =>
       CaregiverReport(
         period: (json['period'] ?? '') as String,
+        days: (json['days'] ?? 7) as int,
         tasksCompleted: (json['tasks_completed'] ?? 0) as int,
         punctualityPct: (json['punctuality_pct'] ?? 0) is num
             ? (json['punctuality_pct'] as num).toDouble()
@@ -512,6 +446,7 @@ class CaregiverReport {
 
   Map<String, dynamic> toJson() => {
         'period': period,
+        'days': days,
         'tasks_completed': tasksCompleted,
         'punctuality_pct': punctualityPct,
         'checkins_on_time': checkinsOnTime,

@@ -25,11 +25,12 @@ from sqlalchemy import text as _t  # noqa: E402
 from app.config import get_settings  # noqa: E402
 from app.db import engine as _eng  # noqa: E402
 from app.errors import register_error_handlers  # noqa: E402
-from app.routers import caregiver  # noqa: E402
+from app.routers import caregiver, caregiver_profile  # noqa: E402
 
 app = FastAPI()
 register_error_handlers(app)
 app.include_router(caregiver.router)
+app.include_router(caregiver_profile.router)
 
 PACIENTE = "33333333-3333-4333-8333-333333333333"
 AJENO = "eeeeeee1-0000-4000-8000-000000000001"
@@ -82,7 +83,14 @@ async def main(client, rr):
         print(f"       alertas    : {d['alerts_count']}")
         print(f"       adherencia : {d['adherence_pct']}")
         n += 1
-        if d["patient_id"] == PACIENTE:
+        # La cuidadora puede atender a mas de un paciente (la semilla trae a
+        # Elena y a Luis): basta con que el elegido sea de su circulo.
+        async with _eng.begin() as c:
+            suyos = {str(x) for x in (await c.execute(_t(
+                "SELECT patient_id FROM patient_members "
+                "WHERE user_id = :u AND removed_at IS NULL"),
+                {"u": cuidadora})).scalars().all()}
+        if d["patient_id"] in suyos:
             ok += 1; print("  OK   elige el paciente de su circulo")
         else:
             print(f"  FALLA eligio {d['patient_id']}")
@@ -275,6 +283,14 @@ async def main(client, rr):
         else:
             print(f"  FALLA especialidades: {d['specialties']}")
 
+    # El perfil profesional es de cuentas de cuidador(a): 'libre' se marca
+    # como tal mientras duran estas pruebas y se restaura al final.
+    async with _eng.begin() as c:
+        tipo_libre = (await c.execute(_t(
+            "SELECT account_type FROM users WHERE id=:u"), {"u": str(libre)})).scalar()
+        await c.execute(_t("UPDATE users SET account_type='caregiver' WHERE id=:u"),
+                        {"u": str(libre)})
+
     r = await client.get("/api/v1/caregiver/profile", headers=token(str(libre)))
     check("quien no tiene perfil recibe uno vacio, no 404", 200, r, campo="headline")
     if r.status_code == 200:
@@ -390,6 +406,8 @@ async def main(client, rr):
             for t in ("caregiver_languages", "caregiver_zones", "caregiver_specialties"):
                 await c.execute(_t(f"DELETE FROM {t} WHERE profile_id=:p"), {"p": str(pid_libre)})
             await c.execute(_t("DELETE FROM caregiver_profiles WHERE id=:p"), {"p": str(pid_libre)})
+        await c.execute(_t("UPDATE users SET account_type=:t WHERE id=:u"),
+                        {"t": tipo_libre, "u": str(libre)})
         await c.execute(_t(
             "UPDATE caregiver_profiles SET headline=:h, bio=:b, years_experience=:a "
             "WHERE user_id=:u"),

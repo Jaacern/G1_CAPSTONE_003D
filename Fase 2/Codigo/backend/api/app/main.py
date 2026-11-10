@@ -17,6 +17,7 @@ from app.routers import (
     assistant,
     auth,
     caregiver,
+    caregiver_profile,
     chat,
     content,
     devices,
@@ -197,6 +198,7 @@ app.include_router(timeline.router)
 app.include_router(tasks.router)
 app.include_router(documents.router)
 app.include_router(caregiver.router)
+app.include_router(caregiver_profile.router)
 app.include_router(marketplace.router)
 app.include_router(marketplace.jobs_router)
 app.include_router(gallery.router)

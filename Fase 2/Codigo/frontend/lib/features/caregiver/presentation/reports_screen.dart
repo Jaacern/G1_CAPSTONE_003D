@@ -9,12 +9,25 @@ import '../../../core/widgets/common.dart';
 import '../application/caregiver_providers.dart';
 import '../domain/models.dart';
 
-/// Reportes de desempeño de la cuidadora (con upsell freemium).
-class CaregiverReportsScreen extends ConsumerWidget {
+/// "Mi desempeño" de la cuidadora (RF-74), con el rango que permite su plan.
+///
+/// Los últimos 7 días son gratis. 30 y 90 días son Premium (RF-73): el
+/// servidor los niega con 402 a un plan gratuito, y aquí se muestran con
+/// candado y llevan a la suscripción en vez de fallar.
+class CaregiverReportsScreen extends ConsumerStatefulWidget {
   const CaregiverReportsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CaregiverReportsScreen> createState() =>
+      _CaregiverReportsScreenState();
+}
+
+class _CaregiverReportsScreenState
+    extends ConsumerState<CaregiverReportsScreen> {
+  int _days = 7;
+
+  @override
+  Widget build(BuildContext context) {
     if (!AppConfig.hasCaregiverLog) {
       return Scaffold(
         appBar: AppBar(title: const Text('Reportes')),
@@ -25,48 +38,103 @@ class CaregiverReportsScreen extends ConsumerWidget {
         ),
       );
     }
-    final reportAsync = ref.watch(caregiverReportProvider);
     final planAsync = ref.watch(caregiverPlanProvider);
+    // Mientras se sabe el plan se asume gratuito: así nunca se pide un rango
+    // que el servidor va a negar.
+    final isFree = planAsync.valueOrNull?.tier.isFree ?? true;
+    final dias = isFree ? 7 : _days;
+    final reportAsync = ref.watch(caregiverReportProvider(dias));
 
     return Scaffold(
       appBar: AppBar(title: const Text('Mi desempeño')),
-      body: reportAsync.when(
-        loading: () => const LoadingView(),
-        error: (e, _) => ErrorView(
-          message: e.toString(),
-          onRetry: () => ref.invalidate(caregiverReportProvider),
-        ),
-        data: (report) {
-          final isFree = planAsync.valueOrNull?.tier.isFree ?? true;
-          return RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(caregiverReportProvider);
-              ref.invalidate(caregiverPlanProvider);
-            },
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-              children: [
-                Text(report.period,
-                    style: const TextStyle(color: AppColors.textSecondary)),
-                const SizedBox(height: 12),
-                _MetricsGrid(report: report),
-                const SizedBox(height: 20),
-                Text('Tareas completadas por día',
-                    style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 12),
-                AppCard(
-                  child: SizedBox(
-                    height: 200,
-                    child: _TasksChart(points: report.weeklyTasks),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                if (isFree) _PremiumUpsell(),
-              ],
-            ),
-          );
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(caregiverReportProvider(dias));
+          ref.invalidate(caregiverPlanProvider);
         },
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          children: [
+            _SelectorRango(
+              dias: dias,
+              bloqueado: isFree,
+              onElegir: (d) => setState(() => _days = d),
+            ),
+            const SizedBox(height: 12),
+            reportAsync.when(
+              loading: () =>
+                  const SizedBox(height: 260, child: LoadingView()),
+              error: (e, _) => ErrorView(
+                message: e.toString(),
+                onRetry: () => ref.invalidate(caregiverReportProvider(dias)),
+              ),
+              data: (report) => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(report.period,
+                      style: const TextStyle(color: AppColors.textSecondary)),
+                  const SizedBox(height: 12),
+                  _MetricsGrid(report: report),
+                  const SizedBox(height: 20),
+                  Text(
+                      report.days > 30
+                          ? 'Tareas completadas por semana'
+                          : 'Tareas completadas por día',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 12),
+                  AppCard(
+                    child: SizedBox(
+                      height: 200,
+                      child: _TasksChart(points: report.weeklyTasks),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            if (isFree) _PremiumUpsell(),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+/// 7 / 30 / 90 días. En el plan gratuito, 30 y 90 llevan candado y abren
+/// la suscripción.
+class _SelectorRango extends StatelessWidget {
+  const _SelectorRango({
+    required this.dias,
+    required this.bloqueado,
+    required this.onElegir,
+  });
+
+  final int dias;
+  final bool bloqueado;
+  final ValueChanged<int> onElegir;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      children: [
+        for (final d in const [7, 30, 90])
+          ChoiceChip(
+            avatar: bloqueado && d > 7
+                ? const Icon(Icons.lock_outline_rounded, size: 16)
+                : null,
+            label: Text('$d días'),
+            selected: dias == d,
+            tooltip: bloqueado && d > 7 ? 'Disponible con Premium' : null,
+            onSelected: (_) {
+              if (bloqueado && d > 7) {
+                context.push('/premium');
+              } else {
+                onElegir(d);
+              }
+            },
+          ),
+      ],
     );
   }
 }
@@ -149,6 +217,10 @@ class _TasksChart extends StatelessWidget {
       );
     }
     final maxY = points.map((p) => p.value).reduce((a, b) => a > b ? a : b);
+    // Con 30 barras no caben 30 etiquetas: se muestra una cada tantas,
+    // siempre la de hoy (la última).
+    final cada = points.length > 14 ? (points.length / 6).ceil() : 1;
+    final ancho = points.length > 14 ? 6.0 : 14.0;
     return BarChart(
       BarChartData(
         minY: 0,
@@ -178,6 +250,9 @@ class _TasksChart extends StatelessWidget {
                 if (i < 0 || i >= points.length) {
                   return const SizedBox.shrink();
                 }
+                if ((points.length - 1 - i) % cada != 0) {
+                  return const SizedBox.shrink();
+                }
                 return Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(points[i].label,
@@ -193,7 +268,7 @@ class _TasksChart extends StatelessWidget {
             BarChartGroupData(x: i, barRods: [
               BarChartRodData(
                 toY: points[i].value,
-                width: 14,
+                width: ancho,
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(4)),
                 color: AppColors.primary,
@@ -226,7 +301,7 @@ class _PremiumUpsell extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               const Expanded(
-                child: Text('Desbloquea reportes avanzados con Premium',
+                child: Text('Mira tu desempeño de 30 y 90 días con Premium',
                     style:
                         TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               ),
@@ -234,8 +309,8 @@ class _PremiumUpsell extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           const Text(
-            'Con el plan gratuito ves los reportes básicos. Actualiza a Premium '
-            'para acceder a tendencias, comparativas y exportación.',
+            'Con el plan gratuito ves tus últimos 7 días. Con Premium ves '
+            'también el último mes y los últimos tres meses.',
             style: TextStyle(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 14),

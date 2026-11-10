@@ -5,9 +5,10 @@ Endpoints que la aplicacion ya consume:
     GET  /caregiver/today
     GET  /caregiver/plan
     POST /caregiver/plan/upgrade
-    GET  /caregiver/profile
-    PUT  /caregiver/profile
     GET  /caregiver/reports
+
+El perfil profesional (GET/PUT /caregiver/profile) vive en
+caregiver_profile.py.
 
 Ninguno lleva paciente en la ruta: son del usuario que pide. El de hoy
 resuelve solo cual es el paciente que corresponde mostrar.
@@ -15,8 +16,8 @@ resuelve solo cual es el paciente que corresponde mostrar.
 from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -400,230 +401,6 @@ async def upgrade_plan(
     return await _plan_del_usuario(db, user.user_id)
 
 
-# ---------------------------------------------------------------------------
-# Perfil profesional del marketplace
-# ---------------------------------------------------------------------------
-class ProfileOut(BaseModel):
-    headline:         str
-    bio:              str
-    years_experience: int
-    specialties:      list[str]
-    languages:        list[str]
-    zones:            list[str]
-    certifications:   list[str]
-
-
-async def _perfil(db: AsyncSession, user_id: str) -> ProfileOut:
-    """Arma el perfil, o uno vacio si la cuidadora todavia no lo creo.
-
-    La pantalla de perfil se abre igual aunque no haya nada escrito, asi
-    que devolver 404 la dejaria sin poder empezar. Un perfil vacio es la
-    respuesta util.
-    """
-    perfil = (
-        await db.execute(
-            text(
-                """
-                SELECT id, headline, bio, years_experience
-                FROM caregiver_profiles
-                WHERE user_id = :uid AND deleted_at IS NULL
-                """
-            ),
-            {"uid": user_id},
-        )
-    ).mappings().first()
-
-    if perfil is None:
-        return ProfileOut(headline="", bio="", years_experience=0,
-                          specialties=[], languages=[], zones=[],
-                          certifications=[])
-
-    pid = str(perfil["id"])
-
-    especialidades = (
-        await db.execute(
-            text(
-                """
-                SELECT s.label
-                FROM caregiver_specialties cs
-                JOIN specialties s ON s.code = cs.specialty_code
-                WHERE cs.profile_id = :pid
-                ORDER BY s.label
-                """
-            ),
-            {"pid": pid},
-        )
-    ).scalars().all()
-
-    idiomas = (
-        await db.execute(
-            text("SELECT language_code FROM caregiver_languages "
-                 "WHERE profile_id = :pid ORDER BY language_code"),
-            {"pid": pid},
-        )
-    ).scalars().all()
-
-    zonas = (
-        await db.execute(
-            text("SELECT commune_code FROM caregiver_zones "
-                 "WHERE profile_id = :pid ORDER BY commune_code"),
-            {"pid": pid},
-        )
-    ).scalars().all()
-
-    certificaciones = (
-        await db.execute(
-            text("SELECT name FROM caregiver_certifications "
-                 "WHERE profile_id = :pid AND deleted_at IS NULL "
-                 "ORDER BY issued_at DESC NULLS LAST, name"),
-            {"pid": pid},
-        )
-    ).scalars().all()
-
-    return ProfileOut(
-        headline=perfil["headline"],
-        bio=perfil["bio"] or "",
-        years_experience=perfil["years_experience"],
-        specialties=list(especialidades),
-        languages=list(idiomas),
-        zones=list(zonas),
-        certifications=list(certificaciones),
-    )
-
-
-@router.get("/profile", response_model=ProfileOut)
-async def get_profile(
-    user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Perfil profesional de la cuidadora."""
-    return await _perfil(db, user.user_id)
-
-
-class ProfileIn(BaseModel):
-    headline:         str = Field(default="", max_length=120)
-    bio:              str = Field(default="", max_length=2000)
-    years_experience: int = Field(default=0, ge=0, le=70)
-    specialties:      list[str] = Field(default_factory=list)
-    languages:        list[str] = Field(default_factory=list)
-    zones:            list[str] = Field(default_factory=list)
-    certifications:   list[str] = Field(default_factory=list)
-
-
-@router.put("/profile", response_model=ProfileOut)
-async def save_profile(
-    payload: ProfileIn,
-    user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Guarda el perfil profesional.
-
-    La pantalla manda el perfil completo, no un parche, asi que las listas
-    se reemplazan enteras: lo que no viene es lo que la cuidadora quito.
-
-    Las certificaciones NO se tocan aca. Cada una puede estar verificada
-    por Alloxentric y llevar un archivo adjunto, asi que borrarlas y
-    reescribirlas desde una pantalla de texto perderia la verificacion y
-    dejaria el archivo huerfano. Se devuelven para mostrar, y se
-    administran por su propio camino.
-    """
-    headline = payload.headline.strip()
-    if not headline:
-        # headline es NOT NULL y la pantalla permite dejarlo vacio al
-        # empezar. Un texto neutro es mejor que un error que no deja
-        # guardar el resto de lo que si escribio.
-        headline = f"Cuidadora, {payload.years_experience} anios de experiencia"
-
-    perfil_id = (
-        await db.execute(
-            text("SELECT id FROM caregiver_profiles "
-                 "WHERE user_id = :uid AND deleted_at IS NULL"),
-            {"uid": user.user_id},
-        )
-    ).scalar()
-
-    if perfil_id is None:
-        perfil_id = (
-            await db.execute(
-                text(
-                    """
-                    INSERT INTO caregiver_profiles (
-                        user_id, headline, bio, years_experience
-                    ) VALUES (:uid, :tit, :bio, :anios)
-                    RETURNING id
-                    """
-                ),
-                {"uid": user.user_id, "tit": headline,
-                 "bio": payload.bio.strip() or None,
-                 "anios": payload.years_experience},
-            )
-        ).scalar()
-    else:
-        await db.execute(
-            text(
-                """
-                UPDATE caregiver_profiles
-                   SET headline = :tit, bio = :bio,
-                       years_experience = :anios, updated_at = now()
-                 WHERE id = :pid
-                """
-            ),
-            {"pid": str(perfil_id), "tit": headline,
-             "bio": payload.bio.strip() or None,
-             "anios": payload.years_experience},
-        )
-
-    pid = str(perfil_id)
-
-    # Especialidades: la pantalla manda etiquetas y la tabla guarda codigos.
-    # Una etiqueta que no existe en el catalogo se rechaza en vez de
-    # inventar un codigo, porque specialties es la lista que alimenta el
-    # buscador del marketplace.
-    codigos: list[str] = []
-    if payload.specialties:
-        catalogo = {
-            _normaliza(fila["label"]): fila["code"]
-            for fila in (
-                await db.execute(text("SELECT code, label FROM specialties"))
-            ).mappings().all()
-        }
-        validos = set(catalogo.values())
-        for s in payload.specialties:
-            limpio = s.strip()
-            if not limpio:
-                continue
-            codigo = limpio if limpio in validos else catalogo.get(_normaliza(limpio))
-            if codigo is None:
-                raise ApiError(
-                    status_code=422, code="VALIDATION_ERROR",
-                    message="Esa especialidad no esta en el catalogo.",
-                    details=[{"field": "specialties",
-                              "message": f"Valor recibido: {s}."}],
-                )
-            codigos.append(codigo)
-
-    # El motor exige el formato exacto: dos letras para el idioma y cinco
-    # digitos para la comuna. Si no se valida aca, un dato mal escrito llega
-    # al CHECK y el usuario recibe un 500 en vez de saber que corregir.
-    idiomas = _validados(
-        payload.languages, r"^[a-z]{2}$", "languages",
-        "Usa el codigo de dos letras del idioma, como 'es' o 'en'.",
-        transformar=lambda s: s.strip().lower(),
-    )
-    zonas = _validados(
-        payload.zones, r"^[0-9]{5}$", "zones",
-        "Usa el codigo de cinco digitos de la comuna, como '08101'.",
-    )
-
-    await _reemplazar(db, "caregiver_specialties", "specialty_code", pid,
-                      dict.fromkeys(codigos))
-    await _reemplazar(db, "caregiver_languages", "language_code", pid, idiomas)
-    await _reemplazar(db, "caregiver_zones", "commune_code", pid, zonas)
-
-    await db.commit()
-    return await _perfil(db, user.user_id)
-
-
 class ReportPoint(BaseModel):
     label: str
     value: float
@@ -631,27 +408,47 @@ class ReportPoint(BaseModel):
 
 class ReportOut(BaseModel):
     period:             str
+    days:               int
     tasks_completed:    int
     punctuality_pct:    float
     checkins_on_time:   int
     observations_logged: int
+    # Serie de la grafica: por dia hasta 30 dias, por semana en 90. El
+    # nombre se mantiene por compatibilidad con la app.
     weekly_tasks:       list[ReportPoint]
 
 
 _DIAS = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"]
 
+# RF-74: informes por rango de fechas. Los ultimos 7 dias son del plan
+# gratuito; 30 y 90 dias son la funcion 'activity_reports' del premium
+# (RF-73: se bloquea en el servidor, no solo en la pantalla).
+_RANGOS = (7, 30, 90)
+
 
 @router.get("/reports", response_model=ReportOut)
 async def reports(
+    days: int = Query(7, description="7, 30 o 90. Mas de 7 requiere Premium."),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Desempeno de la cuidadora en los ultimos siete dias.
+    """Desempeno de la cuidadora en los ultimos 7, 30 o 90 dias.
 
     Es sobre su propio trabajo, no sobre un paciente: cuenta lo que hizo
     ella en todos los circulos donde participa.
     """
-    desde = datetime.now(timezone.utc) - timedelta(days=7)
+    if days not in _RANGOS:
+        raise ApiError(
+            status_code=422, code="VALIDATION_ERROR",
+            message="El rango debe ser de 7, 30 o 90 dias.",
+            details=[{"field": "days", "message": f"Valor recibido: {days}."}],
+        )
+    if days > 7 and (await _plan_del_usuario(db, user.user_id)).tier == "free":
+        raise ApiError(
+            status_code=402, code="PREMIUM_REQUIRED",
+            message="Los informes de 30 y 90 dias son parte de Premium.",
+        )
+    desde = datetime.now(timezone.utc) - timedelta(days=days)
 
     tareas = (
         await db.execute(
@@ -705,7 +502,7 @@ async def reports(
         if turnos and turnos["total"] else 0.0
     )
 
-    # Serie por dia para la grafica. Se arma la semana completa aca y no se
+    # Serie por dia para la grafica. Se arma el rango completo aca y no se
     # deja que la pantalla rellene los huecos: un dia sin tareas es un cero
     # que la grafica tiene que dibujar, no un dia que falta.
     por_dia = {
@@ -735,65 +532,40 @@ async def reports(
     # Tiene que ser el mismo dia con el que agrupa la consulta de arriba,
     # o las etiquetas de la grafica no calzan con sus valores.
     hoy = hoy_local()
-    semana = [
-        ReportPoint(
-            label=_DIAS[(hoy - timedelta(days=i)).weekday()],
-            value=float(por_dia.get(hoy - timedelta(days=i), 0)),
-        )
-        for i in range(6, -1, -1)
-    ]
+    if days == 7:
+        serie = [
+            ReportPoint(
+                label=_DIAS[(hoy - timedelta(days=i)).weekday()],
+                value=float(por_dia.get(hoy - timedelta(days=i), 0)),
+            )
+            for i in range(6, -1, -1)
+        ]
+    elif days == 30:
+        serie = [
+            ReportPoint(
+                label=(hoy - timedelta(days=i)).strftime("%d/%m"),
+                value=float(por_dia.get(hoy - timedelta(days=i), 0)),
+            )
+            for i in range(29, -1, -1)
+        ]
+    else:
+        # 90 dias por dia son 90 barras ilegibles: se suman por semana,
+        # terminando hoy. La etiqueta es el primer dia de cada semana.
+        serie = []
+        for semana in range(12, -1, -1):
+            inicio = hoy - timedelta(days=semana * 7 + 6)
+            serie.append(ReportPoint(
+                label=inicio.strftime("%d/%m"),
+                value=float(sum(por_dia.get(inicio + timedelta(days=d), 0)
+                                for d in range(7))),
+            ))
 
     return ReportOut(
-        period="Ultimos 7 dias",
+        period=f"Ultimos {days} dias",
+        days=days,
         tasks_completed=tareas or 0,
         punctuality_pct=puntualidad,
         checkins_on_time=(turnos["cerrados"] if turnos else 0),
         observations_logged=observaciones or 0,
-        weekly_tasks=semana,
+        weekly_tasks=serie,
     )
-
-
-def _validados(valores: list[str], patron: str, campo: str, ayuda: str,
-               transformar=lambda s: s.strip()) -> dict:
-    """Recorta, valida contra el patron y quita repetidos conservando el orden."""
-    import re as _re
-    limpios = {}
-    for v in valores:
-        x = transformar(v)
-        if not x:
-            continue
-        if not _re.match(patron, x):
-            raise ApiError(
-                status_code=422, code="VALIDATION_ERROR",
-                message=ayuda,
-                details=[{"field": campo, "message": f"Valor recibido: {v}."}],
-            )
-        limpios[x] = True
-    return limpios
-
-
-def _normaliza(s: str) -> str:
-    tabla = str.maketrans("áàäâãéèëêíìïîóòöôõúùüûñç",
-                          "aaaaaeeeeiiiiooooouuuunc")
-    return s.strip().lower().translate(tabla)
-
-
-async def _reemplazar(db: AsyncSession, tabla: str, columna: str,
-                      perfil_id: str, valores) -> None:
-    """Deja la lista exactamente como la mando la pantalla.
-
-    Se borra y se vuelve a insertar porque son tablas de union sin nada
-    propio que perder: no tienen id, ni historial, ni nada que apunte a
-    ellas. Para las certificaciones esto no valdria, y por eso no se hacen
-    aca.
-    """
-    await db.execute(
-        text(f"DELETE FROM {tabla} WHERE profile_id = :pid"),  # noqa: S608
-        {"pid": perfil_id},
-    )
-    for v in valores:
-        await db.execute(
-            text(f"INSERT INTO {tabla} (profile_id, {columna}) "  # noqa: S608
-                 f"VALUES (:pid, :valor)"),
-            {"pid": perfil_id, "valor": v},
-        )

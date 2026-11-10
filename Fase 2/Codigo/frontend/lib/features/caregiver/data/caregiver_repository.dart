@@ -15,10 +15,9 @@ abstract class CaregiverRepository {
   Future<CaregiverPlan> getPlan();
   Future<CaregiverPlan> upgradePlan();
 
-  // Reportes / perfil
-  Future<CaregiverReport> getReport();
-  Future<CaregiverProfile> getProfile();
-  Future<CaregiverProfile> updateProfile(CaregiverProfile profile);
+  // Reportes. [days] es 7, 30 o 90; más de 7 es Premium (402 si no).
+  // El perfil profesional vive en ProfessionalProfileRepository.
+  Future<CaregiverReport> getReport({int days = 7});
 
   // Tareas
   Future<List<CareTask>> listTasks(String patientId);
@@ -94,24 +93,10 @@ class CaregiverRepositoryHttp implements CaregiverRepository {
   }
 
   @override
-  Future<CaregiverReport> getReport() async {
-    final data = await _api.get<Map<String, dynamic>>('/caregiver/reports');
+  Future<CaregiverReport> getReport({int days = 7}) async {
+    final data = await _api.get<Map<String, dynamic>>('/caregiver/reports',
+        query: {'days': days});
     return CaregiverReport.fromJson(data);
-  }
-
-  @override
-  Future<CaregiverProfile> getProfile() async {
-    final data = await _api.get<Map<String, dynamic>>('/caregiver/profile');
-    return CaregiverProfile.fromJson(data);
-  }
-
-  @override
-  Future<CaregiverProfile> updateProfile(CaregiverProfile profile) async {
-    final res = await _api.put<Map<String, dynamic>>(
-      '/caregiver/profile',
-      data: profile.toJson(),
-    );
-    return CaregiverProfile.fromJson(res);
   }
 
   @override
@@ -243,16 +228,6 @@ class CaregiverRepositoryMock implements CaregiverRepository {
     ],
     limitsText: 'Hasta 1 paciente / reportes básicos',
   );
-  CaregiverProfile _profile = const CaregiverProfile(
-    headline: 'Cuidadora de adultos mayores con vocación y experiencia',
-    bio: 'Acompaño a personas mayores en su día a día con paciencia y cariño. '
-        'Especial atención a la movilidad y la toma de medicación.',
-    yearsExperience: 6,
-    specialties: ['Movilidad reducida', 'Demencia leve', 'Post-operatorio'],
-    languages: ['Español', 'Inglés básico'],
-    zones: ['Providencia', 'Las Condes', 'Ñuñoa'],
-    certifications: ['Primeros auxilios', 'Cuidado del adulto mayor (SENAMA)'],
-  );
 
   DateTime _at(int h, int m) {
     final n = DateTime.now();
@@ -360,37 +335,62 @@ class CaregiverRepositoryMock implements CaregiverRepository {
   }
 
   @override
-  Future<CaregiverReport> getReport() async {
+  Future<CaregiverReport> getReport({int days = 7}) async {
     await Future.delayed(const Duration(milliseconds: 350));
-    return const CaregiverReport(
-      period: 'Últimos 7 días',
-      tasksCompleted: 34,
-      punctualityPct: 92,
-      checkinsOnTime: 6,
-      observationsLogged: 18,
-      weeklyTasks: [
-        ReportPoint(label: 'Lun', value: 5),
-        ReportPoint(label: 'Mar', value: 6),
-        ReportPoint(label: 'Mié', value: 4),
-        ReportPoint(label: 'Jue', value: 5),
-        ReportPoint(label: 'Vie', value: 6),
-        ReportPoint(label: 'Sáb', value: 4),
-        ReportPoint(label: 'Dom', value: 4),
-      ],
+    // Misma regla que el servidor: más de 7 días es Premium.
+    if (days > 7 && _plan.tier.isFree) {
+      throw ApiException(
+        statusCode: 402,
+        code: 'PREMIUM_REQUIRED',
+        message: 'Los informes de 30 y 90 días son parte de Premium.',
+      );
+    }
+    if (days == 7) {
+      return const CaregiverReport(
+        period: 'Últimos 7 días',
+        days: 7,
+        tasksCompleted: 34,
+        punctualityPct: 92,
+        checkinsOnTime: 6,
+        observationsLogged: 18,
+        weeklyTasks: [
+          ReportPoint(label: 'Lun', value: 5),
+          ReportPoint(label: 'Mar', value: 6),
+          ReportPoint(label: 'Mié', value: 4),
+          ReportPoint(label: 'Jue', value: 5),
+          ReportPoint(label: 'Vie', value: 6),
+          ReportPoint(label: 'Sáb', value: 4),
+          ReportPoint(label: 'Dom', value: 4),
+        ],
+      );
+    }
+    // 30 días por día; 90 días sumado por semana (13 puntos), como el backend.
+    final hoy = DateTime.now();
+    String dm(DateTime d) =>
+        '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+    final puntos = days == 30
+        ? [
+            for (var i = 29; i >= 0; i--)
+              ReportPoint(
+                  label: dm(hoy.subtract(Duration(days: i))),
+                  value: (3 + (i * 7) % 4).toDouble()),
+          ]
+        : [
+            for (var w = 12; w >= 0; w--)
+              ReportPoint(
+                  label: dm(hoy.subtract(Duration(days: w * 7 + 6))),
+                  value: (26 + (w * 5) % 9).toDouble()),
+          ];
+    final total = puntos.fold<double>(0, (a, p) => a + p.value).round();
+    return CaregiverReport(
+      period: 'Últimos $days días',
+      days: days,
+      tasksCompleted: total,
+      punctualityPct: 91,
+      checkinsOnTime: days == 30 ? 25 : 76,
+      observationsLogged: days == 30 ? 71 : 214,
+      weeklyTasks: puntos,
     );
-  }
-
-  @override
-  Future<CaregiverProfile> getProfile() async {
-    await Future.delayed(const Duration(milliseconds: 250));
-    return _profile;
-  }
-
-  @override
-  Future<CaregiverProfile> updateProfile(CaregiverProfile profile) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    _profile = profile;
-    return _profile;
   }
 
   @override

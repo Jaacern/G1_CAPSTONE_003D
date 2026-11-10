@@ -42,12 +42,8 @@ final caregiverPlanProvider = FutureProvider<CaregiverPlan>((ref) {
   return ref.watch(caregiverRepositoryProvider).getPlan();
 });
 
-/// Reporte de desempeño de la cuidadora.
-final caregiverReportProvider = FutureProvider<CaregiverReport>((ref) {
-  return ref.watch(caregiverRepositoryProvider).getReport();
-});
-
-/// Perfil profesional de la cuidadora.
-final caregiverProfileProvider = FutureProvider<CaregiverProfile>((ref) {
-  return ref.watch(caregiverRepositoryProvider).getProfile();
+/// Reporte de desempeño de la cuidadora para 7, 30 o 90 días.
+final caregiverReportProvider =
+    FutureProvider.family<CaregiverReport, int>((ref, days) {
+  return ref.watch(caregiverRepositoryProvider).getReport(days: days);
 });

@@ -24,10 +24,18 @@ class CaregiverHomeScreen extends ConsumerWidget {
     final summary = ref.watch(todaySummaryProvider);
 
     if (patient == null) {
-      return const EmptyView(
+      // Sin paciente es justo cuando más le sirve publicarse: así la
+      // encuentran las familias que buscan cuidadora.
+      return EmptyView(
         icon: Icons.person_search_rounded,
         title: 'Sin paciente asignado',
-        subtitle: 'Cuando te asignen un paciente, lo verás aquí.',
+        subtitle: 'Cuando una familia te invite, verás aquí a su familiar. '
+            'Publica tu perfil para que las familias te encuentren.',
+        action: FilledButton.icon(
+          onPressed: () => context.push('/cg/profile'),
+          icon: const Icon(Icons.badge_outlined),
+          label: const Text('Mi perfil profesional'),
+        ),
       );
     }
 

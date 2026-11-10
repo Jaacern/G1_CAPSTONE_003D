@@ -15,6 +15,7 @@ import '../../features/caregiver/presentation/checkin_screen.dart';
 import '../../features/caregiver/presentation/handover_screen.dart';
 import '../../features/caregiver/presentation/incident_screen.dart';
 import '../../features/caregiver/presentation/observation_screen.dart';
+import '../../features/caregiver/presentation/professional_profile_screen.dart';
 import '../../features/caregiver/presentation/reports_screen.dart';
 import '../../features/caregiver/presentation/task_edit_screen.dart';
 import '../../features/comms/presentation/assistant_screen.dart';
@@ -200,6 +201,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
           path: '/cg/reports',
           builder: (_, __) => const CaregiverReportsScreen()),
+      GoRoute(
+          path: '/cg/profile',
+          builder: (_, __) => const ProfessionalProfileScreen()),
       // Estas tres pantallas existian sin ruta ni nadie que las instanciara,
       // asi que ninguna cuidadora podia abrirlas. Con ellas se caian tambien
       // el check-in, la observacion, el incidente y el relevo, porque los

@@ -10,3 +10,8 @@ __pycache__/
 # LibreOffice / Office lock files
 .~lock.*#
 ~$*
+
+# Build del panel de administración (se genera con flutter build web en admin_web)
+backend/api/app/static/admin_web/
+admin_web/build/
+admin_web/.dart_tool/

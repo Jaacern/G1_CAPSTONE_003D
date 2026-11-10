@@ -727,6 +727,7 @@ async def extraer_texto(
 @router.get("/files/{file_id}/ocr", response_model=TextoDeArchivoOut)
 async def texto_de_archivo(
     file_id: UUID,
+    request: Request,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -737,7 +738,7 @@ async def texto_de_archivo(
     archivo no existe.
     """
     row = await _cargar_archivo(db, file_id)
-    await _exigir_acceso(db, row, user.user_id)
+    role = await _exigir_acceso(db, row, user.user_id)
 
     fila = await _texto_guardado(db, file_id)
     if fila is None:
@@ -745,4 +746,9 @@ async def texto_de_archivo(
             status_code=404, code="OCR_NOT_YET",
             message="Este archivo todavia no tiene texto extraido.",
         )
+    # Leer el texto es leer el documento (RNF-14): queda registrado igual que
+    # una descarga. Solo cuando hay texto que entregar, para no llenar la
+    # tabla con consultas que no devolvieron contenido.
+    await _registrar_acceso(db, row, user_id=user.user_id, role=role,
+                            request=request)
     return _respuesta(fila)

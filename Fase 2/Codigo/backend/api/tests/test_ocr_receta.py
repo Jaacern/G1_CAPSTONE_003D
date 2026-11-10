@@ -169,6 +169,22 @@ async def main(client):
     if r.status_code == 200:
         check("el texto releido es el mismo", r.json()["texto"] == texto)
 
+    # RNF-14: leer el texto es leer el documento, y tiene que quedar anotado.
+    from sqlalchemy import text as _sql
+    from app.db import SessionLocal
+
+    async def lecturas() -> int:
+        async with SessionLocal() as db:
+            return (await db.execute(
+                _sql("SELECT count(*) FROM record_access_log "
+                     "WHERE entity_id = :f AND user_id = :u"),
+                {"f": file_id, "u": FAMILIAR})).scalar()
+
+    antes_log = await lecturas()
+    await client.get(f"/api/v1/files/{file_id}/ocr", headers=token(FAMILIAR))
+    check("releer el texto deja registro de acceso (RNF-14)",
+          await lecturas() == antes_log + 1, f"{antes_log} -> {await lecturas()}")
+
     print("--- permisos ---")
     r = await client.post(f"/api/v1/files/{file_id}/ocr", headers=token(AJENO))
     estado("un usuario ajeno al circulo no saca el texto", 404, r)

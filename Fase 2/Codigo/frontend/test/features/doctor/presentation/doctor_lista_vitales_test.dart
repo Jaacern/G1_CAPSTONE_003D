@@ -71,19 +71,18 @@ void main() {
       (tester) async {
     await montar(tester);
 
-    // Temperatura de los dos, con su decimal.
     expect(find.text('36.7 °C'), findsNWidgets(2));
     // El oxigeno los distingue: Elena 97, José 91 (bajo el minimo de 92).
     expect(find.text('97 %'), findsOneWidget);
-    expect(find.text('91 %'), findsOneWidget);
+    expect(find.textContaining('91 %'), findsOneWidget);
   });
 
   testWidgets('el valor fuera de rango queda marcado en la propia lista',
       (tester) async {
     await montar(tester);
 
-    // El semaforo ya decia que algo pasaba con José; esto dice que.
-    expect(find.byIcon(Icons.error_rounded), findsAtLeastNWidgets(1));
+    expect(find.bySemanticsLabel(RegExp('fuera de rango')),
+        findsAtLeastNWidgets(1));
   });
 
   testWidgets('la temperatura conserva el decimal y el pulso no lo inventa',

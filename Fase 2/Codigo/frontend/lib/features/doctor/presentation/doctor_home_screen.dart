@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
-import '../../alerts/domain/models.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../health/application/health_providers.dart';
 import '../../health/domain/models.dart' as health;
@@ -19,6 +18,9 @@ import '../../patients/domain/models.dart';
 /// donde el usuario es miembro, con cualquier rol (incluido doctor).
 class DoctorHomeScreen extends ConsumerWidget {
   const DoctorHomeScreen({super.key});
+
+  /// Ancho máximo de la lista; más allá, las tarjetas se centran.
+  static const _anchoMaximo = 720.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -38,18 +40,28 @@ class DoctorHomeScreen extends ConsumerWidget {
                   'rol médico, verás a tus pacientes aquí.',
             );
           }
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-            children: [
-              _Saludo(
-                  total: patients.length, porRevisar: _porRevisar(patients)),
-              const SizedBox(height: 14),
-              for (final p in patients)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _DoctorPatientCard(patient: p),
-                ),
-            ],
+          // En pantallas anchas las tarjetas no se estiran de borde a borde:
+          // con pocos pacientes quedaban como franjas vacías. Un ancho
+          // máximo, centrado, las mantiene legibles.
+          return Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: _anchoMaximo),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                children: [
+                  _Saludo(
+                      total: patients.length,
+                      porRevisar: _porRevisar(patients)),
+                  const SizedBox(height: 14),
+                  for (final p in patients)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _DoctorPatientCard(patient: p),
+                    ),
+                ],
+              ),
+            ),
           );
         },
       ),
@@ -131,27 +143,26 @@ class _Saludo extends ConsumerWidget {
 
 /// Tarjeta de un paciente en la lista del médico.
 ///
-/// Está ordenada como se lee en un triage, de arriba hacia abajo:
+/// Está hecha para escanearse en dos o tres segundos entre consulta y
+/// consulta: responde "¿a quién miro primero?" y nada más. De arriba hacia
+/// abajo:
 ///
-///  1. **Quién es** (izquierda) y **cómo está en general** (derecha, el
-///     semáforo). Edad, sexo, RUT y domicilio van aquí porque sirven para no
-///     confundir a dos pacientes con el mismo nombre.
-///  2. **Por qué mirarlo ahora**: una franja con el motivo del semáforo y las
-///     alertas activas, teñida con el color del estado. Solo aparece cuando
-///     hay algo que decir, así que un paciente estable queda más liviano.
-///  3. **Antecedentes** (izquierda: alergias, enfermedades crónicas,
-///     prioridad y complejidad) y **vitales** (derecha), lado a lado en
-///     pantallas anchas y uno sobre otro en el teléfono.
+///  1. **Quién es** y **cómo está** (semáforo). Solo nombre y edad: el RUT, el
+///     domicilio y los antecedentes viven en la ficha, un toque más allá.
+///  2. **Por qué mirarlo ahora**: una franja con el motivo del semáforo,
+///     teñida con el color del estado. Solo aparece si hay algo que decir.
+///  3. **Todos los vitales** en una línea. Los que están en rango van
+///     sobrios; el que está fuera de rango se pinta en rojo y lleva su
+///     nombre, sin fondo ni chip aparte: el motivo de la franja y ese número
+///     son la misma historia y no deben verse como dos alarmas.
 ///
-/// El borde izquierdo lleva el color del semáforo, para recorrer la lista
-/// con la vista sin leer cada tarjeta.
+/// El borde izquierdo lleva el color del semáforo, y ese color ya comunica la
+/// prioridad: no se repite con otras etiquetas. El número de alertas tampoco
+/// se repite aquí; la campana de arriba ya lo muestra.
 class _DoctorPatientCard extends ConsumerWidget {
   const _DoctorPatientCard({required this.patient});
 
   final PatientCard patient;
-
-  /// Desde este ancho de tarjeta, antecedentes y vitales van en dos columnas.
-  static const _anchoDosColumnas = 600.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -168,41 +179,17 @@ class _DoctorPatientCard extends ConsumerWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 14, 12, 14),
-              child: LayoutBuilder(builder: (context, c) {
-                final dosColumnas = c.maxWidth >= _anchoDosColumnas;
-                final antecedentes = _Antecedentes(patient: patient);
-                final vitales = _VitalesEnLinea(patientId: patient.patientId);
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _Cabecera(patient: patient),
-                    if (_hayMotivo(patient)) ...[
-                      const SizedBox(height: 10),
-                      _FranjaMotivo(patient: patient),
-                    ],
-                    const SizedBox(height: 12),
-                    if (dosColumnas)
-                      IntrinsicHeight(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(flex: 5, child: antecedentes),
-                            VerticalDivider(
-                                width: 28,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .outlineVariant),
-                            Expanded(flex: 4, child: vitales),
-                          ],
-                        ),
-                      )
-                    else ...[
-                      antecedentes,
-                      vitales,
-                    ],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _Cabecera(patient: patient),
+                  if (_hayMotivo(patient)) ...[
+                    const SizedBox(height: 10),
+                    _FranjaMotivo(patient: patient),
                   ],
-                );
-              }),
+                  _VitalesEnLinea(patientId: patient.patientId),
+                ],
+              ),
             ),
             // Borde de estado: decorativo, el semáforo ya se anuncia con texto.
             Positioned(
@@ -222,7 +209,7 @@ class _DoctorPatientCard extends ConsumerWidget {
       (p.topReason ?? '').trim().isNotEmpty || p.activeAlertsCount > 0;
 }
 
-/// Fila de arriba: avatar e identidad a la izquierda, semáforo a la derecha.
+/// Fila de arriba: avatar y nombre a la izquierda, semáforo a la derecha.
 class _Cabecera extends StatelessWidget {
   const _Cabecera({required this.patient});
 
@@ -230,11 +217,13 @@ class _Cabecera extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final identidad = _identidad(patient);
-    final domicilio = (patient.address ?? '').trim();
+    final detalle = [
+      if (patient.age != null) '${patient.age} años',
+      if ((patient.sex ?? '').isNotEmpty) _sexo(patient.sex!),
+    ].join(' · ');
     final cs = Theme.of(context).colorScheme;
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         InitialsAvatar(
           name: patient.fullName,
@@ -247,39 +236,19 @@ class _Cabecera extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(patient.fullName,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                       fontSize: 16, fontWeight: FontWeight.w700)),
-              // Edad · sexo · RUT: con esto se distingue a dos pacientes con
-              // el mismo nombre sin abrir la ficha.
-              if (identidad.isNotEmpty) ...[
+              if (detalle.isNotEmpty) ...[
                 const SizedBox(height: 2),
-                Text(identidad,
+                Text(detalle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
                         color: cs.onSurfaceVariant)),
-              ],
-              // Domicilio: el otro desempate práctico, y útil si hay que ir.
-              if (domicilio.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Icon(Icons.home_outlined,
-                        size: 13, color: cs.onSurfaceVariant),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(domicilio,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontSize: 12, color: cs.onSurfaceVariant)),
-                    ),
-                  ],
-                ),
               ],
             ],
           ),
@@ -291,13 +260,6 @@ class _Cabecera extends StatelessWidget {
     );
   }
 
-  /// "76 años · Femenino · RUT 5.123.456-K". Solo lo que exista.
-  static String _identidad(PatientCard p) => [
-        if (p.age != null) '${p.age} años',
-        if ((p.sex ?? '').isNotEmpty) _sexo(p.sex!),
-        if ((p.rut ?? '').isNotEmpty) 'RUT ${p.rut}',
-      ].join(' · ');
-
   /// La base guarda una letra y la API la traduce a palabra; se mira la
   /// inicial para aceptar las dos formas (igual que la cabecera de la ficha).
   static String _sexo(String s) => switch (s[0].toUpperCase()) {
@@ -307,9 +269,9 @@ class _Cabecera extends StatelessWidget {
       };
 }
 
-/// "Por qué mirarlo ahora": motivo del semáforo y alertas activas, en una
-/// sola franja con el tinte del estado. Es lo primero que el médico necesita
-/// para decidir a quién abrir, por eso va entre la identidad y el detalle.
+/// "Por qué mirarlo ahora": el motivo del semáforo, en una franja con el
+/// tinte del estado. Es lo primero que el médico necesita para decidir a
+/// quién abrir, por eso va entre la identidad y los números.
 class _FranjaMotivo extends StatelessWidget {
   const _FranjaMotivo({required this.patient});
 
@@ -319,7 +281,6 @@ class _FranjaMotivo extends StatelessWidget {
   Widget build(BuildContext context) {
     final estado = patient.wellbeingStatus;
     final motivo = (patient.topReason ?? '').trim();
-    final alertas = patient.activeAlertsCount;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
@@ -341,196 +302,21 @@ class _FranjaMotivo extends StatelessWidget {
                   color: estado.onTint),
             ),
           ),
-          if (alertas > 0) ...[
-            const SizedBox(width: 8),
-            Icon(Icons.notifications_active_rounded,
-                size: 14, color: estado.onTint),
-            const SizedBox(width: 3),
-            Text(
-              textoDeAlertasActivas(alertas),
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: estado.onTint),
-            ),
-          ],
         ],
       ),
     );
   }
 }
 
-/// Lo que no se puede pasar por alto antes de indicar algo: alergias primero,
-/// después enfermedades crónicas, y al final prioridad y complejidad.
-class _Antecedentes extends StatelessWidget {
-  const _Antecedentes({required this.patient});
-
-  final PatientCard patient;
-
-  @override
-  Widget build(BuildContext context) {
-    final cronicas = _cronicas(patient);
-    final hayEtiquetas = patient.priority != null || patient.complexity != null;
-    if (patient.allergies.isEmpty && cronicas.isEmpty && !hayEtiquetas) {
-      return const SizedBox.shrink();
-    }
-    final cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const _Rotulo('Antecedentes'),
-        if (patient.allergies.isNotEmpty)
-          _LineaDato(
-            icon: Icons.warning_amber_rounded,
-            texto: 'Alergias: '
-                '${patient.allergies.map((a) => a.label).join(', ')}',
-            color: patient.allergies.any((a) => a.esGrave)
-                ? AppColors.critical
-                : AgeColors.warn700,
-            negrita: true,
-          ),
-        if (cronicas.isNotEmpty)
-          _LineaDato(
-            icon: Icons.monitor_heart_outlined,
-            texto: 'Crónico: ${cronicas.join(' · ')}',
-            color: cs.onSurface,
-          ),
-        if (hayEtiquetas)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                if (patient.priority != null)
-                  _Etiqueta(
-                    texto: 'Prioridad ${patient.priority!}',
-                    color: _colorNivel(patient.priority!),
-                  ),
-                if (patient.complexity != null)
-                  _Etiqueta(
-                    texto: 'Complejidad ${patient.complexity!}',
-                    color: _colorNivel(patient.complexity!),
-                  ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  /// Enfermedades con su nombre legible; si el backend no las trae (datos de
-  /// prueba antiguos), se humaniza el código.
-  static List<String> _cronicas(PatientCard p) => p.conditionsLabels.isNotEmpty
-      ? p.conditionsLabels
-      : p.conditions.map((c) {
-          final t = c.replaceAll('_', ' ').trim();
-          return t.isEmpty ? c : t[0].toUpperCase() + t.substring(1);
-        }).toList();
-
-  static Color _colorNivel(String v) => switch (v) {
-        'alta' => AppColors.statusAttention,
-        'media' || 'moderada' => AgeColors.warn700,
-        _ => AgeColors.ok700,
-      };
-}
-
-/// Rótulo pequeño de sección: ordena la tarjeta sin agregar peso visual.
-class _Rotulo extends StatelessWidget {
-  const _Rotulo(this.texto);
-
-  final String texto;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      texto.toUpperCase(),
-      style: TextStyle(
-        fontSize: 10.5,
-        fontWeight: FontWeight.w700,
-        letterSpacing: .6,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-    );
-  }
-}
-
-/// Una línea de dato con ícono. Hasta dos líneas: una alergia cortada con
-/// puntos suspensivos es justo la que no se ve.
-class _LineaDato extends StatelessWidget {
-  const _LineaDato({
-    required this.icon,
-    required this.texto,
-    required this.color,
-    this.negrita = false,
-  });
-
-  final IconData icon;
-  final String texto;
-  final Color color;
-  final bool negrita;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 1),
-            child: Icon(icon, size: 15, color: color),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              texto,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12.5,
-                height: 1.3,
-                color: color,
-                fontWeight: negrita ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Etiqueta extends StatelessWidget {
-  const _Etiqueta({required this.texto, required this.color});
-  final String texto;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .10),
-        borderRadius: BorderRadius.circular(AgeRadius.full),
-      ),
-      child: Text(texto,
-          style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w700, color: color)),
-    );
-  }
-}
-
-/// Los últimos valores del paciente dentro de su tarjeta.
+/// Los últimos valores del paciente, todos, en una línea que se parte sola.
 ///
-/// El semáforo dice que algo pasa, pero no qué. Con esto el médico compara a
-/// sus pacientes de un vistazo en vez de entrar a una ficha, mirar, salir y
-/// entrar a la siguiente.
+/// Los signos clínicos (presión, pulso, saturación, temperatura, glucosa) van
+/// primero y los de actividad (sueño, pasos) después y más tenues, porque
+/// informan pero no deciden un triage. Un valor fuera de rango se escribe con
+/// su nombre y en rojo, así se entiende qué pasa sin abrir la ficha.
 ///
-/// Los signos clínicos (presión, pulso, SpO2, temperatura, glucosa) van
-/// primero y destacados; los de actividad (sueño, pasos) debajo y más tenues,
-/// porque informan pero no deciden un triage.
+/// Si la última lectura tiene más de un día se dice: ese número ya no es
+/// "cómo está ahora".
 ///
 /// Mientras cargan no se dibuja nada en lugar de un indicador: son varias
 /// tarjetas pidiendo a la vez y la lista entera quedaría parpadeando. Si la
@@ -550,60 +336,36 @@ class _VitalesEnLinea extends ConsumerWidget {
 
     final clinicos = conDatos.where((v) => v.type.isCoreVital).toList();
     final actividad = conDatos.where((v) => !v.type.isCoreVital).toList();
-
-    // La lectura más reciente de todas: un valor sin hora no sirve para
-    // decidir (un pulso de hace 3 días no dice cómo está hoy).
     final ultima = conDatos
         .map((v) => v.measuredAt)
         .reduce((a, b) => a.isAfter(b) ? a : b);
-    // Más de un día sin lecturas se marca: el número ya no es "cómo está".
     final antigua = DateTime.now().difference(ultima).inHours >= 24;
+    final cs = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.only(top: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
+          Wrap(
+            spacing: 14,
+            runSpacing: 6,
             children: [
-              const _Rotulo('Vitales'),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Última lectura ${_hace(ultima)}',
-                  textAlign: TextAlign.end,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: antigua ? FontWeight.w700 : FontWeight.w500,
-                    color: antigua
-                        ? AgeColors.warn700
-                        : Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
+              for (final v in clinicos) _ValorSuelto(vital: v),
+              for (final v in actividad) _ValorSuelto(vital: v, tenue: true),
             ],
           ),
-          if (clinicos.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 14,
-              runSpacing: 6,
-              children: [for (final v in clinicos) _ValorSuelto(vital: v)],
+          const SizedBox(height: 6),
+          Text(
+            antigua
+                ? 'Sin lecturas nuevas · ${_hace(ultima)}'
+                : 'Última lectura ${_hace(ultima)}',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: antigua ? FontWeight.w700 : FontWeight.w500,
+              color: antigua ? AgeColors.warn700 : cs.onSurfaceVariant,
             ),
-          ],
-          if (actividad.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 14,
-              runSpacing: 4,
-              children: [
-                for (final v in actividad) _ValorSuelto(vital: v, tenue: true),
-              ],
-            ),
-          ],
+          ),
         ],
       ),
     );
@@ -647,21 +409,20 @@ class _ValorSuelto extends StatelessWidget {
                   ? AppColors.statusAttention
                   : (tenue ? cs.onSurfaceVariant : AppColors.primary)),
           const SizedBox(width: 4),
-          Text(
-            texto,
-            style: TextStyle(
-              fontSize: tenue ? 12 : 13.5,
-              fontWeight: fuera
-                  ? FontWeight.w800
-                  : (tenue ? FontWeight.w500 : FontWeight.w700),
-              color: color,
+          // Fuera de rango lleva el nombre: "Oxígeno (SpO2) 86 %" se entiende
+          // solo; un 86 con un ícono obliga a adivinar qué mide.
+          Flexible(
+            child: Text(
+              fuera ? '${vital.type.label} $texto' : texto,
+              style: TextStyle(
+                fontSize: tenue ? 12 : 13.5,
+                fontWeight: fuera
+                    ? FontWeight.w800
+                    : (tenue ? FontWeight.w500 : FontWeight.w700),
+                color: color,
+              ),
             ),
           ),
-          if (fuera) ...[
-            const SizedBox(width: 3),
-            const Icon(Icons.error_rounded,
-                size: 14, color: AppColors.statusAttention),
-          ],
         ],
       ),
     );

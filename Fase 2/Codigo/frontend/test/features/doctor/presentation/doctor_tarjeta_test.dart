@@ -1,9 +1,9 @@
 // La tarjeta del paciente en la lista del medico.
 //
-// Con dos "Ramirez" en la lista, el nombre solo no alcanza para saber a quien
-// se mira. La tarjeta trae lo que lo identifica (edad, sexo, RUT, domicilio),
-// lo que no se puede pasar por alto (alergias, enfermedades cronicas) y cuando
-// fue la ultima lectura de sus vitales.
+// Se lee de un vistazo: quien es, como esta y sus vitales, con el que esta
+// fuera de rango marcado. El RUT, el domicilio y los antecedentes viven en la
+// ficha; aqui competirian con lo que importa para decidir a quien abrir
+// primero.
 import 'package:agecare_app/core/theme/app_theme.dart';
 import 'package:agecare_app/features/auth/application/auth_controller.dart';
 import 'package:agecare_app/features/auth/domain/models.dart';
@@ -58,50 +58,38 @@ void main() {
     }
   }
 
-  testWidgets('la tarjeta dice edad, sexo y RUT para no confundir homonimos',
-      (tester) async {
+  testWidgets('la tarjeta dice solo edad y sexo', (tester) async {
     await montar(tester);
 
-    expect(find.text('78 años · Femenino · RUT 5.123.456-K'), findsOneWidget);
+    expect(find.text('78 años · Femenino'), findsOneWidget);
     expect(find.text('81 años · Masculino'), findsOneWidget);
   });
 
-  testWidgets('la tarjeta muestra el domicilio', (tester) async {
+  testWidgets('RUT, domicilio y antecedentes quedan para la ficha',
+      (tester) async {
     await montar(tester);
 
-    expect(find.text('Los Aromos 1234, La Florida'), findsOneWidget);
-    expect(find.text('Pasaje Los Olmos 55, Maipú'), findsOneWidget);
+    expect(find.textContaining('RUT'), findsNothing);
+    expect(find.text('Los Aromos 1234, La Florida'), findsNothing);
+    expect(find.textContaining('Alergias:'), findsNothing);
+    expect(find.textContaining('Crónico:'), findsNothing);
+    expect(find.textContaining('Prioridad'), findsNothing);
+    expect(find.textContaining('Complejidad'), findsNothing);
   });
 
-  testWidgets('una alergia grave se ve en rojo', (tester) async {
+  testWidgets('se ven todos los vitales y el fuera de rango lleva su nombre',
+      (tester) async {
     await montar(tester);
 
-    final texto = tester.widget<Text>(find.text('Alergias: Penicilina'));
-    expect(texto.style?.color, AppColors.critical);
-  });
-
-  testWidgets('las enfermedades cronicas salen con su nombre', (tester) async {
-    await montar(tester);
-
-    expect(find.text('Crónico: Hipertensión arterial (HTA) · Artrosis'),
-        findsOneWidget);
-    expect(
-        find.text('Crónico: Diabetes mellitus tipo 2 (DM2)'), findsOneWidget);
-  });
-
-  testWidgets('prioridad y complejidad salen como etiquetas', (tester) async {
-    await montar(tester);
-
-    expect(find.text('Prioridad baja'), findsOneWidget);
-    expect(find.text('Complejidad alta'), findsOneWidget);
-  });
-
-  testWidgets('sin datos clinicos no aparecen lineas vacias', (tester) async {
-    await montar(tester);
-
-    // Jose no tiene alergias ni prioridad: solo la tarjeta de Elena las trae.
-    expect(find.textContaining('Alergias:'), findsOneWidget);
-    expect(find.textContaining('Prioridad'), findsOneWidget);
+    // Elena, en rango: valores sobrios, sin nombre.
+    expect(find.text('97 %'), findsOneWidget);
+    expect(find.text('74 bpm'), findsNWidgets(2));
+    expect(find.text('36.7 °C'), findsNWidgets(2));
+    // Jose, oxigeno bajo el minimo: con su nombre, para no adivinar que mide.
+    expect(find.textContaining('91 %'), findsOneWidget);
+    expect(find.textContaining('Oxígeno'), findsOneWidget);
+    // Y no hay un segundo aviso de "todo en rango" repitiendo al semaforo.
+    expect(find.text('Vitales en rango'), findsNothing);
   });
 
   testWidgets('la tarjeta dice cuando fue la ultima lectura', (tester) async {
@@ -110,23 +98,19 @@ void main() {
     expect(find.textContaining('Última lectura'), findsNWidgets(2));
   });
 
-  testWidgets('en pantalla ancha antecedentes y vitales van lado a lado',
+  testWidgets('el numero de alertas no se repite en la tarjeta',
       (tester) async {
-    await montar(tester, ancho: 1024);
+    await montar(tester);
 
-    final alergia = tester.getTopLeft(find.text('Alergias: Penicilina'));
-    final lectura =
-        tester.getTopLeft(find.textContaining('Última lectura').first);
-    // Los vitales quedan a la derecha de los antecedentes, a la misma altura
-    // aproximada, en vez de debajo.
-    expect(lectura.dx, greaterThan(alergia.dx + 300));
-    expect((lectura.dy - alergia.dy).abs(), lessThan(40));
+    // La campana de la barra superior ya lo muestra.
+    expect(find.textContaining('alertas activas'), findsNothing);
+    expect(find.textContaining('alerta activa'), findsNothing);
   });
 
   testWidgets('con todos los datos la tarjeta cabe en 320 dp', (tester) async {
     await montar(tester, ancho: 320);
 
     expect(find.text('Elena Ramírez'), findsOneWidget);
-    expect(find.text('Alergias: Penicilina'), findsOneWidget);
+    expect(find.textContaining('91 %'), findsOneWidget);
   });
 }

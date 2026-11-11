@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/notifications/push_device_id.dart';
 import '../data/auth_repository.dart';
 import '../domain/models.dart';
 
@@ -106,7 +107,11 @@ class AuthController extends Notifier<AuthState> {
     final refresh = await tokens.refreshToken;
     if (refresh != null) {
       try {
-        await _repo.logout(refresh);
+        // Con el id del aparato el backend deja de mandarle avisos a este
+        // teléfono (RF-04). Sin él, quien cerró sesión seguiría recibiendo
+        // las alertas del paciente en un teléfono que ya no es su sesión.
+        await _repo.logout(refresh,
+            deviceId: ref.read(pushDeviceIdProvider).value);
       } catch (_) {/* best effort */}
     }
     await tokens.clear();

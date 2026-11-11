@@ -29,7 +29,9 @@ abstract class AuthRepository {
 
   Future<User> me();
 
-  Future<void> logout(String refreshToken);
+  /// [deviceId] es el id del aparato registrado para push. Si se manda, el
+  /// backend deja de enviarle avisos a este teléfono (RF-04).
+  Future<void> logout(String refreshToken, {String? deviceId});
 }
 
 // ---------------------------------------------------------------------------
@@ -106,8 +108,11 @@ class AuthRepositoryHttp implements AuthRepository {
   }
 
   @override
-  Future<void> logout(String refreshToken) =>
-      _api.post<void>('/auth/logout', data: {'refresh_token': refreshToken});
+  Future<void> logout(String refreshToken, {String? deviceId}) =>
+      _api.post<void>('/auth/logout', data: {
+        'refresh_token': refreshToken,
+        if (deviceId != null) 'device_id': deviceId,
+      });
 }
 
 // ---------------------------------------------------------------------------
@@ -335,7 +340,7 @@ class AuthRepositoryMock implements AuthRepository {
   }
 
   @override
-  Future<void> logout(String refreshToken) async {
+  Future<void> logout(String refreshToken, {String? deviceId}) async {
     _currentUser = null;
   }
 }

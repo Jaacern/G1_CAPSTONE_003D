@@ -164,6 +164,26 @@ class AllergyIn(BaseModel):
     source:    str = "reportada"     # reportada|test|reaccion_tratamiento
     noted_on:  date | None = None
 
+    @field_validator("substance")
+    @classmethod
+    def _sustancia(cls, v: str) -> str:
+        """Código del catálogo (penicilina, aines) o una alergia escrita a
+        mano ("Otra"). La escrita se reconoce entera: empieza con letra y solo
+        lleva letras, números, espacios y - . , ( ) / ' +. Así entra "Vitamina
+        B12" o "Contraste yodado" y no "1234" ni "<script>", que terminarían
+        impresos en la hoja de emergencia."""
+        s = re.sub(r"\s+", " ", v.strip())
+        # Código del catálogo: siempre empieza con letra ("1234" no es uno).
+        if re.fullmatch(r"[a-z][a-z0-9_]{1,39}", s):
+            return s
+        if not re.fullmatch(r"[^\W\d_][\w '\-.,()/+]{1,79}", s) or "_" in s:
+            raise ValueError(
+                "Escribe el nombre del alérgeno: empieza con una letra, "
+                "sin símbolos como < > # @.")
+        if sum(c.isalpha() for c in s) < 2:
+            raise ValueError("Escribe el nombre del alérgeno.")
+        return s
+
 
 class ImmunizationIn(BaseModel):
     """Una vacuna a registrar (aplicada o programada)."""
@@ -514,7 +534,16 @@ async def _load_allergies_detail(db: AsyncSession, patient_id: str) -> list[dict
     ).mappings().all()
     out = []
     for r in rows:
-        label = r["catalog_label"] or r["substance"].replace("_", " ").capitalize()
+        # Del catálogo, su etiqueta. Un código suelto (sin catálogo) se hace
+        # legible; lo escrito a mano ("Vitamina B12") se muestra tal cual,
+        # sin pasarlo a minúsculas.
+        sub = r["substance"]
+        if r["catalog_label"]:
+            label = r["catalog_label"]
+        elif re.fullmatch(r"[a-z0-9_]+", sub):
+            label = sub.replace("_", " ").capitalize()
+        else:
+            label = sub
         out.append({
             "substance": r["substance"],
             "label": label,

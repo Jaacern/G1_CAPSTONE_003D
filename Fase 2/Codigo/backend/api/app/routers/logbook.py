@@ -19,11 +19,12 @@ import re
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.avisos import despachar
 from app.db import get_db
 from app.deps import PatientContext, get_patient_member
 from app.errors import ApiError
@@ -353,6 +354,7 @@ class IncidentOut(BaseModel):
              response_model=IncidentOut, status_code=201)
 async def create_incident(
     payload: IncidentIn,
+    segundo_plano: BackgroundTasks,
     ctx: PatientContext = Depends(get_patient_member(["caregiver", "family"])),
     db: AsyncSession = Depends(get_db),
 ):
@@ -437,6 +439,10 @@ async def create_incident(
         )
     ).mappings().first()
     await db.commit()
+    # Un incidente grave o critico nacio con su alerta: el aviso al telefono
+    # sale ahora, en segundo plano, y no cuando pase el repartidor.
+    if alert_id is not None:
+        segundo_plano.add_task(despachar)
 
     return IncidentOut(
         id=fila["id"],

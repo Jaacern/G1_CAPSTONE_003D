@@ -33,11 +33,12 @@ Notas de alcance:
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.avisos import despachar
 from app.db import get_db
 from app.deps import PatientContext, get_patient_member
 from app.errors import ApiError
@@ -641,6 +642,7 @@ async def link_device(
 @router.post("/devices/vitals/batch", response_model=DeviceBatchOut)
 async def device_ingest_batch(
     payload: DeviceBatchIn,
+    segundo_plano: BackgroundTasks,
     ctx: DeviceContext = Depends(get_device_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -690,10 +692,13 @@ async def device_ingest_batch(
 
     # Igual que en la ingesta desde el teléfono (vitals.py): la medición del
     # reloj se evalúa al llegar y no en la pasada horaria del mantenimiento.
+    alertas = 0
     if accepted:
-        await evaluar_vitales(db, patient_id=ctx.patient_id)
+        alertas, _ = await evaluar_vitales(db, patient_id=ctx.patient_id)
 
     await db.commit()
+    if alertas:
+        segundo_plano.add_task(despachar)
 
     duplicates = len(payload.readings) - accepted
     return DeviceBatchOut(accepted=accepted, duplicates=duplicates)
@@ -705,6 +710,7 @@ async def device_ingest_batch(
 @router.post("/devices/fall", response_model=DeviceFallOut, status_code=201)
 async def device_report_fall(
     payload: DeviceFallIn,
+    segundo_plano: BackgroundTasks,
     ctx: DeviceContext = Depends(get_device_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -757,6 +763,9 @@ async def device_report_fall(
         )
     ).mappings().first()
     await db.commit()
+    # El aviso sale ya, sin esperar la pasada del repartidor: una caída tiene
+    # que llegar al teléfono en menos de diez segundos (RNF-04).
+    segundo_plano.add_task(despachar)
 
     return DeviceFallOut(alert_id=str(alert["id"]), status="active")
 

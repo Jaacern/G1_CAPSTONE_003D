@@ -5,10 +5,10 @@ alerts, alert_deliveries, notification_settings, emergency_contacts,
 sos_events. SQL crudo con text() y sesiones async, igual que los módulos 3
 (auth.py) y 4 (patients.py). Sin ORM.
 
-Notas de alcance / desviaciones respecto a la spec por el hito actual:
-- El envío real de push/notificaciones NO se realiza en este hito. Los
-  endpoints crean las alertas y los eventos en la base; la generación de
-  filas en alert_deliveries y el envío por FCM/APNs se implementará después.
+Notas:
+- El aviso al teléfono no se envía desde aquí. Los endpoints crean la alerta
+  y app/avisos.py la reparte: deja una fila en alert_deliveries por cada
+  teléfono a avisar y la manda por el proveedor de push.
 - Coherencia con los CHECK de alerts (ver 401_alerts.sql): al resolver una
   alerta que aún está 'active' (sin acknowledged_at) se setea también
   acknowledged_by/acknowledged_at, porque los constraints ck_alerts_status_ack
@@ -17,12 +17,13 @@ Notas de alcance / desviaciones respecto a la spec por el hito actual:
 import json
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.acceso import registrar_acceso
+from app.avisos import ROLES_AVISADOS, despachar
 from app.db import get_db
 from app.deps import (
     CurrentUser,
@@ -518,6 +519,7 @@ async def update_notification_settings(
 @router.post("/patients/{patient_id}/sos", response_model=SosOut, status_code=201)
 async def trigger_sos(
     payload: SosIn,
+    segundo_plano: BackgroundTasks,
     ctx: PatientContext = Depends(
         get_patient_member(roles=["caregiver", "elder"])
     ),
@@ -525,9 +527,9 @@ async def trigger_sos(
 ):
     detail = payload.note or "Se activó el botón de emergencia del paciente."
 
-    # Alerta crítica del SOS. NOTA: en este hito NO se envía push real; solo
-    # se crea la alerta y el evento SOS. El fan-out a alert_deliveries y el
-    # envío por FCM/APNs se implementará en un hito posterior.
+    # Alerta crítica del SOS. El aviso al teléfono de la familia sale al
+    # terminar, en segundo plano (app/avisos.py): la respuesta no espera a
+    # que el proveedor de push conteste.
     alert = (
         await db.execute(
             text(
@@ -564,7 +566,10 @@ async def trigger_sos(
         },
     )
 
-    # Familiares que serían notificados (miembros vivos con rol family).
+    # A cuántas personas se les avisa: las mismas que toma el repartidor
+    # (app/avisos.py), familiares y cuidadoras del círculo menos quien apretó
+    # el botón. Antes contaba solo a los familiares, y la cuidadora que
+    # recibía el aviso no figuraba.
     notified_count = (
         await db.execute(
             text(
@@ -572,11 +577,13 @@ async def trigger_sos(
                 SELECT count(*)
                 FROM patient_members
                 WHERE patient_id = :pid
-                  AND role = 'family'
+                  AND role = ANY(CAST(:roles AS varchar[]))
                   AND removed_at IS NULL
+                  AND user_id <> :uid
                 """
             ),
-            {"pid": ctx.patient_id},
+            {"pid": ctx.patient_id, "roles": list(ROLES_AVISADOS),
+             "uid": ctx.user.user_id},
         )
     ).scalar_one()
 
@@ -628,6 +635,9 @@ async def trigger_sos(
     ]
 
     await db.commit()
+    # Recién después del commit: el repartidor usa otra conexión y no vería
+    # una alerta que todavía no está guardada.
+    segundo_plano.add_task(despachar)
 
     return SosOut(
         alert_id=alert_id,

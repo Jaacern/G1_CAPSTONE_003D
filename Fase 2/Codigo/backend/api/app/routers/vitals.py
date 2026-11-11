@@ -10,11 +10,12 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from enum import Enum
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.avisos import despachar
 from app.db import get_db
 from app.deps import CurrentUser, PatientContext, get_current_user, get_patient_member
 from app.errors import ApiError
@@ -430,6 +431,7 @@ def _compute_wellbeing(
 @router.post("/patients/{patient_id}/vitals/batch", response_model=BatchOut)
 async def ingest_batch(
     payload: BatchIn,
+    segundo_plano: BackgroundTasks,
     ctx: PatientContext = Depends(
         get_patient_member(roles=["caregiver", "elder", "family"])
     ),
@@ -497,6 +499,8 @@ async def ingest_batch(
         alertas, _ = await evaluar_vitales(db, patient_id=ctx.patient_id)
 
     await db.commit()
+    if alertas:
+        segundo_plano.add_task(despachar)
     duplicates = len(payload.readings) - accepted
     return BatchOut(accepted=accepted, duplicates=duplicates,
                     alerts_triggered=alertas)
@@ -512,6 +516,7 @@ async def ingest_batch(
 )
 async def ingest_manual(
     payload: ManualIn,
+    segundo_plano: BackgroundTasks,
     ctx: PatientContext = Depends(get_patient_member(roles=["caregiver"])),
     db: AsyncSession = Depends(get_db),
 ):
@@ -587,6 +592,8 @@ async def ingest_manual(
         db, ctx.patient_id, str(row["id"]), payload.type.value,
         payload.value, measured_at)
     await db.commit()
+    if alerta:
+        segundo_plano.add_task(despachar)
     return ManualOut(reading_id=str(row["id"]), alert_triggered=alerta)
 
 

@@ -8,11 +8,12 @@ Cambios 2FN aplicados:
 import json
 from datetime import date, datetime, time, timedelta
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.avisos import despachar
 from app.db import get_db
 from app.deps import CurrentUser, PatientContext, get_current_user, get_patient_member
 from app.errors import ApiError
@@ -450,6 +451,7 @@ async def list_doses(
 async def log_dose(
     dose_id: str,
     payload: DoseLogIn,
+    segundo_plano: BackgroundTasks,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -605,6 +607,8 @@ async def log_dose(
         alert_triggered = True
 
     await db.commit()
+    if alert_triggered:
+        segundo_plano.add_task(despachar)
     return DoseLogOut(dose_id=dose_id, status=payload.status,
                       alert_triggered=alert_triggered)
 

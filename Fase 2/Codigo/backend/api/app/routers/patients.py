@@ -28,6 +28,7 @@ from app.deps import (
     is_verified_doctor,
 )
 from app.errors import ApiError
+from app.routers.checkins import MOTIVO_MAL_HOY
 from app.ratelimit import LIMIT_INVITE_CODE, limiter
 from app.security import hash_token
 from app.validators import (
@@ -1389,7 +1390,14 @@ async def list_patients(
                                         ELSE 2 END,
                                     a.created_at DESC
                            LIMIT 1
-                       ) AS top_reason
+                       ) AS top_reason,
+                       -- RF-38: el adulto mayor dijo hoy que se siente mal.
+                       EXISTS (
+                           SELECT 1 FROM daily_checkins dc
+                           WHERE dc.patient_id = p.id
+                             AND dc.checkin_date = current_date
+                             AND dc.mood = 'bad'
+                       ) AS mal_hoy
                 FROM patient_members pm
                 JOIN patients p ON p.id = pm.patient_id
                 WHERE pm.user_id = :uid
@@ -1408,7 +1416,7 @@ async def list_patients(
     def _wellbeing(r) -> str:
         if r["critical_alerts"] > 0:
             return "attention"
-        if r["active_alerts"] > 0:
+        if r["active_alerts"] > 0 or r["mal_hoy"]:
             return "warning"
         return "ok"
 
@@ -1474,7 +1482,7 @@ async def list_patients(
             conditions=list(r["conditions"]),
             active_alerts_count=int(r["active_alerts"]),
             critical_alerts_count=int(r["critical_alerts"]),
-            top_reason=r["top_reason"],
+            top_reason=r["top_reason"] or (MOTIVO_MAL_HOY if r["mal_hoy"] else None),
             rut=_rut(r),
             sex=_SEX_DB_TO_API.get(r["sex"], r["sex"]),
             address=r["address"],

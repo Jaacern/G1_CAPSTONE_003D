@@ -19,6 +19,7 @@ from app.routers import (
     caregiver,
     caregiver_profile,
     chat,
+    checkins,
     content,
     devices,
     documents,
@@ -205,6 +206,8 @@ app.include_router(gallery.router)
 app.include_router(chat.router)
 app.include_router(assistant.router)
 app.include_router(content.router)
+# Check-in diario del adulto mayor (RF-38).
+app.include_router(checkins.router)
 app.include_router(speech.router)
 app.include_router(devices.router)
 

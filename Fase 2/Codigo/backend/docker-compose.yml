@@ -88,6 +88,16 @@ services:
       # dinero (Alloxentric aun no elige pasarela, ver app/payment_provider.py).
       # Con 'none' contratar responde 503. NO dejar 'simulated' en produccion.
       PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-simulated}
+
+      # Avisos al telefono (app/avisos.py y app/push_provider.py). Con 'none'
+      # las alertas se crean igual y cada aviso queda anotado como fallido en
+      # alert_deliveries, con el motivo: no se finge un envio que no ocurrio.
+      # Con 'fcm' hace falta la cuenta de servicio de Firebase, por una de
+      # las dos vias: el JSON entero en la variable, o la ruta a un archivo
+      # montado en el contenedor.
+      PUSH_PROVIDER: ${PUSH_PROVIDER:-none}
+      FCM_CREDENTIALS_JSON: ${FCM_CREDENTIALS_JSON:-}
+      FCM_CREDENTIALS_FILE: ${FCM_CREDENTIALS_FILE:-}
       SPEECH_REGION: ${SPEECH_REGION:-}
       SPEECH_API_KEY: ${SPEECH_API_KEY:-}
     ports:
@@ -135,6 +145,30 @@ services:
       # Necesita el mismo volumen que la api: una de sus tareas es borrar
       # los binarios de las subidas que nunca llegaron.
       - archivos:/var/agecare/files
+    restart: unless-stopped
+    networks: [agecare-net]
+
+  # El repartidor de avisos: manda al telefono las alertas que nadie avisó
+  # todavia y vuelve a avisar de las criticas que siguen sin atender (RF-52).
+  #
+  # Los endpoints que crean una alerta ya la avisan en el momento, asi que
+  # esto no es el camino principal sino lo que lo sostiene: recoge lo que
+  # quedo pendiente si el envio fallo o la api se reinicio a mitad, y es el
+  # unico que se ocupa de los reavisos, que no dependen de ningun request.
+  #
+  # Aparte del mantenimiento porque corren a ritmos que no se parecen: aquel
+  # cada hora, este cada treinta segundos. Un reaviso cada quince minutos no
+  # se puede colgar de una tarea horaria.
+  avisos:
+    build: ./api
+    container_name: agecare-avisos
+    command: python -m app.avisos vigilar
+    environment:
+      <<: *entorno_api
+      AVISOS_INTERVALO_SEG: ${AVISOS_INTERVALO_SEG:-30}
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
     networks: [agecare-net]
 

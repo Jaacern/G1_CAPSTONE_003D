@@ -6,9 +6,9 @@
 --   1. El seed tenia un solo paciente, asi que nada que dependa de tener
 --      varios se podia probar: el selector de paciente de Salud, la lista del
 --      medico ordenada por criticidad, el filtro "solo este paciente" de
---      alertas. Se agrega a Luis Alberto Fuentes Rojas, suegro de Javier
---      (E-FAM-03 de docs/QA_ESCENARIOS_REALES_POR_ROL.md), con el mismo
---      circulo: Javier, Rosa y la doctora Soto.
+--      alertas. Se agrega a Luis Alberto Fuentes Rojas, esposo de Elena y
+--      padre de la familiar (E-FAM-03 de docs/QA_ESCENARIOS_REALES_POR_ROL.md),
+--      con el mismo circulo: la familiar, la cuidadora y la doctora Soto.
 --   2. Ningun paciente tenia presion arterial, temperatura ni glucosa: las
 --      tres tarjetas de Salud salian "Sin datos aun". Se agregan con sus
 --      rangos, para Elena (hipertensa y diabetica) y para Luis.
@@ -45,10 +45,10 @@ WHERE NOT EXISTS (SELECT 1 FROM patient_allergies
                    WHERE patient_id = '33333333-3333-4333-8333-333333333334'
                      AND substance = 'aspirina' AND deleted_at IS NULL);
 
--- Circulo de cuidado: Javier es su yerno y administra el perfil.
+-- Circulo de cuidado: su hija administra el perfil.
 INSERT INTO patient_members (patient_id, user_id, role, is_owner, relationship)
 VALUES ('33333333-3333-4333-8333-333333333334',
-        '11111111-1111-4111-8111-111111111111', 'family', true, 'yerno'),
+        '11111111-1111-4111-8111-111111111111', 'family', true, 'hija'),
        ('33333333-3333-4333-8333-333333333334',
         '22222222-2222-4222-8222-222222222222', 'caregiver', false, NULL)
 ON CONFLICT (patient_id, user_id) DO NOTHING;
@@ -60,7 +60,7 @@ ON CONFLICT (patient_id, user_id) DO NOTHING;
 
 INSERT INTO emergency_contacts (patient_id, member_user_id, notes)
 SELECT '33333333-3333-4333-8333-333333333334',
-       '11111111-1111-4111-8111-111111111111', 'Yerno, administra el perfil'
+       '11111111-1111-4111-8111-111111111111', 'Hija, administra el perfil'
 WHERE NOT EXISTS (SELECT 1 FROM emergency_contacts
                    WHERE patient_id = '33333333-3333-4333-8333-333333333334'
                      AND member_user_id = '11111111-1111-4111-8111-111111111111'
@@ -142,7 +142,7 @@ WHERE NOT EXISTS (SELECT 1 FROM vital_readings
 -- 4. Presion arterial, temperatura y glucosa (los dos pacientes)
 -- ---------------------------------------------------------------------
 -- La serie larga llega del tensiometro y el glucometro conectados (origen
--- health_connect); las ultimas tres de cada una las anoto Rosa a mano, que
+-- health_connect); las ultimas tres de cada una las anoto la cuidadora a mano, que
 -- es como entran en la vida real cuando el aparato no esta sincronizado.
 
 -- Presion: sistolica en value, diastolica en value_secondary. Dos al dia.
@@ -182,7 +182,7 @@ CROSS JOIN generate_series(date_trunc('day', now()) - interval '30 days' + inter
 WHERE NOT EXISTS (SELECT 1 FROM vital_readings vr
                    WHERE vr.patient_id = p.pid AND vr.type = 'glucose');
 
--- Mediciones a mano de Rosa, recientes y con nota. Algunas fuera de rango a
+-- Mediciones a mano de la cuidadora, recientes y con nota. Algunas fuera de rango a
 -- proposito: son las que el historial y el semaforo tienen que mostrar.
 INSERT INTO vital_readings (patient_id, type, value, value_secondary, measured_at, source, meta)
 SELECT v.pid, v.t, v.val, v.val2, v.ts, 'manual',
@@ -260,7 +260,7 @@ CROSS JOIN generate_series(1, 7) AS d
 ON CONFLICT DO NOTHING;
 
 -- Dosis de la ultima semana y de los proximos dos dias, como las dejaria el
--- generador. Rosa registra casi todas; alguna se omite o se salta.
+-- generador. La cuidadora registra casi todas; alguna se omite o se salta.
 WITH slots AS (
     SELECT ti.id AS item_id,
            ((d::date + tt.time_of_day) AT TIME ZONE 'America/Santiago') AS scheduled_at,

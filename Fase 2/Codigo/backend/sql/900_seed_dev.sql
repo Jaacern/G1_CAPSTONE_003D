@@ -1,7 +1,7 @@
 -- =====================================================================
 -- AgeCare — Datos de demostración (SOLO DESARROLLO)
 -- =====================================================================
--- Contraseña de todos los usuarios de prueba: demo1234
+-- Contraseña de todos los usuarios de prueba: agecare123
 --
 -- Cambios respecto al esquema anterior (correcciones 2FN):
 --   · users/patients: full_name reemplazado por first_name + last_name
@@ -16,17 +16,17 @@
 -- ---------------------------------------------------------------
 INSERT INTO users (id, email, password_hash, first_name, last_name, phone, locale) VALUES
   ('11111111-1111-4111-8111-111111111111',
-   'ja.cernac@duocuc.cl',
-   '$2b$12$PhFlUg1xEBTGKQuSYaBy.ODxdKlWAShWRiJxT0w85tC15kZaSNK/.',
-   'Javier', 'Cerna', '+56912345678', 'es'),
+   'familiar@agecare.cl',
+   '$2b$12$sOwnF0GBHVfW/6AuaTTIoez598bSRvAjjd.MhockXbT6sCX1.v4Xe',
+   'Daniela', 'Fuentes', '+56912345678', 'es'),
   ('22222222-2222-4222-8222-222222222222',
-   'rosa@cuidados.cl',
-   '$2b$12$PhFlUg1xEBTGKQuSYaBy.ODxdKlWAShWRiJxT0w85tC15kZaSNK/.',
-   'Rosa', 'Medina', '+56987654321', 'es'),
+   'cuidadora@agecare.cl',
+   '$2b$12$sOwnF0GBHVfW/6AuaTTIoez598bSRvAjjd.MhockXbT6sCX1.v4Xe',
+   'Marisol', 'Tapia', '+56987654321', 'es'),
   -- Cuenta del adulto mayor (la propia Elena). Rol 'elder' sobre su paciente.
   ('99999999-9999-4999-8999-999999999999',
-   'elena@agecare.cl',
-   '$2b$12$PhFlUg1xEBTGKQuSYaBy.ODxdKlWAShWRiJxT0w85tC15kZaSNK/.',
+   'adultomayor@agecare.cl',
+   '$2b$12$sOwnF0GBHVfW/6AuaTTIoez598bSRvAjjd.MhockXbT6sCX1.v4Xe',
    'Elena', 'Rosales', '+56911112222', 'es');
 
 -- ---------------------------------------------------------------
@@ -53,10 +53,10 @@ INSERT INTO patient_members (patient_id, user_id, role, is_owner) VALUES
 INSERT INTO push_devices (id, user_id, push_token, platform, last_seen_at) VALUES
   ('55555555-5555-4555-8555-555555555555',
    '11111111-1111-4111-8111-111111111111',
-   'demo-token-javier-android', 'android', now()),
+   'demo-token-familiar-android', 'android', now()),
   ('66666666-6666-4666-8666-666666666666',
    '22222222-2222-4222-8222-222222222222',
-   'demo-token-rosa-ios', 'ios', now());
+   'demo-token-cuidadora-ios', 'ios', now());
 
 -- ---------------------------------------------------------------
 -- 3. Wearable y umbrales
@@ -309,12 +309,12 @@ INSERT INTO notification_settings (user_id, alert_type, push_enabled) VALUES
   ('22222222-2222-4222-8222-222222222222', 'wearable_offline',   true);
 
 INSERT INTO emergency_contacts (patient_id, first_name, last_name, relationship, phone, escalation_order) VALUES
-  ('33333333-3333-4333-8333-333333333333', 'Javier', 'Cerna',  'Hijo',      '+56912345678', 1),
-  ('33333333-3333-4333-8333-333333333333', 'Rosa',   'Medina', 'Cuidadora', '+56987654321', 2),
+  ('33333333-3333-4333-8333-333333333333', 'Daniela', 'Fuentes Rosales', 'Hija',      '+56912345678', 1),
+  ('33333333-3333-4333-8333-333333333333', 'Marisol', 'Tapia Vergara', 'Cuidadora', '+56987654321', 2),
   ('33333333-3333-4333-8333-333333333333', 'SAMU', 'Servicio de Urgencia', 'Emergencia','+56961313131', 3);
 
 -- ---------------------------------------------------------------
--- 10. Suscripción freemium (Rosa, cuidadora)
+-- 10. Suscripción freemium (la cuidadora)
 -- ---------------------------------------------------------------
 INSERT INTO subscriptions (user_id, plan, status, current_period_end) VALUES
   ('22222222-2222-4222-8222-222222222222', 'premium', 'active', now() + interval '25 days');

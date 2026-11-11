@@ -54,7 +54,7 @@ CREATE INDEX IF NOT EXISTS ix_users_staff
 -- otras cuentas de prueba del seed, asi que entra con la misma clave.
 -- En produccion esta fila se borra o se le cambia la clave antes de salir.
 INSERT INTO users (email, password_hash, first_name, last_name, phone, locale, is_staff)
-VALUES ('admin@alloxentric.cl',
-        '$2b$12$PhFlUg1xEBTGKQuSYaBy.ODxdKlWAShWRiJxT0w85tC15kZaSNK/.',
-        'Administracion', 'Alloxentric', '+56900000000', 'es', true)
+VALUES ('administrador@agecare.cl',
+        '$2b$12$sOwnF0GBHVfW/6AuaTTIoez598bSRvAjjd.MhockXbT6sCX1.v4Xe',
+        'Tomás', 'Bravo', '+56933334444', 'es', true)
 ON CONFLICT DO NOTHING;

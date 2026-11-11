@@ -19,7 +19,8 @@
 -- suite funcione sobre una base recien levantada con docker compose, sin
 -- pasos a mano.
 --
--- La contrasena es la misma 'demo1234' del resto del sembrado.
+-- La contrasena es la misma del resto del sembrado. Desde 999 la crean y
+-- la borran las propias pruebas (tests/_ajeno.py).
 
 INSERT INTO users (id, email, password_hash, first_name, last_name, phone, locale)
 VALUES ('eeeeeee1-0000-4000-8000-000000000001',

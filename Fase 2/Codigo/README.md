@@ -426,9 +426,11 @@ flutter run \
 
 | Rol | Correo | Contraseña |
 |-----|--------|------------|
-| Familiar | `ja.cernac@duocuc.cl` | `demo1234` |
-| Cuidadora | `rosa@cuidados.cl` | `demo1234` |
-| Adulto mayor | `elena@agecare.cl` | `demo1234` |
+| Familiar | `familiar@agecare.cl` | `agecare123` |
+| Cuidadora | `cuidadora@agecare.cl` | `agecare123` |
+| Médica | `doctora@agecare.cl` | `agecare123` |
+| Adulto mayor | `adultomayor@agecare.cl` | `agecare123` |
+| Administrador (panel) | `administrador@agecare.cl` | `agecare123` |
 
 ---
 

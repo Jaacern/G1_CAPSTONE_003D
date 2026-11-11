@@ -218,26 +218,26 @@
 
     <div class="demo-hint">
       <p><strong>Datos de demostración:</strong><br>
-      👤 Familiar (Javier Cerna): <strong>ja.cernac@duocuc.cl</strong><br>
-      👩‍⚕️ Cuidadora (Rosa Medina): <strong>rosa@cuidados.cl</strong><br>
-      🔑 Contraseña ambos: <strong>demo1234</strong><br>
-      🏥 Paciente: <strong>Elena Rosales</strong>
+      👤 Familiar (Daniela Fuentes): <strong>familiar@agecare.cl</strong><br>
+      👩‍⚕️ Cuidadora (Marisol Tapia): <strong>cuidadora@agecare.cl</strong><br>
+      🔑 Contraseña de todas: <strong>agecare123</strong><br>
+      🏥 Adulto mayor: <strong>Elena Rosales</strong>
       </p>
     </div>
 
     <div style="display:flex;flex-direction:column;gap:12px;">
       <div class="field">
         <label>Correo electrónico</label>
-        <input type="email" id="login-email" value="ja.cernac@duocuc.cl" placeholder="email@ejemplo.com">
+        <input type="email" id="login-email" value="familiar@agecare.cl" placeholder="email@ejemplo.com">
       </div>
       <div class="field">
         <label>Contraseña</label>
-        <input type="password" id="login-password" value="demo1234" placeholder="contraseña">
+        <input type="password" id="login-password" value="agecare123" placeholder="contraseña">
       </div>
       <button class="btn btn-primary btn-full" id="login-btn" onclick="doLogin()">
         Iniciar sesión
       </button>
-      <button class="btn btn-secondary btn-full" onclick="loginAs('rosa@cuidados.cl')">
+      <button class="btn btn-secondary btn-full" onclick="loginAs('cuidadora@agecare.cl')">
         Entrar como Rosa (Cuidadora)
       </button>
     </div>
@@ -571,7 +571,7 @@
         <div class="tabpane" id="vitals-manual-tab">
           <div class="card">
             <div class="card-head"><h2>Registrar vital manual</h2><span class="badge badge-info">POST /vitals/manual</span></div>
-            <div class="tag-input" style="margin-bottom:12px;">⚠️ Solo para cuidadoras (role=caregiver). Javier (familiar) recibirá 403.</div>
+            <div class="tag-input" style="margin-bottom:12px;">⚠️ Solo para cuidadoras (role=caregiver). Daniela (familiar) recibirá 403.</div>
             <div class="form-grid">
               <div class="field"><label>Tipo</label>
                 <select id="manual-type">
@@ -916,7 +916,7 @@ async function doLogin() {
 }
 function loginAs(email) {
   document.getElementById('login-email').value = email;
-  document.getElementById('login-password').value = 'demo1234';
+  document.getElementById('login-password').value = 'agecare123';
   doLogin();
 }
 function enterApp() {

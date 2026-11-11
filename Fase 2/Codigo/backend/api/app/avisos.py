@@ -61,6 +61,7 @@ import sys
 from sqlalchemy import text
 
 from app.db import engine
+from app.email_provider import get_email
 from app.push_provider import get_push
 
 # Quienes reciben el aviso en el telefono. Un solo lugar, a proposito: es una
@@ -322,7 +323,66 @@ async def enviar_cola() -> dict[str, int]:
                     text("UPDATE push_devices SET is_active = false "
                          "WHERE id = :id"), {"id": f["device_id"]})
 
+            # RF-82: si el push falló y hay correo configurado, se intenta
+            # enviar por esa vía como canal alternativo.
+            if get_email().disponible:
+                asyncio.create_task(_correo_alternativo(f, error))
+
     return {"enviadas": enviadas, "fallidas": fallidas}
+
+
+async def _correo_alternativo(f: dict, motivo_push: str) -> None:
+    """RF-82: vía alternativa por correo cuando el push falla.
+
+    Se obtiene el correo del destinatario y se envía un aviso simple.
+    No bloquea la cola de push: corre como tarea paralela.
+    Nunca lanza: si el correo también falla, se anota y se sigue.
+    """
+    async with engine.connect() as conn:
+        email_row = (await conn.execute(
+            text("SELECT email, full_name FROM users WHERE id = :uid"),
+            {"uid": str(f["user_id"])},
+        )).mappings().first()
+
+    if not email_row or not email_row["email"]:
+        return
+
+    titulo, cuerpo_notif = _texto(f)
+    nombre = email_row["full_name"] or email_row["email"]
+
+    cuerpo_html = f"""
+    <html><body style="font-family:sans-serif;color:#222;">
+    <h2 style="color:#d32f2f;">&#9888;&#65039; {titulo}</h2>
+    <p>Hola, <strong>{nombre}</strong>.</p>
+    <p>{cuerpo_notif}</p>
+    <p style="font-size:0.85rem;color:#888;">
+      Esta notificación llegó por correo porque no se pudo enviar al teléfono.<br>
+      Abre la app AgeCare para ver los detalles y atender la alerta.
+    </p>
+    <hr><p style="font-size:0.8rem;color:#aaa;">AgeCare · Cuidando a quienes cuidaron de nosotros.</p>
+    </body></html>
+    """
+    cuerpo_texto = (
+        f"{titulo}\n\n{cuerpo_notif}\n\n"
+        "Esta notificación llegó por correo porque no se pudo enviar al teléfono.\n"
+        "Abre la app AgeCare para ver los detalles.\n\n— AgeCare"
+    )
+
+    try:
+        resultado = await get_email().enviar(
+            destinatario=email_row["email"],
+            asunto=f"[AgeCare] {titulo}",
+            cuerpo_html=cuerpo_html,
+            cuerpo_texto=cuerpo_texto,
+        )
+        if not resultado.ok:
+            print(
+                f"[avisos] correo alternativo fallido para "
+                f"{email_row['email']}: {resultado.error}"
+            )
+    except Exception as e:  # noqa: BLE001
+        print(f"[avisos] excepción en correo alternativo: "
+              f"{str(e).splitlines()[0]}")
 
 
 async def despachar() -> dict[str, int]:

@@ -174,7 +174,9 @@ class SosIn(BaseModel):
 
 class EmergencyContactOut(BaseModel):
     full_name: str
-    phone: str
+    # Opcional: un contacto que es miembro del grupo toma el teléfono de su
+    # perfil, y el perfil puede no tenerlo. Sigue siendo alguien a quien avisar.
+    phone: str | None = None
     role: str | None = None
 
 
@@ -182,6 +184,7 @@ class SosOut(BaseModel):
     alert_id: str
     notified_count: int
     emergency_contacts: list[EmergencyContactOut]
+
 
 
 # --------------------------------------------------------------------------
@@ -566,31 +569,54 @@ async def trigger_sos(
         )
     ).scalar_one()
 
-    # Contactos de emergencia, en orden de escalamiento.
+    # Contactos de emergencia vigentes. Misma regla que la ficha del paciente
+    # (patients.py) y la hoja de emergencia (reports.py):
+    #
+    #   · Un contacto que es miembro del grupo (406) no guarda nombre ni
+    #     teléfono propios: salen del perfil del usuario. Leer full_name y
+    #     phone directo de emergency_contacts devolvía NULL para ellos y el
+    #     endpoint respondía 500 DESPUÉS de haber guardado la alerta, así que
+    #     quien apretaba el botón veía un error con el SOS ya registrado.
+    #   · Solo los activos. Un contacto desactivado en la rotación conserva su
+    #     fila, pero no es a quien hay que llamar hoy.
+    #   · Sin orden de escalamiento: se avisa a todos por igual (406).
     contact_rows = (
         await db.execute(
             text(
                 """
-                SELECT full_name, phone, relationship
-                FROM emergency_contacts
-                WHERE patient_id = :pid AND deleted_at IS NULL
-                ORDER BY escalation_order
+                SELECT COALESCE(u.full_name, ec.full_name)         AS nombre,
+                       COALESCE(u.phone, ec.phone)                 AS telefono,
+                       COALESCE(ec.relationship, pm.relationship)  AS parentesco
+                FROM emergency_contacts ec
+                LEFT JOIN users u ON u.id = ec.member_user_id
+                LEFT JOIN patient_members pm
+                       ON pm.patient_id = ec.patient_id
+                      AND pm.user_id = ec.member_user_id
+                      AND pm.removed_at IS NULL
+                WHERE ec.patient_id = :pid
+                  AND ec.deleted_at IS NULL
+                  AND ec.is_active = true
+                ORDER BY nombre
                 """
             ),
             {"pid": ctx.patient_id},
         )
     ).mappings().all()
 
-    await db.commit()
-
+    # La respuesta se arma ANTES del commit. Si algo de aquí falla, que no
+    # quede una alerta guardada detrás de un error: en un SOS eso se traduce
+    # en que la persona vuelve a apretar y la familia recibe dos emergencias.
     contacts = [
         EmergencyContactOut(
-            full_name=r["full_name"],
-            phone=r["phone"],
-            role=r["relationship"],
+            full_name=r["nombre"],
+            phone=r["telefono"],
+            role=r["parentesco"],
         )
         for r in contact_rows
+        if r["nombre"]
     ]
+
+    await db.commit()
 
     return SosOut(
         alert_id=alert_id,

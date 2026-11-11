@@ -8,6 +8,7 @@ Se corren desde afuera, no desde un request:
     python -m app.maintenance alertar-dosis
     python -m app.maintenance alertar-vitales
     python -m app.maintenance alertar-reloj
+    python -m app.maintenance avisar
     python -m app.maintenance semaforo
 
 Y las del dia juntas, en el orden correcto, que es lo que va en la tarea
@@ -28,6 +29,7 @@ import sys
 
 from sqlalchemy import text
 
+from app import avisos
 from app.config import get_settings
 from app.db import engine
 from app.storage import get_storage
@@ -976,6 +978,27 @@ async def calcular_semaforo(*, verbose: bool = True) -> dict[str, int]:
     return {"pacientes": pacientes, **por_estado}
 
 
+async def avisar_alertas(*, verbose: bool = True) -> dict[str, int]:
+    """Manda al telefono las alertas que esta misma corrida acaba de crear.
+
+    Las alertas que nacen de un request se avisan en el momento, desde el
+    propio endpoint. Las que nacen aca, de una dosis vencida, de una medicion
+    del reloj o de un reloj callado, no tienen request detras: sin este paso
+    quedarian esperando al contenedor de avisos, y si ese contenedor no esta
+    corriendo, no saldrian nunca.
+
+    El trabajo es de app/avisos.py. Aca solo se lo invoca en el punto de la
+    corrida donde hace falta.
+    """
+    r = await avisos.pasada(verbose=False)
+    if verbose:
+        print(f"alertas avisadas : {r['alertas']}")
+        print(f"reavisos         : {r['reavisos']}")
+        print(f"enviadas         : {r['enviadas']}")
+        print(f"fallidas         : {r['fallidas']}")
+    return r
+
+
 # El orden no es casual y es la razon de que esto exista como una sola
 # tarea en vez de cinco lineas en el crontab.
 #
@@ -991,10 +1014,12 @@ async def calcular_semaforo(*, verbose: bool = True) -> dict[str, int]:
 #                       activas.
 #   5. alertar-reloj    igual que la anterior: independiente, y antes del
 #                       semaforo por la misma razon.
-#   6. semaforo         al final, para que vea las dosis y las alertas de
+#   6. avisar           manda al telefono lo que crearon los pasos 3, 4 y
+#                       5. Despues de los tres, para que salgan juntas.
+#   7. semaforo         al final, para que vea las dosis y las alertas de
 #                       esta misma corrida. Al revés mostraria el estado de
-#                       antes de los cinco pasos anteriores.
-#   7. barrer-subidas   no depende de nada ni nada depende de ella; va al
+#                       antes de los pasos anteriores.
+#   8. barrer-subidas   no depende de nada ni nada depende de ella; va al
 #                       final porque es la unica que toca archivos y no
 #                       datos clinicos, y si se cae no arrastra al resto.
 DIARIO = (
@@ -1003,6 +1028,7 @@ DIARIO = (
     ("alertar-dosis",   alertar_dosis_omitidas),
     ("alertar-vitales", alertar_vitales_fuera_de_rango),
     ("alertar-reloj",   alertar_reloj_sin_datos),
+    ("avisar",          avisar_alertas),
     ("semaforo",        calcular_semaforo),
     ("barrer-subidas",  barrer_subidas_vencidas),
 )
@@ -1052,6 +1078,7 @@ async def _main(argv: list[str]) -> int:
               "alertar-dosis": alertar_dosis_omitidas,
               "alertar-vitales": alertar_vitales_fuera_de_rango,
               "alertar-reloj": alertar_reloj_sin_datos,
+              "avisar": avisar_alertas,
               "semaforo": calcular_semaforo,
               "diario": correr_todo}
     if len(argv) != 1 or argv[0] not in tareas:

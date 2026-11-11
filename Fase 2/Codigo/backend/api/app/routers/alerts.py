@@ -17,11 +17,12 @@ Notas de alcance / desviaciones respecto a la spec por el hito actual:
 import json
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.acceso import registrar_acceso
 from app.db import get_db
 from app.deps import (
     CurrentUser,
@@ -192,6 +193,7 @@ class SosOut(BaseModel):
 # --------------------------------------------------------------------------
 @router.get("/users/me/alerts", response_model=AlertsListOut)
 async def list_my_alerts(
+    request: Request,
     status: str = Query("active"),
     patient_id: str | None = Query(None),
     page: int = Query(1, ge=1),
@@ -288,7 +290,8 @@ async def list_my_alerts(
                 f"""
                 SELECT a.id, a.patient_id, p.full_name AS patient_name,
                        a.type, a.severity, a.title, a.detail, a.payload,
-                       a.status, a.created_at, a.acknowledged_by, a.resolved_at
+                       a.status, a.created_at, a.acknowledged_by, a.resolved_at,
+                       pm.role AS mi_rol
                 FROM alerts a
                 JOIN patient_members pm ON pm.patient_id = a.patient_id
                 JOIN patients p ON p.id = a.patient_id
@@ -318,6 +321,14 @@ async def list_my_alerts(
         )
         for r in rows
     ]
+
+    # Trazabilidad (RNF-14). Esta ruta no lleva el paciente porque junta las
+    # alertas de todos, así que el middleware no la ve: se deja constancia por
+    # cada paciente cuyas alertas salieron en esta página, que son los
+    # expedientes que de verdad se mostraron.
+    for pid, rol in {(str(r["patient_id"]), r["mi_rol"]) for r in rows}:
+        await registrar_acceso(patient_id=pid, user_id=user.user_id, role=rol,
+                               seccion="alerts", request=request)
 
     return AlertsListOut(items=items, total=int(total), unread_count=int(unread_count))
 

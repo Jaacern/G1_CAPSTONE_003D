@@ -14,7 +14,7 @@ import re
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +24,7 @@ from app.assistant_safety import (
     pide_criterio_clinico,
     sanitizar_respuesta,
 )
+from app.acceso import registrar_acceso
 from app.db import get_db
 from app.deps import CurrentUser, PatientContext, get_current_user, get_patient_member
 from app.errors import ApiError
@@ -742,6 +743,7 @@ _ETIQUETA = {
             response_model=MessagesOut)
 async def conversation_messages(
     conversation_id: UUID,
+    request: Request,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -760,7 +762,7 @@ async def conversation_messages(
         await db.execute(
             text(
                 """
-                SELECT id, user_id FROM conversations
+                SELECT id, user_id, patient_id FROM conversations
                 WHERE id = :cid AND type = 'assistant'
                 """
             ),
@@ -770,6 +772,14 @@ async def conversation_messages(
 
     if conv is None or str(conv["user_id"]) != user.user_id:
         raise _NO_EXISTE
+
+    # Trazabilidad (RNF-14). La ruta no lleva el paciente, asi que el
+    # middleware no la ve. Releer una conversacion con el asistente es volver
+    # a leer lo que el modelo saco del expediente.
+    if conv["patient_id"] is not None:
+        await registrar_acceso(patient_id=str(conv["patient_id"]),
+                               user_id=user.user_id, seccion="assistant",
+                               request=request)
 
     filas = (
         await db.execute(

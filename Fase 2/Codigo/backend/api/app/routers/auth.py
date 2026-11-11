@@ -1,17 +1,14 @@
 """Módulo 3: Autenticación y cuenta de usuario (endpoints 3.1–3.9).
 
 Alineado con la Especificación de Endpoints v1. Usa las tablas existentes:
-users, refresh_tokens (rotación con family_id), push_devices.
-
-Notas de alcance para este hito:
-- password/recovery y password/reset no envían correo real: recovery siempre
-  responde 202 (evita enumeración) y reset queda como stub documentado, porque
-  no hay tabla de tokens de recuperación en el SQL actual. Se implementará
-  cuando se agregue esa tabla.
+users, refresh_tokens (rotación con family_id), push_devices,
+password_reset_tokens (RF-05).
 """
+import hashlib
+import os
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Request, Response, status
@@ -21,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
 from app.deps import CurrentUser, get_current_user, is_verified_doctor
+from app.email_provider import get_email
 from app.errors import ApiError
 from app.ratelimit import LIMIT_INVITE_CODE, LIMIT_LOGIN, LIMIT_REFRESH, limiter
 from app.validators import clean_person_name, normalize_phone, parse_rut
@@ -657,34 +655,199 @@ async def logout(
 
 
 # --------------------------------------------------------------------------
-# 3.5 Solicitar recuperación de contraseña
+# 3.5 Solicitar recuperación de contraseña (RF-05)
 # --------------------------------------------------------------------------
 @router.post("/auth/password/recovery", status_code=202)
-async def password_recovery(payload: RecoveryIn, db: AsyncSession = Depends(get_db)):
-    # Siempre 202, exista o no el correo (evita enumeración de cuentas).
-    # El envío real de correo y la tabla de tokens de reset se añadirán luego.
+async def password_recovery(
+    payload: RecoveryIn, db: AsyncSession = Depends(get_db)
+):
+    """Solicita el enlace de recuperación de contraseña.
+
+    Siempre responde 202 exista o no el correo, para no revelar qué cuentas
+    hay en el sistema (evitar enumeración de usuarios).
+
+    Si el correo existe:
+    1. Invalida tokens anteriores del usuario.
+    2. Genera un token aleatorio seguro y guarda su hash SHA-256.
+    3. Envía el enlace al correo del usuario por el proveedor configurado.
+    4. Si el correo no está configurado (EMAIL_PROVIDER=none) el token se
+       crea igual; sin enlace el flujo queda incompleto pero no explota.
+    """
+    fila = (
+        await db.execute(
+            text(
+                """
+                SELECT id, full_name FROM users
+                WHERE lower(email) = lower(:email)
+                  AND is_active = true
+                  AND deleted_at IS NULL
+                """
+            ),
+            {"email": payload.email},
+        )
+    ).mappings().first()
+
+    if fila is None:
+        # No existe la cuenta: responde 202 igualmente (anti-enumeración).
+        return Response(status_code=status.HTTP_202_ACCEPTED)
+
+    # Leer la ventana de validez desde system_parameters.
+    minutos = (
+        await db.execute(
+            text(
+                "SELECT value FROM system_parameters "
+                "WHERE key = 'password_reset_expire_minutes'"
+            )
+        )
+    ).scalar()
+    try:
+        minutos = int(minutos)
+    except (TypeError, ValueError):
+        minutos = 30
+
+    # Invalidar tokens anteriores del mismo usuario.
+    await db.execute(
+        text(
+            "UPDATE password_reset_tokens SET used_at = now() "
+            "WHERE user_id = :uid AND used_at IS NULL"
+        ),
+        {"uid": str(fila["id"])},
+    )
+
+    # Generar token seguro y guardar solo el hash.
+    token_claro = os.urandom(32).hex()  # 64 hex chars, 256 bits de entropía
+    token_hash = hashlib.sha256(token_claro.encode()).hexdigest()
+    vence = datetime.now(timezone.utc) + timedelta(minutes=minutos)
+
+    await db.execute(
+        text(
+            """
+            INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+            VALUES (:uid, :hash, :exp)
+            """
+        ),
+        {"uid": str(fila["id"]), "hash": token_hash, "exp": vence},
+    )
+    await db.commit()
+
+    # Enviar correo con el enlace. Si el proveedor no está configurado
+    # el Envio queda como fallido pero no lanzamos: el 202 ya salió.
+    nombre = fila["full_name"] or payload.email
+    enlace = f"agecare://reset-password?token={token_claro}"
+
+    cuerpo_html = f"""
+    <html><body style="font-family:sans-serif;color:#222;">
+    <h2>Recupera tu contraseña — AgeCare</h2>
+    <p>Hola, <strong>{nombre}</strong>.</p>
+    <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta.</p>
+    <p>
+      <a href="{enlace}"
+         style="display:inline-block;padding:12px 24px;background:#1976d2;
+                color:#fff;border-radius:6px;text-decoration:none;
+                font-weight:bold;">
+        Restablecer contraseña
+      </a>
+    </p>
+    <p>Este enlace vence en <strong>{minutos} minutos</strong>.<br>
+    Si no solicitaste esto, ignora este mensaje.</p>
+    <hr><p style="font-size:0.85rem;color:#888;">AgeCare · Cuidando a quienes cuidaron de nosotros.</p>
+    </body></html>
+    """
+    cuerpo_texto = (
+        f"Hola {nombre},\n\n"
+        f"Para restablecer tu contraseña abre este enlace "
+        f"(válido {minutos} min):\n{enlace}\n\n"
+        "Si no lo pediste, ignora este mensaje.\n\n— AgeCare"
+    )
+
+    await get_email().enviar(
+        destinatario=payload.email,
+        asunto="Recupera tu contraseña en AgeCare",
+        cuerpo_html=cuerpo_html,
+        cuerpo_texto=cuerpo_texto,
+    )
+
     return Response(status_code=status.HTTP_202_ACCEPTED)
 
 
 # --------------------------------------------------------------------------
-# 3.6 Restablecer contraseña (stub: requiere tabla de tokens de reset)
+# 3.6 Restablecer contraseña (RF-05)
 # --------------------------------------------------------------------------
 @router.post("/auth/password/reset", status_code=204)
-async def password_reset(payload: ResetIn, db: AsyncSession = Depends(get_db)):
+async def password_reset(
+    payload: ResetIn, db: AsyncSession = Depends(get_db)
+):
+    """Establece la nueva contraseña usando el token del correo.
+
+    Valida:
+    - El token existe y no fue usado.
+    - No venció.
+    - La contraseña cumple los requisitos de seguridad.
+
+    Tras el reset invalida todos los refresh tokens del usuario (cierra
+    todas las sesiones activas) como medida de seguridad.
+    """
     if not _PASSWORD_RE.match(payload.new_password):
         raise ApiError(
             status_code=400,
             code="WEAK_PASSWORD",
             message="La contraseña no cumple los requisitos mínimos de seguridad.",
         )
-    # Sin tabla de tokens de recuperación en el SQL actual: el token no se
-    # puede validar todavía. Se responde con el error de la spec hasta que
-    # exista la tabla correspondiente.
-    raise ApiError(
-        status_code=400,
-        code="INVALID_RESET_TOKEN",
-        message="El enlace de recuperación es inválido o expiró. Solicita uno nuevo.",
+
+    token_hash = hashlib.sha256(payload.reset_token.encode()).hexdigest()
+
+    fila = (
+        await db.execute(
+            text(
+                """
+                SELECT prt.id, prt.user_id, prt.expires_at
+                FROM password_reset_tokens prt
+                WHERE prt.token_hash = :hash
+                  AND prt.used_at IS NULL
+                """
+            ),
+            {"hash": token_hash},
+        )
+    ).mappings().first()
+
+    if fila is None:
+        raise ApiError(
+            status_code=400,
+            code="INVALID_RESET_TOKEN",
+            message="El enlace de recuperación es inválido o expiró. Solicita uno nuevo.",
+        )
+
+    if fila["expires_at"] < datetime.now(timezone.utc):
+        raise ApiError(
+            status_code=400,
+            code="INVALID_RESET_TOKEN",
+            message="El enlace de recuperación es inválido o expiró. Solicita uno nuevo.",
+        )
+
+    nuevo_hash = hash_password(payload.new_password)
+
+    # Actualizar contraseña, marcar token como usado y cerrar todas las sesiones.
+    await db.execute(
+        text("UPDATE users SET hashed_password = :pw WHERE id = :uid"),
+        {"pw": nuevo_hash, "uid": str(fila["user_id"])},
     )
+    await db.execute(
+        text(
+            "UPDATE password_reset_tokens SET used_at = now() WHERE id = :id"
+        ),
+        {"id": str(fila["id"])},
+    )
+    # Cerrar todas las sesiones activas del usuario como medida de seguridad.
+    await db.execute(
+        text(
+            "UPDATE refresh_tokens SET revoked_at = now() "
+            "WHERE user_id = :uid AND revoked_at IS NULL"
+        ),
+        {"uid": str(fila["user_id"])},
+    )
+    await db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # --------------------------------------------------------------------------

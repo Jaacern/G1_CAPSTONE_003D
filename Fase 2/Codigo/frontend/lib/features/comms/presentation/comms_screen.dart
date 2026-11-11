@@ -20,9 +20,9 @@ class CommsScreen extends ConsumerWidget {
         appBar: AppBar(title: const Text('Comunicación')),
         body: const EmptyView(
           icon: Icons.forum_rounded,
-          title: 'Sin paciente seleccionado',
+          title: 'Sin adulto mayor seleccionado',
           subtitle:
-              'Selecciona a un paciente para abrir el chat del equipo de '
+              'Elige a un adulto mayor para abrir el chat del equipo de '
               'cuidado o hablar con el asistente.',
         ),
       );

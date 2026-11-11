@@ -39,7 +39,7 @@ class ThresholdsScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Rangos de alerta')),
       body: patient == null
           ? const EmptyView(
-              icon: Icons.tune_rounded, title: 'Sin paciente seleccionado')
+              icon: Icons.tune_rounded, title: 'Sin adulto mayor seleccionado')
           : thresholds.when(
               loading: () => const LoadingView(),
               error: (e, _) => ErrorView(
@@ -91,8 +91,7 @@ class _ThresholdRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = threshold;
-    final hasRange =
-        t != null && (t.minValue != null || t.maxValue != null);
+    final hasRange = t != null && (t.minValue != null || t.maxValue != null);
     final rangeText = !hasRange
         ? 'Sin rango definido'
         : '${[
@@ -171,7 +170,7 @@ class _ThresholdRow extends ConsumerWidget {
       return 'Indica al menos un valor mínimo o máximo.';
     }
     if (s.contains('FORBIDDEN') || s.contains('403')) {
-      return 'No tienes permiso para cambiar los rangos de este paciente.';
+      return 'No tienes permiso para cambiar los rangos de este adulto mayor.';
     }
     return 'No se pudo guardar el rango. Intenta de nuevo.';
   }
@@ -228,7 +227,8 @@ class _ThresholdDialogState extends State<_ThresholdDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('Valores en ${widget.type.unit}. Deja un campo vacío si no '
+          Text(
+              'Valores en ${widget.type.unit}. Deja un campo vacío si no '
               'quieres ese límite.',
               style: const TextStyle(
                   fontSize: 12, color: AppColors.textSecondary)),
@@ -238,8 +238,8 @@ class _ThresholdDialogState extends State<_ThresholdDialog> {
               Expanded(
                 child: TextField(
                   controller: _min,
-                  keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(labelText: 'Mínimo'),
                 ),
               ),
@@ -247,8 +247,8 @@ class _ThresholdDialogState extends State<_ThresholdDialog> {
               Expanded(
                 child: TextField(
                   controller: _max,
-                  keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(labelText: 'Máximo'),
                 ),
               ),

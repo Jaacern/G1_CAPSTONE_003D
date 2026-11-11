@@ -23,8 +23,8 @@ class CaregiverLogScreen extends ConsumerWidget {
         appBar: AppBar(title: const Text('Bitácora')),
         body: const EmptyView(
           icon: Icons.person_off_rounded,
-          title: 'Sin paciente seleccionado',
-          subtitle: 'Selecciona un paciente para ver su bitácora.',
+          title: 'Sin adulto mayor seleccionado',
+          subtitle: 'Elige a un adulto mayor para ver su bitácora.',
         ),
       );
     }

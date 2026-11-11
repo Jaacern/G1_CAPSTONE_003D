@@ -386,7 +386,7 @@ class _StepsCard extends StatelessWidget {
               style: TextStyle(fontWeight: FontWeight.w700)),
           SizedBox(height: 10),
           _Step(n: '1', text: 'Toca "Generar código".'),
-          _Step(n: '2', text: 'Abre la app AgeCare en el reloj del paciente.'),
+          _Step(n: '2', text: 'Abre la app AgeCare en el reloj del adulto mayor.'),
           _Step(n: '3', text: 'Escribe los 6 dígitos en el reloj.'),
           _Step(n: '4', text: 'La app avisa sola cuando el reloj queda vinculado.'),
         ],

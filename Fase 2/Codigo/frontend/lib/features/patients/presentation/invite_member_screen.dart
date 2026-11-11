@@ -51,15 +51,16 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
       body: patient == null
           ? const EmptyView(
               icon: Icons.group_outlined,
-              title: 'Primero crea un paciente',
-              subtitle: 'Las invitaciones se envían por paciente.')
+              title: 'Primero agrega a tu adulto mayor',
+              subtitle: 'Las invitaciones se envían por cada adulto mayor.')
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text('Invitar a alguien al cuidado de ${patient.fullName}',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 20),
                   const Text('¿Qué rol tendrá?',
                       style: TextStyle(fontWeight: FontWeight.w600)),
@@ -95,7 +96,8 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Correo (opcional)',
                       prefixIcon: Icon(Icons.mail_outline),
-                      helperText: 'Para identificar a quién invitaste. El código '
+                      helperText:
+                          'Para identificar a quién invitaste. El código '
                           'se comparte aparte, por el medio que prefieras.',
                       helperMaxLines: 2,
                     ),
@@ -113,11 +115,13 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.check_circle, color: AppColors.statusOk),
+                              const Icon(Icons.check_circle,
+                                  color: AppColors.statusOk),
                               const SizedBox(width: 8),
                               Text(
                                 'Código para ${_created!.role.label.toLowerCase()}',
-                                style: const TextStyle(fontWeight: FontWeight.w700),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700),
                               ),
                             ],
                           ),

@@ -28,7 +28,7 @@ class CaregiverHomeScreen extends ConsumerWidget {
       // encuentran las familias que buscan cuidadora.
       return EmptyView(
         icon: Icons.person_search_rounded,
-        title: 'Sin paciente asignado',
+        title: 'Sin adulto mayor asignado',
         subtitle: 'Cuando una familia te invite, verás aquí a su familiar. '
             'Publica tu perfil para que las familias te encuentren.',
         action: FilledButton.icon(

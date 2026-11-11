@@ -209,7 +209,7 @@ class _AlertDetailBody extends StatelessWidget {
           child: Column(
             children: [
               if (alert.patientName.isNotEmpty)
-                _DetailRow('Paciente', alert.patientName),
+                _DetailRow('Adulto mayor', alert.patientName),
               _DetailRow('Tipo', alert.type.label),
               _DetailRow('Estado', alert.status.label),
               _DetailRow(

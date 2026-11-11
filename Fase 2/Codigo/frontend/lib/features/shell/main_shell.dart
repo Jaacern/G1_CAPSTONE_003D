@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../auth/application/auth_controller.dart';
 import '../auth/domain/models.dart';
-import '../alerts/presentation/alerts_screen.dart';
+import '../alerts/application/alerts_providers.dart';
+import '../patients/application/patients_providers.dart';
+import '../patients/presentation/patient_profile_screen.dart';
 import '../caregiver/presentation/caregiver_home_screen.dart';
 import '../comms/presentation/comms_screen.dart';
 import '../doctor/presentation/doctor_home_screen.dart';
@@ -18,11 +21,14 @@ import 'shell_providers.dart';
 
 /// Contenedor principal con navegación inferior según el rol del usuario.
 /// Las pestañas se limitan a lo que el backend soporta hoy:
-/// - familiar:        Hoy · Salud · Mensajes · Tienda · Más
+/// - familiar:        Hoy · Salud · Ficha · Mensajes · Tienda · Más
 ///                    (Mensajes = Comunicación, Tienda = Marketplace)
-/// - cuidadora:       Hoy · Salud · Alertas · Más
+/// - cuidadora:       Hoy · Salud · Ficha · Mensajes · Más
 /// - adulto mayor:    experiencia de mosaico a pantalla completa
 /// - médico:          Hoy (mis pacientes) · Salud · Más
+///
+/// Las alertas no ocupan una pestaña: van en la campana de la barra
+/// superior, con el número de activas, a la vista desde cualquier pestaña.
 class MainShell extends ConsumerWidget {
   const MainShell({super.key});
 
@@ -65,7 +71,7 @@ class MainShell extends ConsumerWidget {
     // selectores en la misma pantalla diciendo cosas distintas.
     final showPatientSelector = role == RoleType.doctor
         ? tab.label == 'Salud'
-        : (tab.label == 'Hoy' || tab.label == 'Salud');
+        : (tab.label == 'Hoy' || tab.label == 'Salud' || tab.label == 'Ficha');
 
     return Scaffold(
       body: SafeArea(
@@ -103,30 +109,31 @@ class MainShell extends ConsumerWidget {
     );
   }
 
-  // Orden, emojis y etiquetas fieles al wireframe Suite/Familiar v1:
-  // 🏠 Hoy · ❤️ Salud · 💬 Comunicación · 🛍️ Marketplace · 🔔 Alertas · ☰ Más
+  // 🏠 Hoy · ❤️ Salud · 📋 Ficha · 💬 Comunicación · 🛍️ Marketplace · ☰ Más
   //
-  // Seis destinos en 360 dp dan ~60 dp por etiqueta; "Mensajes" (8 caracteres)
-  // es el más largo y aún cabe. Alertas va al final, antes de Más, para no
-  // mover los índices que el inicio familiar usa para saltar a Salud/Mensajes.
-  // El familiar ve las alertas en modo lectura: sin reconocer ni resolver.
+  // La pestaña de Alertas dejó su lugar a la Ficha del adulto mayor (con la
+  // hoja de emergencia): las alertas ya están en la campana de arriba, y la
+  // ficha es lo que la familia necesita a mano en una urgencia.
+  // Los índices que el inicio usa para saltar viven en [ShellTabs].
   static const familyTabs = <ShellTab>[
     ShellTab('Hoy', '🏠', FamilyHomeScreen()),
     ShellTab('Salud', '❤️', HealthScreen()),
+    ShellTab('Ficha', '📋', FichaTab(), full: 'Ficha del adulto mayor'),
     ShellTab('Mensajes', '💬', CommsScreen(), full: 'Comunicación'),
     ShellTab('Tienda', '🛍️', MarketplaceScreen(), full: 'Marketplace'),
-    ShellTab('Alertas', '🔔', AlertsScreen(embedded: true)),
     ShellTab('Más', '☰', MoreScreen()),
   ];
 
-  // Barra de la cuidadora: solo pestañas con backend real.
-  // 🏠 Hoy (resumen + dosis) · ❤️ Salud · 🔔 Alertas · 💬 Mensajes · ☰ Más
+  // Barra de la cuidadora:
+  // 🏠 Hoy (resumen + dosis) · ❤️ Salud · 📋 Ficha · 💬 Mensajes · ☰ Más
+  // La Ficha es la de cada adulto mayor a su cargo, con la hoja de
+  // emergencia; las alertas van en la campana de arriba.
   // Mensajes reutiliza el hub de Comunicación del familiar: la cuidadora
   // conversa con la familia por el mismo chat de equipo (/patients/{id}/chat).
   static const caregiverTabs = <ShellTab>[
     ShellTab('Hoy', '🏠', CaregiverHomeScreen()),
     ShellTab('Salud', '❤️', HealthScreen()),
-    ShellTab('Alertas', '🔔', AlertsScreen(embedded: true)),
+    ShellTab('Ficha', '📋', FichaTab(), full: 'Ficha del adulto mayor'),
     ShellTab('Mensajes', '💬', CommsScreen(), full: 'Comunicación'),
     ShellTab('Más', '☰', MoreScreen()),
   ];
@@ -281,6 +288,7 @@ class _ShellTitleBar extends StatelessWidget {
                 ),
               ),
             ),
+            const AlertsBell(),
           ],
         ),
       ),
@@ -323,6 +331,88 @@ class _EmojiTab extends StatelessWidget {
         child: Opacity(
           opacity: active ? 1 : 0.55,
           child: Text(emoji, style: const TextStyle(fontSize: 22)),
+        ),
+      ),
+    );
+  }
+}
+
+
+/// Índices de las pestañas a las que el inicio familiar salta. Se leen de la
+/// lista para que reordenar la barra no rompa los atajos.
+abstract final class ShellTabs {
+  static int familia(String label) =>
+      MainShell.familyTabs.indexWhere((t) => t.label == label);
+}
+
+/// Ficha del adulto mayor elegido, como pestaña.
+class FichaTab extends ConsumerWidget {
+  const FichaTab({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final p = ref.watch(selectedPatientProvider);
+    if (p == null) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('Elige a un adulto mayor para ver su ficha.',
+              textAlign: TextAlign.center),
+        ),
+      );
+    }
+    return PatientProfileScreen(
+        key: ValueKey('ficha-${p.patientId}'),
+        patientId: p.patientId,
+        embedded: true);
+  }
+}
+
+/// Campana de alertas de la barra superior, con el número de activas.
+///
+/// Antes las alertas eran una pestaña más de la barra inferior. Arriba a la
+/// derecha están a la vista desde cualquier pestaña, que es lo que importa
+/// con una caída o un SOS.
+class AlertsBell extends ConsumerWidget {
+  const AlertsBell({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Sin filtro, el total del backend; con el centro filtrado por un adulto
+    // mayor, la suma de sus tarjetas, para que la campana cuente todas.
+    final filtro = ref.watch(filtroPacienteAlertasProvider);
+    final centro = ref.watch(alertsControllerProvider).valueOrNull;
+    final tarjetas = ref.watch(myPatientsProvider).valueOrNull ?? const [];
+    final activas = (filtro == null && centro != null)
+        ? centro.unreadCount
+        : tarjetas.fold<int>(0, (a, p) => a + p.activeAlertsCount);
+    final etiqueta = activas == 0
+        ? 'Alertas, sin alertas activas'
+        : 'Alertas, $activas activa${activas == 1 ? '' : 's'}';
+
+    return Tooltip(
+      message: 'Alertas',
+      child: Semantics(
+        button: true,
+        label: etiqueta,
+        excludeSemantics: true,
+        child: IconButton(
+          key: const Key('alertsBell'),
+          onPressed: () {
+            refreshAlertsFromWidget(ref);
+            context.push('/alerts');
+          },
+          icon: Badge(
+            isLabelVisible: activas > 0,
+            backgroundColor: AppColors.critical,
+            label: Text(activas > 99 ? '99+' : '$activas'),
+            child: Icon(
+              activas > 0
+                  ? Icons.notifications_active_rounded
+                  : Icons.notifications_none_rounded,
+              color: activas > 0 ? AppColors.critical : AppColors.textPrimary,
+            ),
+          ),
         ),
       ),
     );

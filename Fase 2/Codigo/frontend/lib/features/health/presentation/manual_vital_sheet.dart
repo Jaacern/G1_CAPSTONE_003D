@@ -123,7 +123,7 @@ class _ManualVitalSheetState extends ConsumerState<_ManualVitalSheet> {
       showAppSnackBar(
         context,
         alerta
-            ? 'Medición guardada. Está fuera del rango del paciente: se avisó al círculo de cuidado.'
+            ? 'Medición guardada. Está fuera de su rango habitual: se avisó al círculo de cuidado.'
             : 'Medición guardada.',
         error: alerta,
       );

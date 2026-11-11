@@ -13,6 +13,7 @@ import '../../caregiver/application/caregiver_providers.dart';
 import '../../caregiver/domain/models.dart';
 import '../../patients/application/patients_providers.dart';
 import '../../patients/domain/models.dart';
+import '../../shell/main_shell.dart' show ShellTabs;
 import '../../shell/shell_providers.dart';
 import '../application/home_providers.dart';
 import '../domain/models.dart';
@@ -41,13 +42,13 @@ class FamilyHomeScreen extends ConsumerWidget {
             if (patients.isEmpty) {
               return EmptyView(
                 icon: Icons.people_alt_outlined,
-                title: 'Aún no tienes pacientes',
+                title: 'Aún no agregas a tu adulto mayor',
                 subtitle:
                     'Crea el perfil de tu familiar para empezar a cuidar de su bienestar.',
                 action: FilledButton.icon(
                   onPressed: () => context.push('/patients/create'),
                   icon: const Icon(Icons.add_rounded),
-                  label: const Text('Crear paciente'),
+                  label: const Text('Agregar adulto mayor'),
                 ),
               );
             }
@@ -62,7 +63,7 @@ class FamilyHomeScreen extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 96),
                 children: [
                   const _AlertBand(),
-                  const _SectionLabel('Tus pacientes'),
+                  const _SectionLabel('Tus adultos mayores'),
                   for (final p in patients) _PatientSemCard(patient: p),
                   _SectionLabel('Resumen de ${_firstName(selected?.fullName)}'),
                   const _VitalsSummaryCard(),
@@ -76,7 +77,8 @@ class FamilyHomeScreen extends ConsumerWidget {
                       label:
                           'Preguntar al asistente sobre ${_firstName(selected?.fullName)}',
                       onTap: () =>
-                          ref.read(shellTabIndexProvider.notifier).state = 2,
+                          ref.read(shellTabIndexProvider.notifier).state =
+                          ShellTabs.familia('Mensajes'),
                     ),
                   ],
                 ],
@@ -89,7 +91,7 @@ class FamilyHomeScreen extends ConsumerWidget {
   }
 
   static String _firstName(String? full) {
-    if (full == null || full.trim().isEmpty) return 'tu paciente';
+    if (full == null || full.trim().isEmpty) return 'tu adulto mayor';
     return full.trim().split(RegExp(r'\s+')).first;
   }
 }
@@ -196,7 +198,8 @@ class _PatientSemCard extends ConsumerWidget {
       child: AppCard(
         onTap: () {
           ref.read(selectedPatientProvider.notifier).select(patient);
-          ref.read(shellTabIndexProvider.notifier).state = 1; // Salud
+          ref.read(shellTabIndexProvider.notifier).state =
+              ShellTabs.familia('Salud');
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -227,7 +230,7 @@ class _PatientSemCard extends ConsumerWidget {
                       Text(
                         patient.topReason ??
                             (isSelected
-                                ? 'Paciente seleccionado'
+                                ? 'Seleccionado'
                                 : patient.role.label),
                         style: const TextStyle(
                             fontSize: 11, color: AppColors.textSecondary),
@@ -265,7 +268,8 @@ class _VitalsSummaryCard extends ConsumerWidget {
       data: (summary) {
         if (summary == null) return const SizedBox.shrink();
         return AppCard(
-          onTap: () => ref.read(shellTabIndexProvider.notifier).state = 1,
+          onTap: () => ref.read(shellTabIndexProvider.notifier).state =
+              ShellTabs.familia('Salud'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -471,7 +475,7 @@ class _LastObservationCard extends ConsumerWidget {
                 SizedBox(height: 8),
                 Text(
                   'La cuidadora todavía no ha registrado una observación para '
-                  'este paciente.',
+                  'este adulto mayor.',
                   style: TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,

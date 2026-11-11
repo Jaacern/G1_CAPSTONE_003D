@@ -21,7 +21,8 @@ class AcceptInvitationScreen extends ConsumerStatefulWidget {
       _AcceptInvitationScreenState();
 }
 
-class _AcceptInvitationScreenState extends ConsumerState<AcceptInvitationScreen> {
+class _AcceptInvitationScreenState
+    extends ConsumerState<AcceptInvitationScreen> {
   final _code = TextEditingController();
   bool _loading = false;
   String? _error;
@@ -99,7 +100,8 @@ class _AcceptInvitationScreenState extends ConsumerState<AcceptInvitationScreen>
             LengthLimitingTextInputFormatter(6),
           ],
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 28, letterSpacing: 8, fontWeight: FontWeight.w700),
+          style: const TextStyle(
+              fontSize: 28, letterSpacing: 8, fontWeight: FontWeight.w700),
           decoration: InputDecoration(
             counterText: '',
             hintText: '000000',
@@ -114,7 +116,8 @@ class _AcceptInvitationScreenState extends ConsumerState<AcceptInvitationScreen>
               ? const SizedBox(
                   height: 20,
                   width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
               : const Text('Unirme'),
         ),
       ],
@@ -125,7 +128,8 @@ class _AcceptInvitationScreenState extends ConsumerState<AcceptInvitationScreen>
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.celebration_rounded, size: 56, color: AppColors.statusOk),
+        const Icon(Icons.celebration_rounded,
+            size: 56, color: AppColors.statusOk),
         const SizedBox(height: 16),
         Text(
           'Te uniste al cuidado de ${card.fullName}',

@@ -521,6 +521,86 @@ class _Alergias extends ConsumerWidget {
     'anafilaxia': 'Anafilaxia',
   };
 
+  static const _categorias = {
+    'medicamento': 'Medicamento',
+    'alimento': 'Alimento',
+    'ambiental': 'Ambiental',
+    'otra': 'Otra',
+  };
+
+  /// Alergia que no está en el catálogo: nombre validado, categoría y
+  /// gravedad. Devuelve null si se cancela.
+  static Future<NewAllergy?> _pedirOtra(BuildContext context) {
+    final formKey = GlobalKey<FormState>();
+    final nombre = TextEditingController();
+    var categoria = 'otra';
+    var gravedad = 'moderada';
+    return showDialog<NewAllergy>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Otra alergia'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  key: const Key('alergia_otra_nombre'),
+                  controller: nombre,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.sentences,
+                  maxLength: 80,
+                  decoration: const InputDecoration(
+                    labelText: '¿A qué es alérgico?',
+                    hintText: 'Ej: Kiwi, Contraste yodado',
+                  ),
+                  validator: validateAllergenName,
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: categoria,
+                  decoration: const InputDecoration(labelText: 'Tipo'),
+                  items: [
+                    for (final c in _categorias.entries)
+                      DropdownMenuItem(value: c.key, child: Text(c.value)),
+                  ],
+                  onChanged: (v) => setLocal(() => categoria = v ?? 'otra'),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: gravedad,
+                  decoration: const InputDecoration(labelText: 'Gravedad'),
+                  items: [
+                    for (final g in _gravedades.entries)
+                      DropdownMenuItem(value: g.key, child: Text(g.value)),
+                  ],
+                  onChanged: (v) => setLocal(() => gravedad = v ?? 'moderada'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Cancelar')),
+            FilledButton(
+              onPressed: () {
+                if (!formKey.currentState!.validate()) return;
+                Navigator.of(ctx).pop(NewAllergy(
+                  substance:
+                      nombre.text.trim().replaceAll(RegExp(r'\s+'), ' '),
+                  category: categoria,
+                  severity: gravedad,
+                ));
+              },
+              child: const Text('Agregar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final catalogo = ref.watch(allergenCatalogProvider);
@@ -558,6 +638,39 @@ class _Alergias extends ConsumerWidget {
                             }
                           : null,
                     ),
+                ],
+              ),
+              // Lo que no está en el catálogo: se escribe, validado.
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final otra in seleccionadas.values.where(
+                      (n) => !items.any((i) => i.code == n.substance)))
+                    InputChip(
+                      label: Text(
+                          '${otra.substance} (${_gravedades[otra.severity]})'),
+                      onDeleted: enabled
+                          ? () {
+                              seleccionadas.remove(otra.substance);
+                              onChanged();
+                            }
+                          : null,
+                    ),
+                  ActionChip(
+                    key: const Key('alergia_otra'),
+                    avatar: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Otra'),
+                    onPressed: enabled
+                        ? () async {
+                            final nueva = await _pedirOtra(context);
+                            if (nueva == null) return;
+                            seleccionadas[nueva.substance] = nueva;
+                            onChanged();
+                          }
+                        : null,
+                  ),
                 ],
               ),
               for (final a

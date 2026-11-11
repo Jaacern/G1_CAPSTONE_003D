@@ -119,9 +119,9 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
         appBar: AppBar(title: const Text('Asistente IA')),
         body: const EmptyView(
           icon: Icons.smart_toy_rounded,
-          title: 'Sin paciente seleccionado',
+          title: 'Sin adulto mayor seleccionado',
           subtitle:
-              'Selecciona a un paciente para preguntarle al asistente sobre '
+              'Elige a un adulto mayor para preguntarle al asistente sobre '
               'su expediente.',
         ),
       );

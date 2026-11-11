@@ -7,7 +7,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from jose import jwt
+from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from app.config import get_settings
@@ -42,6 +42,19 @@ def create_access_token(subject: str, extra_claims: dict | None = None) -> str:
     if extra_claims:
         payload.update(extra_claims)
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def decode_access_token(token: str) -> dict:
+    """Valida un JWT de acceso y devuelve su payload.
+
+    Para los lugares que no pasan por get_current_user, como el WebSocket
+    del chat. Aplica las mismas reglas: firma, vencimiento y que sea un token
+    de acceso; un refresh token no sirve. Lanza JWTError si no cumple.
+    """
+    payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+    if payload.get("type") != "access":
+        raise JWTError("No es un token de acceso.")
+    return payload
 
 
 def generate_refresh_token() -> str:

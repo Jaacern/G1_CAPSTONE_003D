@@ -25,6 +25,7 @@ from fastapi import FastAPI  # noqa: E402
 from jose import jwt  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
+from _ajeno import AJENO  # noqa: E402  (cuenta autentica fuera del circulo)
 from app.config import get_settings  # noqa: E402
 from app.db import engine  # noqa: E402
 from app.errors import register_error_handlers  # noqa: E402
@@ -34,10 +35,9 @@ app = FastAPI()
 register_error_handlers(app)
 app.include_router(alerts.router)
 
-FAMILIAR  = "11111111-1111-4111-8111-111111111111"   # Javier, familiar de los dos
-CUIDADORA = "22222222-2222-4222-8222-222222222222"   # Rosa, cuidadora de los dos
+FAMILIAR  = "11111111-1111-4111-8111-111111111111"   # familiar
+CUIDADORA = "22222222-2222-4222-8222-222222222222"   # cuidadora
 ADULTO    = "99999999-9999-4999-8999-999999999999"   # Elena, la propia paciente
-AJENO     = "eeeeeee1-0000-4000-8000-000000000001"   # existe, fuera del circulo
 ELENA = "33333333-3333-4333-8333-333333333333"       # contactos libres
 LUIS  = "33333333-3333-4333-8333-333333333334"       # contacto que es miembro
 
@@ -125,15 +125,15 @@ async def main(client):
           f"{r.status_code} {r.text[:120]}")
     if r.status_code == 201:
         d = r.json()
-        nombres = [c["full_name"] for c in d["emergency_contacts"]]
+        contactos = d["emergency_contacts"]
+        nombres = [c["full_name"] for c in contactos]
+        # Nombres y relaciones del seed vigente (900_seed_dev.sql).
         check("los contactos libres siguen saliendo con su nombre",
-              "Javier Cerna" in nombres and len(nombres) >= 3, nombres)
+              "Daniela Fuentes Rosales" in nombres and len(nombres) >= 3, nombres)
         check("y con su telefono",
-              all(c["phone"] for c in d["emergency_contacts"]),
-              d["emergency_contacts"])
+              all(c["phone"] for c in contactos), contactos)
         check("conservan el parentesco",
-              any(c["role"] == "Hijo" for c in d["emergency_contacts"]),
-              d["emergency_contacts"])
+              any(c["role"] == "Hija" for c in contactos), contactos)
         check("sin orden de escalamiento: van por nombre",
               nombres == sorted(nombres), nombres)
         async with engine.begin() as c:
@@ -193,7 +193,7 @@ async def main(client):
     r = await sos(client, ELENA, AJENO, "ajeno")
     check("404 para alguien fuera del circulo", r.status_code == 404, r.status_code)
     r = await client.post(f"/api/v1/patients/{ELENA}/sos", json={})
-    check("401 sin sesion", r.status_code == 401, r.status_code)
+    check("401 sin sesion", r.status_code == 401)
     check("ningun rechazo deja una alerta", await cuantas(ELENA) == antes,
           (antes, await cuantas(ELENA)))
 

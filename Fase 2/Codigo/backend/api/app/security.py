@@ -7,7 +7,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from jose import jwt
+from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from app.config import get_settings
@@ -23,7 +23,7 @@ def verify_password(plain: str, password_hash: str) -> bool:
 
 
 def hash_password(plain: str) -> str:
-    """Genera el hash bcrypt de una contraseña (para altas de usuario)."""
+    """Genera un hash bcrypt (para altas de usuario)."""
     return pwd_context.hash(plain)
 
 
@@ -42,6 +42,23 @@ def create_access_token(subject: str, extra_claims: dict | None = None) -> str:
     if extra_claims:
         payload.update(extra_claims)
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def decode_access_token(token: str) -> dict:
+    """Valida un JWT de acceso y devuelve sus claims.
+
+    Se usa en la autenticación del WebSocket, que no pasa por la dependencia
+    HTTP de `app.deps`. Los errores de firma, expiración o tipo de token se
+    propagan para que el endpoint rechace el handshake.
+    """
+    payload = jwt.decode(
+        token,
+        settings.jwt_secret,
+        algorithms=[settings.jwt_algorithm],
+    )
+    if payload.get("type") != "access" or not payload.get("sub"):
+        raise JWTError("invalid access token")
+    return payload
 
 
 def generate_refresh_token() -> str:

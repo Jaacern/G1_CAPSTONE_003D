@@ -1202,10 +1202,24 @@ async def create_patient(
     # Quien crea el perfil queda como familiar administrador. Si lo pudiera
     # crear una cuenta de cuidador(a) o médico, terminaría siendo "familiar" de
     # alguien que no es su familia: esos perfiles llegan por invitación.
-    account_type = (
-        await db.execute(text("SELECT account_type FROM users WHERE id = :u"),
-                         {"u": user.user_id})
-    ).scalar()
+    cuenta = (
+        await db.execute(
+            text("SELECT account_type, is_staff FROM users WHERE id = :u"),
+            {"u": user.user_id})
+    ).mappings().first()
+    account_type = cuenta["account_type"] if cuenta else None
+    # El personal de AgeCare se guarda como cuenta "family" (la tabla no tiene
+    # otro tipo para él), pero no es familia de nadie: administra la
+    # plataforma desde su panel y no crea perfiles de adultos mayores.
+    if cuenta and cuenta["is_staff"]:
+        raise ApiError(
+            status_code=403,
+            code="STAFF_CANNOT_CREATE_PATIENTS",
+            message=(
+                "Las cuentas del personal de AgeCare no crean adultos mayores. "
+                "Los perfiles los crea la familia."
+            ),
+        )
     if account_type != "family":
         raise ApiError(
             status_code=403,

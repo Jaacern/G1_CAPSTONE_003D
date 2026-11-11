@@ -13,7 +13,11 @@ services:
       - pgdata:/var/lib/postgresql/data
       # Los .sql se ejecutan automáticamente SOLO la primera vez
       # que se crea el volumen pgdata (en orden alfabético).
-      - ./sql:/docker-entrypoint-initdb.d:ro,Z
+      # 'z' en minuscula: la api monta esta misma carpeta. Con 'Z' cada
+      # contenedor la reetiqueta para si solo (SELinux) y el que arranca
+      # segundo deja al otro sin permiso de lectura, cortando la carga de
+      # los .sql a mitad de camino.
+      - ./sql:/docker-entrypoint-initdb.d:ro,z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -116,7 +120,7 @@ services:
       # necesita para poner al dia una base que ya existia: el volumen de
       # la base solo los corre cuando se crea, asi que los archivos
       # agregados despues nunca llegaron a quien ya la tenia levantada.
-      - ./sql:/sql:ro,Z
+      - ./sql:/sql:ro,z
     restart: unless-stopped
     networks: [agecare-net]
 

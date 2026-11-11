@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/config/app_config.dart';
+import 'core/notifications/push_registrar.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
@@ -15,6 +16,9 @@ class AgeCareApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(goRouterProvider);
     final themeMode = ref.watch(themeControllerProvider);
+    // Mantiene vivo el registro del teléfono para push mientras dure la
+    // aplicación. No pinta nada: se lee para que exista.
+    ref.watch(pushRegistrarProvider);
 
     return MaterialApp.router(
       title: AppConfig.appName,

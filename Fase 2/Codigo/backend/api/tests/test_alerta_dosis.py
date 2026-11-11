@@ -27,6 +27,15 @@ CUIDADORA = "22222222-2222-4222-8222-222222222222"
 
 async def limpiar(c):
     """Borra lo que crea la prueba, al entrar y al salir."""
+    # Primero los avisos de esas alertas. Desde que las alertas se reparten al
+    # telefono, una alerta puede tener entregas colgando (alert_deliveries la
+    # referencia con RESTRICT) y borrarla directo falla.
+    await c.execute(text(
+        "DELETE FROM alert_deliveries WHERE alert_id IN ("
+        "  SELECT id FROM alerts WHERE payload ->> 'prueba' = 'dosis' "
+        "     OR payload ->> 'dose_id' IN ("
+        "        SELECT CAST(id AS text) FROM scheduled_doses "
+        "         WHERE reason = 'FIXTURE'))"))
     await c.execute(text(
         "DELETE FROM alerts WHERE payload ->> 'prueba' = 'dosis' "
         "   OR payload ->> 'dose_id' IN ("

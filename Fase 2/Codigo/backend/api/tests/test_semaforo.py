@@ -33,8 +33,18 @@ def check(n, c, d=""):
 PAC = "33333333-3333-4333-8333-333333333333"
 MED = "77777777-7777-4777-8777-777777777777"
 
-async def limpiar(c):
+async def borrar_alertas(c):
+    # Primero los avisos de esas alertas. Desde que las alertas se reparten al
+    # telefono, una alerta puede tener entregas colgando (alert_deliveries la
+    # referencia con RESTRICT) y borrarla directo falla.
+    await c.execute(text(
+        "DELETE FROM alert_deliveries WHERE alert_id IN "
+        "(SELECT id FROM alerts WHERE title = 'FIXTURE')"))
     await c.execute(text("DELETE FROM alerts WHERE title = 'FIXTURE'"))
+
+
+async def limpiar(c):
+    await borrar_alertas(c)
     await c.execute(text(
         "DELETE FROM vital_readings WHERE meta ->> 'origin' = 'FIXTURE'"))
     await c.execute(text("DELETE FROM scheduled_doses WHERE reason = 'FIXTURE'"))
@@ -114,7 +124,7 @@ async def main():
               f["reasons"][0] == "Alerta crítica activa: FIXTURE", f["reasons"])
 
         # Se limpian las alertas y se deja un vital fuera de rango.
-        await c.execute(text("DELETE FROM alerts WHERE title = 'FIXTURE'"))
+        await borrar_alertas(c)
         await c.execute(text(
             "INSERT INTO vital_readings (patient_id, type, value, measured_at, "
             "  source, meta) VALUES (:p, 'spo2', 88, now(), 'manual', "

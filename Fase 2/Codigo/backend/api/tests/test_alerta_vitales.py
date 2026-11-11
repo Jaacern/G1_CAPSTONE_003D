@@ -25,6 +25,14 @@ def check(n, c, d=""):
 PAC = "33333333-3333-4333-8333-333333333333"
 
 async def limpiar(c):
+    # Primero los avisos de esas alertas. Desde que las alertas se reparten al
+    # telefono, una alerta puede tener entregas colgando (alert_deliveries la
+    # referencia con RESTRICT) y borrarla directo falla.
+    await c.execute(text(
+        "DELETE FROM alert_deliveries WHERE alert_id IN ("
+        "  SELECT id FROM alerts WHERE payload ->> 'reading_id' IN "
+        "  (SELECT CAST(id AS text) FROM vital_readings "
+        "    WHERE meta ->> 'origin' = 'FIXTURE'))"))
     await c.execute(text(
         "DELETE FROM alerts WHERE payload ->> 'reading_id' IN "
         "(SELECT CAST(id AS text) FROM vital_readings "

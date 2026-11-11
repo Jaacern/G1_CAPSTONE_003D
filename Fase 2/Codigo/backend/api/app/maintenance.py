@@ -7,6 +7,7 @@ Se corren desde afuera, no desde un request:
     python -m app.maintenance marcar-vencidas
     python -m app.maintenance alertar-dosis
     python -m app.maintenance alertar-vitales
+    python -m app.maintenance alertar-reloj
     python -m app.maintenance semaforo
 
 Y las del dia juntas, en el orden correcto, que es lo que va en la tarea
@@ -684,6 +685,114 @@ async def alertar_vitales_fuera_de_rango(*, verbose: bool = True) -> dict[str, i
     return {"creadas": creadas, "en_espera": omitidas}
 
 
+async def alertar_reloj_sin_datos(*, verbose: bool = True) -> dict[str, int]:
+    """Crea la alerta cuando el reloj lleva demasiado tiempo sin enviar datos.
+
+    POR QUE HACE FALTA
+        El tipo 'wearable_offline' esta en la tabla, en el catalogo del
+        router y en las preferencias de notificacion, y RF-44 lo pide por su
+        nombre. Nadie lo creaba. El parametro wearable_offline_minutes se
+        usaba solo para lo contrario, para ignorar mediciones viejas.
+
+        Y es de las alertas que mas importan, porque es la que avisa que las
+        demas dejaron de funcionar: sin datos del reloj no hay alerta de
+        saturacion ni de frecuencia, y el silencio se lee como "todo bien".
+
+    DESDE CUANDO SE CUENTA
+        Desde la ultima sincronizacion. Si el reloj nunca sincronizo, desde
+        que se vinculo: un reloj recien vinculado que no manda nada en dos
+        horas tambien es un reloj sin datos.
+
+        El limite sale de wearable_offline_minutes, que por defecto vale
+        las mismas dos horas con que la pantalla marca el reloj como
+        inactivo (wearable/status), para que la alerta y la pantalla no se
+        contradigan.
+
+    UNA ALERTA POR SILENCIO
+        No se repite mientras dure el mismo silencio: se busca una alerta de
+        este tipo creada despues de la ultima sincronizacion, y si existe no
+        se crea otra, este activa, atendida o resuelta. Un reloj guardado en
+        un cajon una semana genera un aviso, no ciento sesenta y ocho. Cuando
+        vuelve a sincronizar y despues se calla de nuevo, es otro silencio y
+        avisa otra vez.
+
+    Solo relojes vigentes de pacientes vivos. Un paciente sin reloj no tiene
+    nada que pueda estar desconectado.
+    """
+    creadas = 0
+
+    async with engine.begin() as conn:
+        limite = await _parametro(conn, "wearable_offline_minutes", 120)
+
+        callados = (
+            await conn.execute(
+                text(
+                    """
+                    SELECT w.id, w.patient_id, w.last_sync_at,
+                           coalesce(w.last_sync_at, w.created_at) AS desde,
+                           p.first_name,
+                           to_char(coalesce(w.last_sync_at, w.created_at)
+                                   AT TIME ZONE CAST(:zona AS text),
+                                   'DD-MM HH24:MI') AS desde_txt
+                    FROM wearables w
+                    JOIN patients p ON p.id = w.patient_id
+                    WHERE w.unlinked_at IS NULL
+                      AND p.deleted_at IS NULL
+                      AND coalesce(w.last_sync_at, w.created_at) < now()
+                          - make_interval(mins => CAST(:limite AS integer))
+                      AND NOT EXISTS (
+                            SELECT 1 FROM alerts a
+                             WHERE a.patient_id = w.patient_id
+                               AND a.type = 'wearable_offline'
+                               AND a.created_at
+                                   >= coalesce(w.last_sync_at, w.created_at)
+                          )
+                    ORDER BY desde
+                    """
+                ),
+                {"limite": limite, "zona": ZONA},
+            )
+        ).mappings().all()
+
+        for w in callados:
+            nunca = w["last_sync_at"] is None
+            detalle = (
+                f"El reloj de {w['first_name']} se vinculó el {w['desde_txt']} "
+                "y todavía no ha enviado datos."
+                if nunca else
+                f"El reloj de {w['first_name']} no envía datos desde el "
+                f"{w['desde_txt']}."
+            )
+            await conn.execute(
+                text(
+                    """
+                    INSERT INTO alerts
+                        (patient_id, type, severity, title, detail,
+                         payload, dedup_key, status)
+                    VALUES
+                        (:pid, 'wearable_offline', 'warning',
+                         'Reloj sin datos', :detalle,
+                         CAST(:payload AS jsonb), 'wearable_offline', 'active')
+                    """
+                ),
+                {
+                    "pid": str(w["patient_id"]),
+                    "detalle": detalle,
+                    "payload": json.dumps({
+                        "wearable_id": str(w["id"]),
+                        "last_sync_at": (w["last_sync_at"].isoformat()
+                                         if not nunca else None),
+                        "threshold_minutes": limite,
+                    }),
+                },
+            )
+            creadas += 1
+
+    if verbose:
+        print(f"alertas de reloj sin datos : {creadas}")
+    return {"creadas": creadas}
+
+
 async def calcular_semaforo(*, verbose: bool = True) -> dict[str, int]:
     """Calcula el semaforo del dia de cada paciente y lo guarda.
 
@@ -880,10 +989,12 @@ async def calcular_semaforo(*, verbose: bool = True) -> dict[str, int]:
 #   4. alertar-vitales  independiente de los tres anteriores, pero va antes
 #                       del semaforo porque el semaforo cuenta alertas
 #                       activas.
-#   5. semaforo         al final, para que vea las dosis y las alertas de
+#   5. alertar-reloj    igual que la anterior: independiente, y antes del
+#                       semaforo por la misma razon.
+#   6. semaforo         al final, para que vea las dosis y las alertas de
 #                       esta misma corrida. Al revés mostraria el estado de
-#                       antes de los cuatro pasos anteriores.
-#   6. barrer-subidas   no depende de nada ni nada depende de ella; va al
+#                       antes de los cinco pasos anteriores.
+#   7. barrer-subidas   no depende de nada ni nada depende de ella; va al
 #                       final porque es la unica que toca archivos y no
 #                       datos clinicos, y si se cae no arrastra al resto.
 DIARIO = (
@@ -891,6 +1002,7 @@ DIARIO = (
     ("marcar-vencidas", marcar_dosis_vencidas),
     ("alertar-dosis",   alertar_dosis_omitidas),
     ("alertar-vitales", alertar_vitales_fuera_de_rango),
+    ("alertar-reloj",   alertar_reloj_sin_datos),
     ("semaforo",        calcular_semaforo),
     ("barrer-subidas",  barrer_subidas_vencidas),
 )
@@ -939,6 +1051,7 @@ async def _main(argv: list[str]) -> int:
               "marcar-vencidas": marcar_dosis_vencidas,
               "alertar-dosis": alertar_dosis_omitidas,
               "alertar-vitales": alertar_vitales_fuera_de_rango,
+              "alertar-reloj": alertar_reloj_sin_datos,
               "semaforo": calcular_semaforo,
               "diario": correr_todo}
     if len(argv) != 1 or argv[0] not in tareas:

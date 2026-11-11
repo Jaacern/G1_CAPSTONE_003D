@@ -21,8 +21,15 @@ abstract class ProfileRepository {
       NotificationSettings settings);
 
   /// Registra el dispositivo para push (3.9). platform ∈ {ios, android, web}.
-  Future<void> registerDevice(String pushToken, String platform,
+  /// Devuelve el id que el backend le dio al aparato, que es el que hay que
+  /// mandar al cerrar sesión para que deje de recibir avisos (RF-04).
+  Future<String?> registerDevice(String pushToken, String platform,
       {String? appVersion});
+
+  /// Le confirma al backend que un aviso llegó al teléfono (`delivered`) o
+  /// que la persona lo abrió (`opened`). El id viene dentro de la propia
+  /// notificación. Con esto el backend mide cuánto tardó en llegar (RNF-05).
+  Future<void> ackDelivery(String deliveryId, {required bool opened});
 }
 
 // ---------------------------------------------------------------------------
@@ -71,13 +78,21 @@ class ProfileRepositoryHttp implements ProfileRepository {
   }
 
   @override
-  Future<void> registerDevice(String pushToken, String platform,
-          {String? appVersion}) =>
-      _api.post<void>('/users/me/devices', data: {
-        'push_token': pushToken,
-        'platform': platform,
-        if (appVersion != null) 'app_version': appVersion,
-      });
+  Future<String?> registerDevice(String pushToken, String platform,
+      {String? appVersion}) async {
+    final data =
+        await _api.post<Map<String, dynamic>>('/users/me/devices', data: {
+      'push_token': pushToken,
+      'platform': platform,
+      if (appVersion != null) 'app_version': appVersion,
+    });
+    return data['device_id'] as String?;
+  }
+
+  @override
+  Future<void> ackDelivery(String deliveryId, {required bool opened}) =>
+      _api.post<void>('/users/me/deliveries/$deliveryId/ack',
+          data: {'event': opened ? 'opened' : 'delivered'});
 }
 
 // ---------------------------------------------------------------------------
@@ -124,10 +139,14 @@ class ProfileRepositoryMock implements ProfileRepository {
   }
 
   @override
-  Future<void> registerDevice(String pushToken, String platform,
+  Future<String?> registerDevice(String pushToken, String platform,
       {String? appVersion}) async {
     await Future.delayed(const Duration(milliseconds: 200));
+    return 'mock-device';
   }
+
+  @override
+  Future<void> ackDelivery(String deliveryId, {required bool opened}) async {}
 }
 
 final profileRepositoryProvider = Provider<ProfileRepository>((ref) {

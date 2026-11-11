@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from slowapi.errors import RateLimitExceeded
 
+from app.acceso import middleware_de_accesos
 from app.errors import register_error_handlers
 from app.ratelimit import limiter
 from app.routers import (
@@ -138,6 +139,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Registro de accesos al expediente (RNF-14): quién consultó qué parte del
+# expediente de qué paciente y cuándo. Va como middleware para que cubra todas
+# las lecturas de paciente sin depender de que cada endpoint se acuerde.
+app.middleware("http")(middleware_de_accesos)
 
 # Rate limiting por IP (DevSecOps — hallazgos F3/F4 de la auditoria). El
 # limiter se adjunta al estado de la app y los endpoints sensibles lo aplican

@@ -10,7 +10,7 @@
 from collections.abc import Awaitable, Callable
 from uuid import UUID
 
-from fastapi import Depends, Path
+from fastapi import Depends, Path, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlalchemy import text
@@ -135,6 +135,7 @@ def get_patient_member(
     """
 
     async def _dependency(
+        request: Request,
         patient_id: UUID = Path(...),
         user: CurrentUser = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
@@ -193,12 +194,17 @@ def get_patient_member(
                 message="No tienes permisos para realizar esta acción sobre este paciente.",
             )
 
-        return PatientContext(
+        ctx = PatientContext(
             user=user,
             patient_id=str(patient_id),
             role=membership["role"],
             is_owner=membership["is_owner"],
         )
+        # Queda en el request para el registro de accesos (RNF-14, acceso.py).
+        # Se deja recién aquí, pasados todos los controles: quien fue
+        # rechazado no consultó nada y no debe figurar como que lo hizo.
+        request.state.paciente = ctx
+        return ctx
 
     return _dependency
 

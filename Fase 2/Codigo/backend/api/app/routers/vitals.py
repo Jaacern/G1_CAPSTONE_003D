@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.deps import CurrentUser, PatientContext, get_current_user, get_patient_member
 from app.errors import ApiError
+from app.maintenance import evaluar_vitales
 
 router = APIRouter(prefix="/api/v1", tags=["vitals"])
 
@@ -486,10 +487,19 @@ async def ingest_batch(
         {"pid": ctx.patient_id, "battery": payload.battery_pct},
     )
 
+    # Las mediciones del reloj se evalúan al llegar, en la misma transacción.
+    # Antes esperaban a la pasada horaria del mantenimiento: una saturación
+    # de 85 medida por el reloj tardaba hasta una hora en avisar, y la misma
+    # medición tomada a mano avisaba al instante. Solo si entró algo nuevo:
+    # reenviar un lote ya recibido no cambia cuál es la última medición.
+    alertas = 0
+    if accepted:
+        alertas, _ = await evaluar_vitales(db, patient_id=ctx.patient_id)
+
     await db.commit()
     duplicates = len(payload.readings) - accepted
-    # El motor de alertas es un componente aparte; aún no dispara nada aquí.
-    return BatchOut(accepted=accepted, duplicates=duplicates, alerts_triggered=0)
+    return BatchOut(accepted=accepted, duplicates=duplicates,
+                    alerts_triggered=alertas)
 
 
 # --------------------------------------------------------------------------

@@ -475,6 +475,165 @@ def _numero(v) -> str:
     return str(int(f)) if f == int(f) else f"{f:g}"
 
 
+async def evaluar_vitales(ejecutor, *, patient_id: str | None = None) -> tuple[int, int]:
+    """La regla de la alerta por vitales, sobre la conexion que le pasen.
+
+    Esta separada de alertar_vitales_fuera_de_rango para que la use tambien
+    quien recibe el lote del reloj. Antes una medicion del reloj fuera de
+    rango esperaba hasta una hora, la proxima pasada del mantenimiento,
+    mientras que la misma medicion tomada a mano avisaba al instante. Una
+    saturacion de 85 no es menos urgente por venir del reloj.
+
+    [ejecutor] es una conexion del motor o la sesion de un request: lo unico
+    que se le pide es execute. No abre ni cierra transaccion, eso es de quien
+    llama, asi la alerta entra junto con las mediciones o no entra.
+
+    Con [patient_id] mira solo a ese paciente, que es lo que hace falta al
+    recibir un lote. Sin el, a todos.
+
+    Devuelve (creadas, en espera por la ventana).
+    """
+    creadas = omitidas = 0
+
+    ventana  = await _parametro(ejecutor, "alert_dedup_minutes", 30)
+    vigencia = await _parametro(ejecutor, "wearable_offline_minutes", 120)
+
+    # El filtro por paciente se arma en el texto y no con un
+    # "(:solo IS NULL OR patient_id = :solo)": con ese OR el planificador no
+    # puede usar el indice por paciente, y esto corre dentro de la ingesta
+    # del lote, que tiene que responder en menos de un segundo (RNF-01).
+    parametros = {"vigencia": vigencia}
+    solo_uno = ""
+    if patient_id is not None:
+        solo_uno = "AND vr.patient_id = CAST(:solo AS uuid)"
+        parametros["solo"] = str(patient_id)
+
+    fuera = (
+        await ejecutor.execute(
+            text(
+                f"""
+                WITH ultimas AS (
+                    SELECT DISTINCT ON (vr.patient_id, vr.type)
+                           vr.id, vr.patient_id, vr.type, vr.value,
+                           vr.measured_at
+                    FROM vital_readings vr
+                    JOIN patients p ON p.id = vr.patient_id
+                    WHERE p.deleted_at IS NULL
+                      AND vr.measured_at > now()
+                          - make_interval(mins => CAST(:vigencia AS integer))
+                      {solo_uno}
+                    ORDER BY vr.patient_id, vr.type, vr.measured_at DESC
+                )
+                SELECT u.id, u.patient_id, u.type, u.value, u.measured_at,
+                       t.min_value, t.max_value,
+                       coalesce(vt.label, u.type) AS etiqueta,
+                       coalesce(vt.unit, '')      AS unidad
+                FROM ultimas u
+                JOIN vital_thresholds t
+                  ON t.patient_id = u.patient_id AND t.type = u.type
+                 AND t.deleted_at IS NULL
+                LEFT JOIN vital_types vt ON vt.code = u.type
+                WHERE (t.min_value IS NOT NULL AND u.value < t.min_value)
+                   OR (t.max_value IS NOT NULL AND u.value > t.max_value)
+                ORDER BY u.measured_at
+                """
+            ),
+            parametros,
+        )
+    ).mappings().all()
+
+    for m in fuera:
+        bajo = (m["min_value"] is not None
+                and m["value"] < m["min_value"])
+        # La clave sale del codigo del catalogo y no de una lista de
+        # abreviaturas a mano, que es de las cosas que se desactualizan
+        # calladas. Su unico trabajo es agrupar "la misma condicion"
+        # para la ventana de deduplicacion.
+        clave = f"{m['type']}_{'low' if bajo else 'high'}"
+
+        reciente = (
+            await ejecutor.execute(
+                text(
+                    """
+                    SELECT 1 FROM alerts
+                     WHERE patient_id = :pid
+                       AND dedup_key = :clave
+                       AND created_at > now()
+                           - make_interval(mins => CAST(:ventana AS integer))
+                     LIMIT 1
+                    """
+                ),
+                {"pid": str(m["patient_id"]), "clave": clave,
+                 "ventana": ventana},
+            )
+        ).first()
+        if reciente is not None:
+            omitidas += 1
+            continue
+
+        ya = (
+            await ejecutor.execute(
+                text(
+                    """
+                    SELECT 1 FROM alerts
+                     WHERE type = 'vital_out_of_range'
+                       AND payload ->> 'reading_id' = CAST(:rid AS text)
+                     LIMIT 1
+                    """
+                ),
+                {"rid": str(m["id"])},
+            )
+        ).first()
+        if ya is not None:
+            continue
+
+        unidad = (" " + m["unidad"]) if m["unidad"] else ""
+        limite = m["min_value"] if bajo else m["max_value"]
+        # Este texto lo lee la familia, asi que va con sus tildes.
+        titulo = (f"{m['etiqueta']} bajo el mínimo" if bajo
+                  else f"{m['etiqueta']} sobre el máximo")
+        detalle = (
+            f"{m['etiqueta']} {_numero(m['value'])}{unidad} "
+            f"({'mínimo' if bajo else 'máximo'} configurado "
+            f"{_numero(limite)}{unidad})."
+        )
+
+        await ejecutor.execute(
+            text(
+                """
+                INSERT INTO alerts
+                    (patient_id, type, severity, title, detail,
+                     payload, dedup_key, status)
+                VALUES
+                    (:pid, 'vital_out_of_range', 'warning',
+                     :titulo, :detalle,
+                     CAST(:payload AS jsonb), :clave, 'active')
+                """
+            ),
+            {
+                "pid": str(m["patient_id"]),
+                # title es varchar(120): una etiqueta larga del catalogo
+                # no puede reventar el INSERT.
+                "titulo": titulo[:120],
+                "detalle": detalle,
+                "clave": clave,
+                "payload": json.dumps({
+                    "reading_id": str(m["id"]),
+                    "type": m["type"],
+                    "value": float(m["value"]),
+                    "min_value": (float(m["min_value"])
+                                  if m["min_value"] is not None else None),
+                    "max_value": (float(m["max_value"])
+                                  if m["max_value"] is not None else None),
+                    "measured_at": m["measured_at"].isoformat(),
+                }),
+            },
+        )
+        creadas += 1
+
+    return creadas, omitidas
+
+
 async def alertar_vitales_fuera_de_rango(*, verbose: bool = True) -> dict[str, int]:
     """Crea la alerta cuando la ultima medicion se sale del umbral.
 
@@ -516,133 +675,8 @@ async def alertar_vitales_fuera_de_rango(*, verbose: bool = True) -> dict[str, i
     condicion, para que una saturacion que oscila alrededor del minimo no
     abra una alerta por cada lectura del reloj.
     """
-    creadas = omitidas = 0
-
     async with engine.begin() as conn:
-        ventana  = await _parametro(conn, "alert_dedup_minutes", 30)
-        vigencia = await _parametro(conn, "wearable_offline_minutes", 120)
-
-        fuera = (
-            await conn.execute(
-                text(
-                    """
-                    WITH ultimas AS (
-                        SELECT DISTINCT ON (vr.patient_id, vr.type)
-                               vr.id, vr.patient_id, vr.type, vr.value,
-                               vr.measured_at
-                        FROM vital_readings vr
-                        JOIN patients p ON p.id = vr.patient_id
-                        WHERE p.deleted_at IS NULL
-                          AND vr.measured_at > now()
-                              - make_interval(mins => CAST(:vigencia AS integer))
-                        ORDER BY vr.patient_id, vr.type, vr.measured_at DESC
-                    )
-                    SELECT u.id, u.patient_id, u.type, u.value, u.measured_at,
-                           t.min_value, t.max_value,
-                           coalesce(vt.label, u.type) AS etiqueta,
-                           coalesce(vt.unit, '')      AS unidad
-                    FROM ultimas u
-                    JOIN vital_thresholds t
-                      ON t.patient_id = u.patient_id AND t.type = u.type
-                     AND t.deleted_at IS NULL
-                    LEFT JOIN vital_types vt ON vt.code = u.type
-                    WHERE (t.min_value IS NOT NULL AND u.value < t.min_value)
-                       OR (t.max_value IS NOT NULL AND u.value > t.max_value)
-                    ORDER BY u.measured_at
-                    """
-                ),
-                {"vigencia": vigencia},
-            )
-        ).mappings().all()
-
-        for m in fuera:
-            bajo = (m["min_value"] is not None
-                    and m["value"] < m["min_value"])
-            # La clave sale del codigo del catalogo y no de una lista de
-            # abreviaturas a mano, que es de las cosas que se desactualizan
-            # calladas. Su unico trabajo es agrupar "la misma condicion"
-            # para la ventana de deduplicacion.
-            clave = f"{m['type']}_{'low' if bajo else 'high'}"
-
-            reciente = (
-                await conn.execute(
-                    text(
-                        """
-                        SELECT 1 FROM alerts
-                         WHERE patient_id = :pid
-                           AND dedup_key = :clave
-                           AND created_at > now()
-                               - make_interval(mins => CAST(:ventana AS integer))
-                         LIMIT 1
-                        """
-                    ),
-                    {"pid": str(m["patient_id"]), "clave": clave,
-                     "ventana": ventana},
-                )
-            ).first()
-            if reciente is not None:
-                omitidas += 1
-                continue
-
-            ya = (
-                await conn.execute(
-                    text(
-                        """
-                        SELECT 1 FROM alerts
-                         WHERE type = 'vital_out_of_range'
-                           AND payload ->> 'reading_id' = CAST(:rid AS text)
-                         LIMIT 1
-                        """
-                    ),
-                    {"rid": str(m["id"])},
-                )
-            ).first()
-            if ya is not None:
-                continue
-
-            unidad = (" " + m["unidad"]) if m["unidad"] else ""
-            limite = m["min_value"] if bajo else m["max_value"]
-            # Este texto lo lee la familia, asi que va con sus tildes.
-            titulo = (f"{m['etiqueta']} bajo el mínimo" if bajo
-                      else f"{m['etiqueta']} sobre el máximo")
-            detalle = (
-                f"{m['etiqueta']} {_numero(m['value'])}{unidad} "
-                f"({'mínimo' if bajo else 'máximo'} configurado "
-                f"{_numero(limite)}{unidad})."
-            )
-
-            await conn.execute(
-                text(
-                    """
-                    INSERT INTO alerts
-                        (patient_id, type, severity, title, detail,
-                         payload, dedup_key, status)
-                    VALUES
-                        (:pid, 'vital_out_of_range', 'warning',
-                         :titulo, :detalle,
-                         CAST(:payload AS jsonb), :clave, 'active')
-                    """
-                ),
-                {
-                    "pid": str(m["patient_id"]),
-                    # title es varchar(120): una etiqueta larga del catalogo
-                    # no puede reventar el INSERT.
-                    "titulo": titulo[:120],
-                    "detalle": detalle,
-                    "clave": clave,
-                    "payload": json.dumps({
-                        "reading_id": str(m["id"]),
-                        "type": m["type"],
-                        "value": float(m["value"]),
-                        "min_value": (float(m["min_value"])
-                                      if m["min_value"] is not None else None),
-                        "max_value": (float(m["max_value"])
-                                      if m["max_value"] is not None else None),
-                        "measured_at": m["measured_at"].isoformat(),
-                    }),
-                },
-            )
-            creadas += 1
+        creadas, omitidas = await evaluar_vitales(conn)
 
     if verbose:
         print(f"alertas de vitales creadas : {creadas}")

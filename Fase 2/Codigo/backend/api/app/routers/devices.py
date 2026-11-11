@@ -41,6 +41,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.deps import PatientContext, get_patient_member
 from app.errors import ApiError
+from app.maintenance import evaluar_vitales
 from app.ratelimit import LIMIT_DEVICE_LINK, limiter
 from app.security import (
     generate_device_token,
@@ -686,6 +687,12 @@ async def device_ingest_batch(
         ),
         {"pid": ctx.patient_id, "battery": payload.battery_pct},
     )
+
+    # Igual que en la ingesta desde el teléfono (vitals.py): la medición del
+    # reloj se evalúa al llegar y no en la pasada horaria del mantenimiento.
+    if accepted:
+        await evaluar_vitales(db, patient_id=ctx.patient_id)
+
     await db.commit()
 
     duplicates = len(payload.readings) - accepted

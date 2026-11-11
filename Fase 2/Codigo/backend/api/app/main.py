@@ -30,6 +30,7 @@ from app.routers import (
     logbook,
     marketplace,
     medications,
+    music,
     patients,
     _prn,
     reports,
@@ -210,6 +211,7 @@ app.include_router(marketplace.router)
 app.include_router(marketplace.jobs_router)
 app.include_router(gallery.router)
 app.include_router(chat.router)
+app.include_router(music.router)
 app.include_router(assistant.router)
 app.include_router(content.router)
 # Check-in diario del adulto mayor (RF-38).

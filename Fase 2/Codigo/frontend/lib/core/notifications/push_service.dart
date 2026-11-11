@@ -8,8 +8,10 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 ///
 /// - Locales: alarmas de medicación programadas en el dispositivo
 ///   (flutter_local_notifications).
-/// - Remotas: push desde el backend vía FCM; el token se reenvía al backend
-///   (POST /users/me/devices), que lo registra en Azure Notification Hubs.
+/// - Remotas: push desde el backend vía FCM. Este servicio solo obtiene el
+///   token y avisa cuando llega un mensaje; quien lo registra en el backend
+///   (POST /users/me/devices) y confirma las entregas es [PushRegistrar], que
+///   sí conoce la sesión.
 ///
 /// En modo mocks el registro remoto se omite para poder correr sin proyecto
 /// Firebase configurado.
@@ -26,8 +28,35 @@ class PushService {
       StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get onNotificationTap => _taps.stream;
 
+  /// Se emite cada vez que hay un token de push, al obtenerlo y cuando FCM lo
+  /// renueva. Un token renovado que no llega al backend es un teléfono que
+  /// deja de recibir alertas sin que nadie se entere.
+  final StreamController<String> _tokens = StreamController<String>.broadcast();
+  Stream<String> get onToken => _tokens.stream;
+
+  /// Se emite cuando un push llega con la aplicación abierta, con sus datos.
+  /// Sirve para confirmarle al backend que la notificación llegó (RNF-05).
+  final StreamController<Map<String, dynamic>> _recibidos =
+      StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get onRemoteMessage => _recibidos.stream;
+
+  Map<String, dynamic>? _toqueInicial;
+
+  /// Datos de la notificación que abrió la aplicación estando cerrada, si la
+  /// hubo. Se entrega una sola vez.
+  Map<String, dynamic>? takeInitialTap() {
+    final t = _toqueInicial;
+    _toqueInicial = null;
+    return t;
+  }
+
   String? _fcmToken;
   String? get fcmToken => _fcmToken;
+
+  void _tokenNuevo(String? t) {
+    _fcmToken = t;
+    if (t != null && t.isNotEmpty) _tokens.add(t);
+  }
 
   bool _initialized = false;
 
@@ -55,11 +84,18 @@ class PushService {
         await Firebase.initializeApp();
         final messaging = FirebaseMessaging.instance;
         await messaging.requestPermission();
-        _fcmToken = await messaging.getToken();
-        messaging.onTokenRefresh.listen((t) => _fcmToken = t);
+        _tokenNuevo(await messaging.getToken());
+        messaging.onTokenRefresh.listen(_tokenNuevo);
         FirebaseMessaging.onMessage.listen(_onForegroundMessage);
         FirebaseMessaging.onMessageOpenedApp
             .listen((m) => _taps.add(Map<String, dynamic>.from(m.data)));
+        // La aplicación estaba cerrada y se abrió tocando la notificación.
+        // No se emite por el stream: a esta altura todavía no hay nadie
+        // escuchando y se perdería. Queda guardado para quien lo pida.
+        final inicial = await messaging.getInitialMessage();
+        if (inicial != null) {
+          _toqueInicial = Map<String, dynamic>.from(inicial.data);
+        }
       } catch (e) {
         // Sin configuración Firebase (o en desarrollo): las notificaciones
         // locales siguen funcionando.
@@ -69,6 +105,7 @@ class PushService {
   }
 
   void _onForegroundMessage(RemoteMessage m) {
+    _recibidos.add(Map<String, dynamic>.from(m.data));
     final n = m.notification;
     if (n != null) {
       _local.show(

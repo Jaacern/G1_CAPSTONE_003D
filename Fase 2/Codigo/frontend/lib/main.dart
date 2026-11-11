@@ -20,7 +20,7 @@ Future<void> main() async {
   await initializeDateFormatting('es');
 
   // Notificaciones locales (alarmas de medicación) siempre disponibles.
-  // El registro remoto (FCM -> Azure Notification Hubs) solo aplica sin mocks.
+  // El push remoto (FCM) solo aplica sin mocks.
   await PushService.instance.init(enableRemote: !AppConfig.useMocks);
 
   runApp(const ProviderScope(child: AgeCareApp()));

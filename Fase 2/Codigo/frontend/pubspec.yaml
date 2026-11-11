@@ -40,7 +40,7 @@ dependencies:
   # Notificaciones y sensores
   flutter_local_notifications: ^17.2.4 # alarmas de medicación locales
   firebase_core: ^3.8.0                # base para FCM
-  firebase_messaging: ^15.1.5          # token de push -> Azure Notification Hubs
+  firebase_messaging: ^15.1.5          # token de push; el backend envía por FCM
   permission_handler: ^11.3.1          # permisos de micrófono/ubicación/notif.
   geolocator: ^13.0.2                  # ubicación para SOS
 

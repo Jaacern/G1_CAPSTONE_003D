@@ -81,14 +81,14 @@ class TimelineRepositoryMock implements TimelineRepository {
               sub: d % 9 == 4 ? 'missed' : 'taken',
               sev: d % 9 == 4 ? 'warning' : null,
               det: '50 mg · programada 08:00',
-              autor: d % 9 == 4 ? null : 'Rosa Millán'));
+              autor: d % 9 == 4 ? null : 'Marisol Tapia'));
           if (d % 2 == 0) {
             out.add(ev(TimelineKind.vital, dia + const Duration(hours: 3),
                 'Presión arterial',
                 sub: 'blood_pressure',
                 sev: d % 6 == 0 ? 'warning' : null,
                 det: 'Medición manual',
-                autor: 'Rosa Millán',
+                autor: 'Marisol Tapia',
                 v: d % 6 == 0 ? 148 : 128,
                 v2: d % 6 == 0 ? 92 : 80,
                 unidad: 'mmHg'));
@@ -96,7 +96,7 @@ class TimelineRepositoryMock implements TimelineRepository {
           if (d % 3 == 1) {
             out.add(ev(TimelineKind.observation, dia + const Duration(hours: 5),
                 'Almorzó completo y salió a caminar por la plaza.',
-                sub: 'food', autor: 'Rosa Millán'));
+                sub: 'food', autor: 'Marisol Tapia'));
           }
           if (d % 7 == 3) {
             out.add(ev(TimelineKind.vital, dia + const Duration(hours: 9),

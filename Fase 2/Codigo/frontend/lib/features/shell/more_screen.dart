@@ -65,7 +65,7 @@ class MoreScreen extends ConsumerWidget {
           ),
 
           // ---- Pacientes ----
-          const _SectionLabel('Pacientes'),
+          const _SectionLabel('Adultos mayores'),
           patientsAsync.when(
             loading: () => const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
@@ -97,7 +97,7 @@ class MoreScreen extends ConsumerWidget {
                   _MoreTile(
                     leading:
                         const Icon(Icons.add_rounded, color: AppColors.primary),
-                    title: 'Añadir paciente',
+                    title: 'Agregar adulto mayor',
                     titleColor: AppColors.primary,
                     onTap: () => context.push('/patients/create'),
                   ),

@@ -20,6 +20,7 @@ from app.db import get_db
 from app.deps import CurrentUser, PatientContext, get_current_user, get_patient_member
 from app.errors import ApiError
 from app.maintenance import evaluar_vitales
+from app.routers.checkins import MOTIVO_MAL_HOY, mal_hoy
 
 router = APIRouter(prefix="/api/v1", tags=["vitals"])
 
@@ -391,11 +392,14 @@ def _compute_wellbeing(
     active_alerts: list[dict],
     latest_vitals: list[LatestItem],
     meds: MedicationsToday,
+    se_siente_mal: bool = False,
 ) -> tuple[str, list[str]]:
     """Cálculo simple y documentado del semáforo (5.7).
 
     - attention: hay una alerta critical activa, o un vital fuera de rango.
-    - warning:   hay una alerta warning activa, o dosis missed hoy.
+    - warning:   hay una alerta warning activa, dosis missed hoy, o el
+                 adulto mayor respondió hoy en su check-in que se siente mal
+                 (RF-38 alimenta RF-22).
     - ok:        ningún motivo de los anteriores.
     """
     reasons: list[str] = []
@@ -418,8 +422,10 @@ def _compute_wellbeing(
         reasons.append(f"Alerta activa: {a['title']}")
     if meds.missed > 0:
         reasons.append(f"{meds.missed} dosis omitida(s) hoy")
+    if se_siente_mal:
+        reasons.append(MOTIVO_MAL_HOY)
 
-    if status != "attention" and (warn_alerts or meds.missed > 0):
+    if status != "attention" and (warn_alerts or meds.missed > 0 or se_siente_mal):
         status = "warning"
 
     return status, reasons
@@ -940,7 +946,8 @@ async def summary_today(
     latest_vitals = await _latest_items(db, ctx.patient_id)
     meds = await _medications_today(db, ctx.patient_id)
 
-    status, reasons = _compute_wellbeing(active_alerts, latest_vitals, meds)
+    status, reasons = _compute_wellbeing(
+        active_alerts, latest_vitals, meds, await mal_hoy(db, ctx.patient_id))
 
     return SummaryTodayOut(
         wellbeing_status=status,
@@ -984,7 +991,8 @@ async def dashboard(
         active_alerts = await _active_alerts(db, pid)
         latest_vitals = await _latest_items(db, pid)
         meds = await _medications_today(db, pid)
-        status, reasons = _compute_wellbeing(active_alerts, latest_vitals, meds)
+        status, reasons = _compute_wellbeing(
+            active_alerts, latest_vitals, meds, await mal_hoy(db, pid))
         items.append(
             DashboardItem(
                 patient_id=pid,

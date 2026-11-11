@@ -5,12 +5,12 @@
 -- El seed principal no traia ningun medico, asi que la vista del medico no se
 -- podia probar. Desde 934 un medico solo opera si esta habilitado, por lo que
 -- aqui se crea la cuenta Y su habilitacion. Usa el mismo hash que las demas
--- cuentas de prueba (clave demo1234).
+-- cuentas de prueba (clave agecare123).
 -- En produccion esta fila se borra o se le cambia la clave antes de salir.
 
 INSERT INTO users (email, password_hash, first_name, last_name, phone, locale, account_type)
 VALUES ('doctora@agecare.cl',
-        '$2b$12$PhFlUg1xEBTGKQuSYaBy.ODxdKlWAShWRiJxT0w85tC15kZaSNK/.',
+        '$2b$12$sOwnF0GBHVfW/6AuaTTIoez598bSRvAjjd.MhockXbT6sCX1.v4Xe',
         'Carolina', 'Soto', '+56922223333', 'es', 'doctor')
 ON CONFLICT DO NOTHING;
 

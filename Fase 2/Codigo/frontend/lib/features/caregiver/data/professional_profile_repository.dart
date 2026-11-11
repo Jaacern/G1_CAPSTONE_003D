@@ -70,7 +70,7 @@ class ProfessionalProfileRepositoryMock
     secondLastName: 'Díaz',
     rut: '15.234.567-4',
     phone: '+56987654321',
-    email: 'cuidadora@agecare.app',
+    email: 'cuidadora@agecare.cl',
     headline: 'Cuidadora con experiencia en demencias',
     bio: 'Acompaño a adultos mayores hace ocho años, en domicilio y residencia.',
     yearsExperience: 8,

@@ -18,6 +18,24 @@ String? validatePersonName(String? value,
   return null;
 }
 
+/// Nombre de un alérgeno escrito a mano ("Otra"): empieza con letra; admite
+/// letras, números, espacios y - . , ( ) / ' + (ej. "Vitamina B12",
+/// "Kiwi", "Contraste yodado"). Mismas reglas que AllergyIn en el backend.
+String? validateAllergenName(String? value) {
+  final v = (value ?? '').trim().replaceAll(RegExp(r'\s+'), ' ');
+  if (v.isEmpty) return 'Escribe a qué es alérgico';
+  if (v.length < 2) return 'Mínimo 2 caracteres';
+  if (v.length > 80) return 'Máximo 80 caracteres';
+  if (!RegExp(r"^\p{L}[\p{L}\p{N} '\-.,()/+]*$", unicode: true)
+      .hasMatch(v)) {
+    return 'Empieza con una letra; sin símbolos como < > # @';
+  }
+  if (RegExp(r'\p{L}', unicode: true).allMatches(v).length < 2) {
+    return 'Escribe el nombre del alérgeno';
+  }
+  return null;
+}
+
 /// Dígito verificador de un RUT chileno (módulo 11).
 String rutCheckDigit(int numero) {
   var suma = 0;

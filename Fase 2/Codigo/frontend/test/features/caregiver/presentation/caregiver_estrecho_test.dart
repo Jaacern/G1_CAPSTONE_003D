@@ -27,7 +27,7 @@ void main() {
         // override queda un timer de restauración pendiente al terminar.
         currentUserProvider.overrideWith((ref) => const User(
               userId: 'u-cg',
-              fullName: 'Rosa Millán',
+              fullName: 'Marisol Tapia',
               accountType: RoleType.caregiver,
               email: 'cuidadora@agecare.app',
             )),

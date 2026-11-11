@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../alerts/domain/models.dart';
+import '../auth/application/auth_controller.dart';
+import '../auth/domain/models.dart';
 import '../../core/theme/app_theme.dart';
 import '../patients/application/patients_providers.dart';
 import '../patients/domain/models.dart';
 
-/// Desplegable de paciente activo de [MainShell] (AGE-206 / DAC05-55).
+/// Desplegable del adulto mayor activo de [MainShell] (AGE-206 / DAC05-55).
+///
+/// El familiar además encuentra aquí "Agregar adulto mayor" (RF-08: es quien
+/// crea el perfil), aunque tenga uno solo.
 ///
 /// Va debajo de la barra de título y solo se muestra en las pestañas Hoy y
 /// Salud, que son donde se lee información del paciente. Cuando el usuario
@@ -25,6 +31,8 @@ class PatientSelectorBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final patientsAsync = ref.watch(myPatientsProvider);
     final selected = ref.watch(selectedPatientProvider);
+    final esFamilia =
+        ref.watch(currentUserProvider)?.primaryRole == RoleType.family;
 
     return Material(
       color: AppColors.background,
@@ -39,11 +47,13 @@ class PatientSelectorBar extends ConsumerWidget {
 
             final current = selected ?? patients.first;
             final canSwitch = patients.length >= 2;
+            final abre = canSwitch || esFamilia;
 
             return InkWell(
               key: const Key('patientSelectorBar_tap'),
-              onTap: canSwitch
-                  ? () => _openSelector(context, ref, patients, current)
+              onTap: abre
+                  ? () => _openSelector(
+                      context, ref, patients, current, esFamilia)
                   : null,
               borderRadius: BorderRadius.circular(12),
               child: Container(
@@ -65,7 +75,7 @@ class PatientSelectorBar extends ConsumerWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Text(
-                            'Paciente: ',
+                            'Adulto mayor: ',
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 14,
@@ -86,7 +96,7 @@ class PatientSelectorBar extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    if (canSwitch) ...[
+                    if (abre) ...[
                       const SizedBox(width: 2),
                       const Icon(Icons.expand_more_rounded,
                           size: 20, color: AppColors.textSecondary),
@@ -106,6 +116,7 @@ class PatientSelectorBar extends ConsumerWidget {
     WidgetRef ref,
     List<PatientCard> patients,
     PatientCard current,
+    bool esFamilia,
   ) async {
     final chosen = await showModalBottomSheet<PatientCard>(
       context: context,
@@ -117,7 +128,7 @@ class PatientSelectorBar extends ConsumerWidget {
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
               child: Text(
-                'Cambiar de paciente',
+                'Cambiar de adulto mayor',
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
               ),
             ),
@@ -128,7 +139,7 @@ class PatientSelectorBar extends ConsumerWidget {
                     color: p.wellbeingStatus.color),
                 title: Text(p.fullName),
                 subtitle: Text(
-                  // Con dos pacientes o más, el rol es lo que cambia el trato:
+                  // Con dos adultos mayores o más, el rol cambia el trato:
                   // no es lo mismo entrar como familiar de uno que como
                   // cuidadora del otro.
                   p.activeAlertsCount > 0
@@ -142,6 +153,21 @@ class PatientSelectorBar extends ConsumerWidget {
                 selected: p.patientId == current.patientId,
                 onTap: () => Navigator.of(sheetContext).pop(p),
               ),
+            if (esFamilia) ...[
+              const Divider(height: 1),
+              ListTile(
+                key: const Key('patientSelectorBar_add'),
+                leading:
+                    const Icon(Icons.person_add_alt_1, color: AppColors.primary),
+                title: const Text('Agregar adulto mayor',
+                    style: TextStyle(
+                        color: AppColors.primary, fontWeight: FontWeight.w700)),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  context.push('/patients/create');
+                },
+              ),
+            ],
           ],
         ),
       ),

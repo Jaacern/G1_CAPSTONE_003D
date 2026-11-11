@@ -121,6 +121,9 @@ class UserOut(BaseModel):
     account_type: str = "family"
     # Solo tiene sentido para account_type == 'doctor'.
     doctor_verified: bool = False
+    # Personal de AgeCare (panel de administración). No es familia de nadie:
+    # la app móvil no le ofrece crear ni cuidar adultos mayores.
+    is_staff: bool = False
     memberships: list["MembershipOut"] = []
 
 
@@ -511,7 +514,7 @@ async def login(request: Request, payload: LoginIn, db: AsyncSession = Depends(g
                 """
                 SELECT id, email, password_hash, first_name, second_name,
                        last_name, second_last_name, full_name, rut_number, rut_dv,
-                       phone, avatar_url, locale, account_type
+                       phone, avatar_url, locale, account_type, is_staff
                 FROM users
                 WHERE lower(email) = lower(:email)
                   AND is_active = true
@@ -549,6 +552,7 @@ async def login(request: Request, payload: LoginIn, db: AsyncSession = Depends(g
             avatar_url=user["avatar_url"],
             locale=user["locale"],
             account_type=user["account_type"],
+            is_staff=user["is_staff"],
             doctor_verified=(user["account_type"] == "doctor"
                              and await is_verified_doctor(db, str(user["id"]))),
             memberships=[MembershipOut(**m) for m in memberships],
@@ -697,7 +701,7 @@ async def get_me(
                 """
                 SELECT id, email, first_name, second_name, last_name,
                        second_last_name, full_name, rut_number, rut_dv,
-                       phone, avatar_url, locale, account_type
+                       phone, avatar_url, locale, account_type, is_staff
                 FROM users WHERE id = :uid
                 """
             ),
@@ -718,6 +722,7 @@ async def get_me(
         avatar_url=row["avatar_url"],
         locale=row["locale"],
         account_type=row["account_type"],
+        is_staff=row["is_staff"],
         doctor_verified=(row["account_type"] == "doctor"
                          and await is_verified_doctor(db, user.user_id)),
         memberships=[MembershipOut(**m) for m in memberships],

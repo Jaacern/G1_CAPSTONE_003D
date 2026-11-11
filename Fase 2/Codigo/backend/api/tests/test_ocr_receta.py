@@ -38,7 +38,7 @@ app.include_router(medications.router)
 
 FAMILIAR = "11111111-1111-4111-8111-111111111111"
 MEDICO   = "22222222-2222-4222-8222-222222222222"
-AJENO    = "eeeeeee1-0000-4000-8000-000000000001"
+from _ajeno import AJENO  # noqa: E402  (cuenta sin circulo, creada y borrada por la prueba)
 PACIENTE = "33333333-3333-4333-8333-333333333333"
 
 RECETA = [

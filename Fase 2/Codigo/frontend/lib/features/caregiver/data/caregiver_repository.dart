@@ -209,7 +209,7 @@ class CaregiverRepositoryHttp implements CaregiverRepository {
 // Mock
 // ---------------------------------------------------------------------------
 /// Datos de demostración de la cuidadora. Lo que se escribe durante la sesión
-/// queda firmado por Rosa Millán, la persona demo de cuidadora@agecare.app; la
+/// queda firmado por Marisol Tapia, la persona demo de cuidadora@agecare.cl; la
 /// nota de relevo semilla se deja a nombre de otra colega porque así se lee:
 /// entra un turno y encuentra la nota de quien se va.
 class CaregiverRepositoryMock implements CaregiverRepository {
@@ -276,14 +276,14 @@ class CaregiverRepositoryMock implements CaregiverRepository {
         text: 'Desayunó bien y de buen ánimo. Presión estable.',
         category: 'Alimentación',
         createdAt: _at(9, 30),
-        authorName: 'Rosa Millán',
+        authorName: 'Marisol Tapia',
       ),
       Observation(
         id: 'o-2',
         text: 'Se notó algo cansada después de la siesta, sin molestias.',
         category: 'Ánimo',
         createdAt: _at(15, 10),
-        authorName: 'Rosa Millán',
+        authorName: 'Marisol Tapia',
       ),
     ]);
 
@@ -476,7 +476,7 @@ class CaregiverRepositoryMock implements CaregiverRepository {
       category: category,
       mediaUrl: mediaUrl,
       createdAt: DateTime.now(),
-      authorName: 'Rosa Millán',
+      authorName: 'Marisol Tapia',
     );
     _observations.add(obs);
     return obs;
@@ -498,7 +498,7 @@ class CaregiverRepositoryMock implements CaregiverRepository {
       category: 'Incidente · $type',
       mediaUrl: mediaUrl,
       createdAt: DateTime.now(),
-      authorName: 'Rosa Millán',
+      authorName: 'Marisol Tapia',
     ));
   }
 
@@ -520,7 +520,7 @@ class CaregiverRepositoryMock implements CaregiverRepository {
     final note = HandoverNote(
       id: 'h-${DateTime.now().millisecondsSinceEpoch}',
       text: text,
-      authorName: 'Rosa Millán',
+      authorName: 'Marisol Tapia',
       createdAt: DateTime.now(),
     );
     _handovers.add(note);

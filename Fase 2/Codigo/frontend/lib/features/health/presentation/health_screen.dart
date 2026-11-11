@@ -10,6 +10,7 @@ import '../../../core/widgets/common.dart';
 import '../../auth/domain/models.dart' show RoleType;
 import '../../medications/presentation/medications_screen.dart';
 import '../../patients/application/patients_providers.dart';
+import '../../documents/presentation/patient_documents_view.dart';
 import '../../patients/presentation/patient_timeline.dart';
 import '../../wearable/application/watch_link_service.dart';
 import '../application/health_providers.dart';
@@ -29,8 +30,8 @@ class HealthScreen extends ConsumerWidget {
     if (patient == null) {
       return const EmptyView(
           icon: Icons.monitor_heart_outlined,
-          title: 'Sin paciente seleccionado',
-          subtitle: 'Crea o selecciona un paciente para ver su salud.');
+          title: 'Sin adulto mayor seleccionado',
+          subtitle: 'Agrega o elige a un adulto mayor para ver su salud.');
     }
 
     // Sub-pestañas: Vitals · Medicinas · Historial · Docs. Historial es la
@@ -82,24 +83,23 @@ class HealthScreen extends ConsumerWidget {
   }
 }
 
-/// Documentos del paciente embebidos en Salud. Solo si el backend los soporta.
+/// Documentos del paciente elegido, directo en la pestaña (sin botón
+/// intermedio). Al cambiar de paciente la vista se arma de nuevo.
 class _DocsTab extends ConsumerWidget {
   const _DocsTab();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final patient = ref.watch(selectedPatientProvider);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: FilledButton.icon(
-          onPressed: () =>
-              context.push('/documents?patient=${patient?.patientId ?? ''}'),
-          icon: const Icon(Icons.folder_open_rounded),
-          label: const Text('Abrir expediente'),
-        ),
-      ),
-    );
+    if (patient == null) {
+      return const EmptyView(
+        icon: Icons.person_search_rounded,
+        title: 'Elige a un adulto mayor',
+      );
+    }
+    return PatientDocumentsView(
+        key: ValueKey('docs-${patient.patientId}'),
+        patientId: patient.patientId);
   }
 }
 

@@ -28,6 +28,7 @@ from app.deps import (
     is_verified_doctor,
 )
 from app.errors import ApiError
+from app.routers.checkins import MOTIVO_MAL_HOY
 from app.ratelimit import LIMIT_INVITE_CODE, limiter
 from app.security import hash_token
 from app.validators import (
@@ -163,6 +164,26 @@ class AllergyIn(BaseModel):
     reaction:  str | None = Field(default=None, max_length=200)
     source:    str = "reportada"     # reportada|test|reaccion_tratamiento
     noted_on:  date | None = None
+
+    @field_validator("substance")
+    @classmethod
+    def _sustancia(cls, v: str) -> str:
+        """Código del catálogo (penicilina, aines) o una alergia escrita a
+        mano ("Otra"). La escrita se reconoce entera: empieza con letra y solo
+        lleva letras, números, espacios y - . , ( ) / ' +. Así entra "Vitamina
+        B12" o "Contraste yodado" y no "1234" ni "<script>", que terminarían
+        impresos en la hoja de emergencia."""
+        s = re.sub(r"\s+", " ", v.strip())
+        # Código del catálogo: siempre empieza con letra ("1234" no es uno).
+        if re.fullmatch(r"[a-z][a-z0-9_]{1,39}", s):
+            return s
+        if not re.fullmatch(r"[^\W\d_][\w '\-.,()/+]{1,79}", s) or "_" in s:
+            raise ValueError(
+                "Escribe el nombre del alérgeno: empieza con una letra, "
+                "sin símbolos como < > # @.")
+        if sum(c.isalpha() for c in s) < 2:
+            raise ValueError("Escribe el nombre del alérgeno.")
+        return s
 
 
 class ImmunizationIn(BaseModel):
@@ -514,7 +535,16 @@ async def _load_allergies_detail(db: AsyncSession, patient_id: str) -> list[dict
     ).mappings().all()
     out = []
     for r in rows:
-        label = r["catalog_label"] or r["substance"].replace("_", " ").capitalize()
+        # Del catálogo, su etiqueta. Un código suelto (sin catálogo) se hace
+        # legible; lo escrito a mano ("Vitamina B12") se muestra tal cual,
+        # sin pasarlo a minúsculas.
+        sub = r["substance"]
+        if r["catalog_label"]:
+            label = r["catalog_label"]
+        elif re.fullmatch(r"[a-z0-9_]+", sub):
+            label = sub.replace("_", " ").capitalize()
+        else:
+            label = sub
         out.append({
             "substance": r["substance"],
             "label": label,
@@ -1173,10 +1203,24 @@ async def create_patient(
     # Quien crea el perfil queda como familiar administrador. Si lo pudiera
     # crear una cuenta de cuidador(a) o médico, terminaría siendo "familiar" de
     # alguien que no es su familia: esos perfiles llegan por invitación.
-    account_type = (
-        await db.execute(text("SELECT account_type FROM users WHERE id = :u"),
-                         {"u": user.user_id})
-    ).scalar()
+    cuenta = (
+        await db.execute(
+            text("SELECT account_type, is_staff FROM users WHERE id = :u"),
+            {"u": user.user_id})
+    ).mappings().first()
+    account_type = cuenta["account_type"] if cuenta else None
+    # El personal de AgeCare se guarda como cuenta "family" (la tabla no tiene
+    # otro tipo para él), pero no es familia de nadie: administra la
+    # plataforma desde su panel y no crea perfiles de adultos mayores.
+    if cuenta and cuenta["is_staff"]:
+        raise ApiError(
+            status_code=403,
+            code="STAFF_CANNOT_CREATE_PATIENTS",
+            message=(
+                "Las cuentas del personal de AgeCare no crean adultos mayores. "
+                "Los perfiles los crea la familia."
+            ),
+        )
     if account_type != "family":
         raise ApiError(
             status_code=403,
@@ -1346,7 +1390,14 @@ async def list_patients(
                                         ELSE 2 END,
                                     a.created_at DESC
                            LIMIT 1
-                       ) AS top_reason
+                       ) AS top_reason,
+                       -- RF-38: el adulto mayor dijo hoy que se siente mal.
+                       EXISTS (
+                           SELECT 1 FROM daily_checkins dc
+                           WHERE dc.patient_id = p.id
+                             AND dc.checkin_date = current_date
+                             AND dc.mood = 'bad'
+                       ) AS mal_hoy
                 FROM patient_members pm
                 JOIN patients p ON p.id = pm.patient_id
                 WHERE pm.user_id = :uid
@@ -1365,7 +1416,7 @@ async def list_patients(
     def _wellbeing(r) -> str:
         if r["critical_alerts"] > 0:
             return "attention"
-        if r["active_alerts"] > 0:
+        if r["active_alerts"] > 0 or r["mal_hoy"]:
             return "warning"
         return "ok"
 
@@ -1431,7 +1482,7 @@ async def list_patients(
             conditions=list(r["conditions"]),
             active_alerts_count=int(r["active_alerts"]),
             critical_alerts_count=int(r["critical_alerts"]),
-            top_reason=r["top_reason"],
+            top_reason=r["top_reason"] or (MOTIVO_MAL_HOY if r["mal_hoy"] else None),
             rut=_rut(r),
             sex=_SEX_DB_TO_API.get(r["sex"], r["sex"]),
             address=r["address"],

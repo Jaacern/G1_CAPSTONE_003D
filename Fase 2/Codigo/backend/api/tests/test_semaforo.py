@@ -83,6 +83,17 @@ async def main():
             "  AND m.patient_id = :p AND sd.status = 'missed' "
             "  AND CAST(sd.scheduled_at AT TIME ZONE :z AS date) "
             "      = CAST(now() AT TIME ZONE :z AS date)"), {"p": PAC, "z": ZONA})
+        # Las dosis de un tratamiento cuelgan de treatment_items, no de
+        # medications. Sin esto, pasadas las 8 AM las dosis vencidas del dia
+        # hacen fallar la prueba segun la hora a la que se corra.
+        await c.execute(text(
+            "UPDATE scheduled_doses sd SET status = 'pending', logged_by = NULL, "
+            "  logged_at = NULL, administered_at = NULL, reason = NULL "
+            "FROM treatment_items ti JOIN treatments t ON t.id = ti.treatment_id "
+            "WHERE ti.id = sd.treatment_item_id "
+            "  AND t.patient_id = :p AND sd.status = 'missed' "
+            "  AND CAST(sd.scheduled_at AT TIME ZONE :z AS date) "
+            "      = CAST(now() AT TIME ZONE :z AS date)"), {"p": PAC, "z": ZONA})
         # Una medicion en rango, la mas nueva de cada tipo con umbral.
         for t, v in (("spo2", 97), ("heart_rate", 72)):
             await c.execute(text(

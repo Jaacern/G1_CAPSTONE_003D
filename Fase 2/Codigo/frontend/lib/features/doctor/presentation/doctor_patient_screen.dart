@@ -12,6 +12,7 @@ import '../../medications/application/treatments_providers.dart';
 import '../../medications/domain/treatment.dart';
 import '../../patients/application/patients_providers.dart';
 import '../../patients/domain/models.dart';
+import '../../documents/presentation/patient_documents_view.dart';
 import '../../patients/presentation/patient_timeline.dart';
 
 /// Ficha clínica del paciente para el rol médico (solo lectura del historial +
@@ -750,29 +751,15 @@ class _ControlesTab extends StatelessWidget {
   }
 }
 
-/// Documentos del expediente (recetas, exámenes).
+/// Documentos del expediente a la mano, con buscador y categorías. Antes era
+/// un botón que abría otra pantalla para recién ver la lista.
 class _DocumentosTab extends StatelessWidget {
   const _DocumentosTab({required this.patientId});
   final String patientId;
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: EmptyView(
-          icon: Icons.folder_rounded,
-          title: 'Documentos del expediente',
-          subtitle: 'Recetas, exámenes e informes escaneados.',
-          action: FilledButton.icon(
-            onPressed: () => context.push('/documents?patient=$patientId'),
-            icon: const Icon(Icons.open_in_new_rounded),
-            label: const Text('Abrir documentos'),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      PatientDocumentsView(patientId: patientId);
 }
 
 class _SectionLabel extends StatelessWidget {

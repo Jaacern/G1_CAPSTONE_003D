@@ -299,9 +299,9 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                     ),
                     const _Benefit(
                       icon: Icons.groups_rounded,
-                      title: 'Pacientes y círculo sin tope',
+                      title: 'Adultos mayores y círculo sin tope',
                       subtitle:
-                          'El plan gratuito permite 1 paciente y 3 miembros.',
+                          'El plan gratuito permite 1 adulto mayor y 3 miembros.',
                     ),
                     const _Benefit(
                       icon: Icons.history_rounded,

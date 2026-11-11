@@ -101,7 +101,7 @@ class _PatientTimelineState extends ConsumerState<PatientTimeline> {
                               icon: Icons.history_rounded,
                               title: 'Sin eventos',
                               subtitle:
-                                  'Aquí aparecerá lo que se registre del paciente.',
+                                  'Aquí aparecerá lo que se registre del adulto mayor.',
                             ),
                           ])
                         : ListView.builder(

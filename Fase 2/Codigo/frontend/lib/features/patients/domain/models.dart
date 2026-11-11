@@ -112,11 +112,19 @@ class ConditionDetail {
   final String system;
   final String label;
 
-  factory ConditionDetail.fromJson(Map<String, dynamic> j) => ConditionDetail(
-        condition: j['condition'] as String,
-        system: (j['system'] ?? 'otras') as String,
-        label: (j['label'] ?? j['condition']) as String,
-      );
+  /// La ficha del paciente manda `condition`; el catálogo
+  /// (GET /conditions/catalog) manda `code`. Antes solo se leía `condition`,
+  /// el catálogo reventaba en el cast y la pantalla decía "No se pudo cargar
+  /// el catálogo" con el backend real (en modo prueba no pasaba porque el
+  /// mock no pasa por aquí).
+  factory ConditionDetail.fromJson(Map<String, dynamic> j) {
+    final codigo = (j['condition'] ?? j['code']) as String;
+    return ConditionDetail(
+      condition: codigo,
+      system: (j['system'] ?? 'otras') as String,
+      label: (j['label'] ?? codigo) as String,
+    );
+  }
 }
 
 /// Etiqueta legible de un sistema clínico.

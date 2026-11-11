@@ -555,7 +555,7 @@ class _WatchLinkedCardState extends ConsumerState<_WatchLinkedCard> {
       builder: (ctx) => AlertDialog(
         title: const Text('Desvincular reloj'),
         content: const Text(
-          'El reloj dejará de enviar datos de este paciente y volverá a pedir '
+          'El reloj dejará de enviar datos de este adulto mayor y volverá a pedir '
           'un código. Podrás vincularlo a otra persona. ¿Continuar?',
         ),
         actions: [
@@ -615,7 +615,7 @@ class _WatchLinkedCardState extends ConsumerState<_WatchLinkedCard> {
           const SizedBox(height: 10),
           Text(
             '${status.deviceLabel ?? 'Reloj'} está vinculado y es la fuente de '
-            'datos de este paciente. Mide ritmo cardíaco, oxígeno y temperatura '
+            'datos de este adulto mayor. Mide ritmo cardíaco, oxígeno y temperatura '
             'y avisa ante una caída.',
             style: const TextStyle(
                 color: AppColors.textSecondary, height: 1.4, fontSize: 14),
@@ -701,7 +701,7 @@ class _WatchAgeCareCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           const Text(
-            'Vincula el reloj del paciente con un código de 6 dígitos. Mide en '
+            'Vincula el reloj del adulto mayor con un código de 6 dígitos. Mide en '
             'vivo ritmo cardíaco, oxígeno y temperatura, y avisa ante una caída.',
             style: TextStyle(
                 color: AppColors.textSecondary, height: 1.4, fontSize: 14),

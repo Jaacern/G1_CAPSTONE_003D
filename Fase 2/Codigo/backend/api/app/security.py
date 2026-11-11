@@ -1,7 +1,7 @@
 """Utilidades de seguridad: verificación de contraseñas (bcrypt) y JWT.
 
 El seed usa hashes bcrypt ($2b$12$...). La password de los usuarios de
-demostración es 'demo1234'.
+demostración es 'agecare123' (947_cuentas_demo.sql).
 """
 import hashlib
 import secrets

@@ -77,7 +77,7 @@ class PrnRepositoryMock implements PrnRepository {
         dose: '2 puff',
         administeredAt: t,
         reason: 'Crisis de disnea',
-        loggedByName: 'Rosa Medina',
+        loggedByName: 'Marisol Tapia',
       ));
     }
   }
@@ -156,7 +156,7 @@ class PrnRepositoryMock implements PrnRepository {
       dose: it.dose,
       administeredAt: cuando,
       reason: reason,
-      loggedByName: 'Rosa Medina',
+      loggedByName: 'Marisol Tapia',
       overrodeInterval: temprano,
     );
     _usos.add(uso);

@@ -8,6 +8,7 @@
 // Y además el caso de borde explícito en el ticket: con 1 solo paciente
 // vinculado, la barra muestra el contexto pero no ofrece cambiar.
 import 'package:agecare_app/core/theme/app_theme.dart';
+import 'package:agecare_app/features/auth/application/auth_controller.dart';
 import 'package:agecare_app/features/auth/domain/models.dart';
 import 'package:agecare_app/features/patients/application/patients_providers.dart';
 import 'package:agecare_app/features/patients/data/patients_repository.dart';
@@ -111,7 +112,7 @@ void main() {
     // Tocar la barra no debe abrir ningún selector.
     await tester.tap(find.byKey(const Key('patientSelectorBar_tap')));
     await tester.pumpAndSettle(const Duration(milliseconds: 1000));
-    expect(find.text('Cambiar de paciente'), findsNothing);
+    expect(find.text('Cambiar de adulto mayor'), findsNothing);
   });
 
   testWidgets(
@@ -127,7 +128,7 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 1000));
 
     // Se ve la lista completa de pacientes vinculados.
-    expect(find.text('Cambiar de paciente'), findsOneWidget);
+    expect(find.text('Cambiar de adulto mayor'), findsOneWidget);
     expect(find.byKey(const Key('patientSelectorBar_option_p-elena')),
         findsOneWidget);
     expect(find.byKey(const Key('patientSelectorBar_option_p-jose')),
@@ -162,5 +163,29 @@ void main() {
     // Sin invalidar nada a mano: selectedPatientDetailProvider observa
     // selectedPatientProvider y se reconstruyó solo con el nuevo paciente.
     expect(find.text('detalle:José Ramírez'), findsOneWidget);
+  });
+
+  testWidgets(
+      'el familiar puede agregar un adulto mayor desde el selector, aunque tenga uno solo',
+      (tester) async {
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        patientsRepositoryProvider.overrideWithValue(_SinglePatientRepo()),
+        currentUserProvider.overrideWith((ref) => const User(
+              userId: 'u-fam',
+              fullName: 'Daniela Fuentes',
+              email: 'f@t.cl',
+              accountType: RoleType.family,
+            )),
+      ],
+      child: MaterialApp(theme: AppTheme.light(), home: const _Harness()),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('Adulto mayor: '), findsOneWidget);
+    await tester.tap(find.byKey(const Key('patientSelectorBar_tap')));
+    await tester.pumpAndSettle(const Duration(milliseconds: 500));
+    expect(find.byKey(const Key('patientSelectorBar_add')), findsOneWidget);
   });
 }

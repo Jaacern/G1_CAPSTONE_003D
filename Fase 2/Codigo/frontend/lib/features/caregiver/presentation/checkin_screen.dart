@@ -97,7 +97,7 @@ class _CheckinScreenState extends ConsumerState<CheckinScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Paciente: ${today.patientName}',
+                        'Adulto mayor: ${today.patientName}',
                         style: const TextStyle(color: AppColors.textSecondary),
                       ),
                     ],
@@ -171,7 +171,7 @@ class _OtroTurnoAbierto extends StatelessWidget {
                       fontSize: 16, fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
               const Text(
-                'Cierra ese turno antes de empezar uno con otro paciente.',
+                'Cierra ese turno antes de empezar uno con otro adulto mayor.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.textSecondary),
               ),

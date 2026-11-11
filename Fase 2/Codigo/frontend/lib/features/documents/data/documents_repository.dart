@@ -70,31 +70,35 @@ class DocumentsRepositoryMock implements DocumentsRepository {
 
   void _seed() {
     final now = DateTime.now();
+    PatientDocument doc(String id, String titulo, String cat, String archivo,
+            int dias, String autor) =>
+        PatientDocument(
+          id: id,
+          title: titulo,
+          category: cat,
+          fileUrl: 'https://example.com/docs/$archivo',
+          createdAt: now.subtract(Duration(days: dias)),
+          uploaderName: autor,
+        );
     _docs.addAll([
-      PatientDocument(
-        id: 'doc-1',
-        title: 'Receta cardiología',
-        category: 'receta',
-        fileUrl: 'https://example.com/docs/receta-cardiologia.pdf',
-        createdAt: now.subtract(const Duration(days: 3)),
-        uploaderName: 'Dra. Pérez',
-      ),
-      PatientDocument(
-        id: 'doc-2',
-        title: 'Estudio de laboratorio (biometría)',
-        category: 'estudio',
-        fileUrl: 'https://example.com/docs/laboratorio.pdf',
-        createdAt: now.subtract(const Duration(days: 10)),
-        uploaderName: 'Laboratorio Central',
-      ),
-      PatientDocument(
-        id: 'doc-3',
-        title: 'Credencial INE',
-        category: 'identificacion',
-        fileUrl: 'https://example.com/docs/credencial.jpg',
-        createdAt: now.subtract(const Duration(days: 60)),
-        uploaderName: 'Familia',
-      ),
+      doc('doc-1', 'Receta cardiología (losartán)', 'receta',
+          'receta-cardiologia.pdf', 3, 'Dra. Carolina Soto'),
+      doc('doc-2', 'Receta metformina', 'receta', 'receta-metformina.pdf', 40,
+          'Dra. Carolina Soto'),
+      doc('doc-3', 'Hemograma y perfil bioquímico', 'estudio',
+          'hemograma.pdf', 10, 'Daniela Fuentes'),
+      doc('doc-4', 'Hemoglobina glicosilada', 'estudio', 'hba1c.pdf', 95,
+          'Daniela Fuentes'),
+      doc('doc-5', 'Radiografía de tórax', 'imagen', 'rx-torax.jpg', 22,
+          'Marisol Tapia'),
+      doc('doc-6', 'Informe de cardiología', 'informe',
+          'informe-cardiologia.pdf', 30, 'Dra. Carolina Soto'),
+      doc('doc-7', 'Epicrisis hospitalización enero', 'epicrisis',
+          'epicrisis.pdf', 280, 'Daniela Fuentes'),
+      doc('doc-8', 'Credencial Fonasa', 'prevision', 'fonasa.jpg', 120,
+          'Daniela Fuentes'),
+      doc('doc-9', 'Cédula de identidad', 'identificacion', 'cedula.jpg', 200,
+          'Daniela Fuentes'),
     ]);
   }
 

@@ -33,7 +33,7 @@ app.include_router(files.router)
 app.include_router(documents.router)
 
 PACIENTE = "33333333-3333-4333-8333-333333333333"
-AJENO = "eeeeeee1-0000-4000-8000-000000000001"
+from _ajeno import AJENO  # noqa: E402  (cuenta sin circulo, creada y borrada por la prueba)
 n = ok = 0
 
 
@@ -88,7 +88,9 @@ async def main(client, rr):
 
     # documentos de prueba, insertados directo para controlar la categoria
     claves = [("prescription", "receta"), ("lab_result", "estudio"),
-              ("identification", "identificacion"), ("imaging", "general"),
+              ("identification", "identificacion"), ("imaging", "imagen"),
+              ("report", "informe"), ("discharge", "epicrisis"),
+              ("consent", "consentimiento"), ("insurance", "prevision"),
               ("other", "general")]
     for codigo, _ in claves:
         url = await archivo(client, familiar, f"{codigo}.pdf")
@@ -106,8 +108,8 @@ async def main(client, rr):
     if r.status_code == 200:
         items = {i["title"]: i for i in r.json()["items"] if i["title"].startswith("PRUEBA")}
         n += 1
-        if len(items) == 5:
-            ok += 1; print("  OK   trae los 5 documentos")
+        if len(items) == len(claves):
+            ok += 1; print(f"  OK   trae los {len(claves)} documentos")
         else:
             print(f"  FALLA trae {len(items)}")
         for codigo, clave in claves:
@@ -186,6 +188,8 @@ async def main(client, rr):
             print(f"  FALLA reintento: {r2.status_code} {r2.text[:100]}")
 
     for clave, codigo in [("estudio", "lab_result"), ("identificacion", "identification"),
+                          ("imagen", "imaging"), ("informe", "report"),
+                          ("epicrisis", "discharge"), ("prevision", "insurance"),
                           ("general", "other")]:
         u = await archivo(client, familiar, f"{clave}-nuevo.pdf")
         rr2 = await client.post(f"/api/v1/patients/{PACIENTE}/documents",

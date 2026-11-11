@@ -777,14 +777,14 @@ class PatientsRepositoryMock implements PatientsRepository {
   Future<List<CareMember>> listMembers(String patientId) async => const [
         CareMember(
             userId: 'u1',
-            fullName: 'Javier Cerna',
-            email: 'ja.cernac@duocuc.cl',
+            fullName: 'Daniela Fuentes',
+            email: 'familiar@agecare.cl',
             role: 'family',
             isOwner: true),
         CareMember(
             userId: 'u2',
-            fullName: 'Rosa Medina',
-            email: 'rosa@cuidados.cl',
+            fullName: 'Marisol Tapia',
+            email: 'cuidadora@agecare.cl',
             role: 'caregiver',
             profession: 'cuidadora'),
       ];

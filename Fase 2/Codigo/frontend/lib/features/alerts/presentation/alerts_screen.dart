@@ -52,8 +52,10 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
     final alertsAsync = ref.watch(alertsControllerProvider);
     // El familiar observa el centro de alertas pero no las gestiona: reconocer
     // y resolver quedan para cuidadora y médico.
-    final readOnly =
-        ref.watch(currentUserProvider)?.primaryRole == RoleType.family;
+    // El médico tampoco: el servidor solo deja reconocer a familia y
+    // cuidadora, y resolver a la cuidadora.
+    final rol = ref.watch(currentUserProvider)?.primaryRole;
+    final readOnly = rol == RoleType.family || rol == RoleType.doctor;
 
     return Scaffold(
       appBar: widget.embedded

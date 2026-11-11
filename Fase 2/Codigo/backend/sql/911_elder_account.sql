@@ -14,7 +14,7 @@
 --
 -- CÓMO QUEDA
 --   El adulto mayor SÍ tiene fila en users. Es lo que el seed de desarrollo ya
---   venía haciendo (elena@agecare.cl con rol elder), así que esto no cambia el
+--   venía haciendo (adultomayor@agecare.cl con rol elder), así que esto no cambia el
 --   modelo: lo deja explícito y cierra el conflicto.
 --
 --   La cuenta se crea sola al canjear el código de vinculación (RF-68) y NO es

@@ -35,7 +35,7 @@ Map<String, dynamic> _mensaje(String id, String hora, String texto) => {
       'id': id,
       'patient_id': 'p-elena',
       'sender_id': 'u-$id',
-      'sender_name': 'Rosa Millán',
+      'sender_name': 'Marisol Tapia',
       'sender_role': 'caregiver',
       'type': 'text',
       'text': texto,

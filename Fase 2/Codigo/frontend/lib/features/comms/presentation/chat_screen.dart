@@ -70,7 +70,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (patient == null) {
       setState(() {
         _loading = false;
-        _error = 'No hay un paciente seleccionado.';
+        _error = 'No hay un adulto mayor seleccionado.';
       });
       return;
     }

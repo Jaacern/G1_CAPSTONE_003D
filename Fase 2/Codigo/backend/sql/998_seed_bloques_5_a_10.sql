@@ -6,9 +6,9 @@
 -- equipo, así que los dos pueden evolucionar sin pisarse.
 --
 -- Se apoya en lo que 900 ya creó:
---   familiar   11111111-1111-4111-8111-111111111111  ja.cernac@duocuc.cl
---   cuidadora  22222222-2222-4222-8222-222222222222  rosa@cuidados.cl
---   adulto m.  99999999-9999-4999-8999-999999999999  elena@agecare.cl
+--   familiar   11111111-1111-4111-8111-111111111111  familiar@agecare.cl
+--   cuidadora  22222222-2222-4222-8222-222222222222  cuidadora@agecare.cl
+--   adulto m.  99999999-9999-4999-8999-999999999999  adultomayor@agecare.cl
 --   paciente   33333333-3333-4333-8333-333333333333  Elena Rosales
 --
 -- Todo usa identificadores fijos con prefijo b... y ON CONFLICT DO NOTHING,
@@ -279,9 +279,9 @@ ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO messages (id, conversation_id, sender_id, kind, body, file_id, created_at) VALUES
  ('bbbbbbc2-0000-4000-8000-000000000001','bbbbbbc1-0000-4000-8000-000000000001',
-  '22222222-2222-4222-8222-222222222222','text','Don Juan, su mamá durmió mal anoche. Le avisé al doctor.',NULL, now() - interval '8 hours'),
+  '22222222-2222-4222-8222-222222222222','text','Daniela, su mamá durmió mal anoche. Le avisé al doctor.',NULL, now() - interval '8 hours'),
  ('bbbbbbc2-0000-4000-8000-000000000002','bbbbbbc1-0000-4000-8000-000000000001',
-  '11111111-1111-4111-8111-111111111111','text','Gracias Rosa. ¿Alcanzó a almorzar?',NULL, now() - interval '7 hours'),
+  '11111111-1111-4111-8111-111111111111','text','Gracias Marisol. ¿Alcanzó a almorzar?',NULL, now() - interval '7 hours'),
  ('bbbbbbc2-0000-4000-8000-000000000003','bbbbbbc1-0000-4000-8000-000000000001',
   '22222222-2222-4222-8222-222222222222','photo','', 'bbbbbbb1-0000-4000-8000-000000000002', now() - interval '6 hours'),
  ('bbbbbbc2-0000-4000-8000-000000000004','bbbbbbc1-0000-4000-8000-000000000001',
@@ -423,7 +423,7 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO invitations (id, patient_id, email, role, token_hash, invited_by, expires_at,
                          accepted_at, accepted_by, created_at, updated_at) VALUES
  ('bbbbbbc9-0000-4000-8000-000000000001','33333333-3333-4333-8333-333333333333',
-  'rosa@cuidados.cl','caregiver', repeat('c',64),'11111111-1111-4111-8111-111111111111',
+  'cuidadora@agecare.cl','caregiver', repeat('c',64),'11111111-1111-4111-8111-111111111111',
   now() - interval '40 days' + interval '7 days', now() - interval '40 days' + interval '1 day',
   '22222222-2222-4222-8222-222222222222',
   now() - interval '40 days', now() - interval '39 days'),
@@ -477,10 +477,10 @@ ON CONFLICT (profile_id, commune_code) DO NOTHING;
 INSERT INTO files (id, patient_id, uploaded_by, storage_key, original_name, mime_type,
                    size_bytes, status, upload_expires_at, stored_at, scope) VALUES
  ('bbbbbbd5-0000-4000-8000-000000000001', NULL,'22222222-2222-4222-8222-222222222222',
-  'cert/rosa/titulo.pdf','titulo_enfermeria.pdf','application/pdf',320000,'stored',
+  'cert/cuidadora/titulo.pdf','titulo_enfermeria.pdf','application/pdf',320000,'stored',
   now(), now() - interval '4 months','caregiver'),
  ('bbbbbbd5-0000-4000-8000-000000000002', NULL,'22222222-2222-4222-8222-222222222222',
-  'cert/rosa/rcp.pdf','certificado_rcp.pdf','application/pdf',145000,'stored',
+  'cert/cuidadora/rcp.pdf','certificado_rcp.pdf','application/pdf',145000,'stored',
   now(), now() - interval '4 months','caregiver')
 ON CONFLICT (id) DO NOTHING;
 
@@ -499,7 +499,7 @@ INSERT INTO contact_requests (id, profile_id, requester_id, patient_id, message,
                               channel, responded_at, created_at) VALUES
  ('bbbbbbd3-0000-4000-8000-000000000001','bbbbbbd1-0000-4000-8000-000000000001',
   '11111111-1111-4111-8111-111111111111','33333333-3333-4333-8333-333333333333',
-  'Hola Rosa, busco apoyo de día para mi mamá en San Pedro. ¿Tiene disponibilidad?',
+  'Hola Marisol, busco apoyo de día para mi mamá en San Pedro. ¿Tiene disponibilidad?',
   'accepted','phone', now() - interval '40 days' + interval '6 hours', now() - interval '40 days')
 ON CONFLICT (id) DO NOTHING;
 
@@ -509,7 +509,7 @@ INSERT INTO caregiver_reviews (id, profile_id, reviewed_user_id, author_id, pati
  ('bbbbbbd4-0000-4000-8000-000000000001','bbbbbbd1-0000-4000-8000-000000000001',
   '22222222-2222-4222-8222-222222222222','11111111-1111-4111-8111-111111111111',
   '33333333-3333-4333-8333-333333333333',5,
-  'Rosa lleva seis meses con mi mamá. Puntual, registra todo en la app y avisa apenas pasa algo.')
+  'Marisol lleva seis meses con mi mamá. Puntual, registra todo en la app y avisa apenas pasa algo.')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO support_articles (category, name, description, reference_price, currency,
@@ -559,7 +559,7 @@ INSERT INTO analytics_events (event_name, event_source, actor_type, actor_user_i
  ('auth.login','api','user','11111111-1111-4111-8111-111111111111','{"plataforma":"android"}', now() - interval '2 hours'),
  ('auth.login','api','user','22222222-2222-4222-8222-222222222222','{"plataforma":"ios"}', now() - interval '5 hours'),
  ('marketplace.profile_viewed','app','user','11111111-1111-4111-8111-111111111111',
-  '{"perfil":"rosa","origen":"busqueda"}', now() - interval '41 days'),
+  '{"perfil":"cuidadora","origen":"busqueda"}', now() - interval '41 days'),
  ('subscription.upgraded','api','user','11111111-1111-4111-8111-111111111111',
   '{"desde":"free","hacia":"premium"}', now() - interval '6 months');
 

@@ -8,24 +8,44 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/util/save_pdf.dart';
 import '../../../core/validation/identity_validators.dart';
 import '../../../core/widgets/common.dart';
+import '../../auth/application/auth_controller.dart';
+import '../../auth/domain/models.dart';
 import '../application/patients_providers.dart';
 import '../data/patients_repository.dart';
 import '../data/reports_repository.dart';
 import '../domain/models.dart';
 
-/// Perfil clínico del paciente: identidad, edad, sexo, enfermedades y accesos
-/// al expediente. Pensado para que el médico tenga el contexto en un vistazo.
+/// Ficha completa del adulto mayor: identidad, ficha social, enfermedades,
+/// alergias, contactos y la hoja de emergencia en PDF.
+///
+/// La ven todos los que lo cuidan: el médico desde su ficha clínica, y la
+/// familia y la cuidadora en su pestaña "Ficha" ([embedded]). Los botones de
+/// edición siguen los permisos del servidor: identidad, ficha social,
+/// enfermedades y contactos los cambia el familiar; alergias, vacunas y
+/// mediciones las registra también la cuidadora o el médico, que son quienes
+/// las descubren.
 class PatientProfileScreen extends ConsumerWidget {
-  const PatientProfileScreen({super.key, required this.patientId});
+  const PatientProfileScreen(
+      {super.key, required this.patientId, this.embedded = false});
 
   final String patientId;
+
+  /// Dentro de una pestaña: sin AppBar propio (lo pone el shell).
+  final bool embedded;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(selectedPatientDetailProvider);
+    final rol = _rolSobre(ref, patientId);
+    final editaFicha = rol == RoleType.family;
+    final registraClinico = rol == RoleType.family ||
+        rol == RoleType.caregiver ||
+        rol == RoleType.doctor;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Perfil del paciente')),
+      appBar: embedded
+          ? null
+          : AppBar(title: const Text('Ficha del adulto mayor')),
       body: detail.when(
         loading: () => const LoadingView(),
         error: (e, _) => ErrorView(
@@ -36,17 +56,22 @@ class PatientProfileScreen extends ConsumerWidget {
           if (p == null) {
             return const EmptyView(
               icon: Icons.person_off_rounded,
-              title: 'Sin paciente',
-              subtitle: 'Selecciona un paciente para ver su perfil.',
+              title: 'Sin adulto mayor',
+              subtitle: 'Elige a un adulto mayor para ver su ficha.',
             );
           }
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: [
               _Cabecera(patient: p),
+              // Arriba y no al final: en una urgencia es lo primero que se
+              // busca, y lo usan todos los que cuidan al adulto mayor.
+              const _SectionLabel('Hoja de emergencia'),
+              _HojaEmergenciaCard(patientId: patientId, nombre: p.fullName),
               Row(
                 children: [
                   const Expanded(child: _SectionLabel('Identidad')),
+                  if (editaFicha)
                   TextButton.icon(
                     onPressed: () => _editarNombre(context, ref, p),
                     icon: const Icon(Icons.edit_outlined, size: 18),
@@ -105,6 +130,7 @@ class PatientProfileScreen extends ConsumerWidget {
               Row(
                 children: [
                   const Expanded(child: _SectionLabel('Ficha social y riesgo')),
+                  if (editaFicha)
                   TextButton.icon(
                     onPressed: () => _editarPerfil(context, ref, p),
                     icon: const Icon(Icons.edit_outlined, size: 18),
@@ -154,6 +180,7 @@ class PatientProfileScreen extends ConsumerWidget {
               Row(
                 children: [
                   const Expanded(child: _SectionLabel('Antropometría')),
+                  if (registraClinico)
                   TextButton.icon(
                     onPressed: () => _agregarMedicion(context, ref, p),
                     icon: const Icon(Icons.add_rounded, size: 18),
@@ -170,6 +197,7 @@ class PatientProfileScreen extends ConsumerWidget {
               Row(
                 children: [
                   const Expanded(child: _SectionLabel('Enfermedades')),
+                  if (editaFicha)
                   TextButton.icon(
                     onPressed: () => _editarEnfermedades(context, ref, p),
                     icon: const Icon(Icons.edit_outlined, size: 18),
@@ -219,6 +247,7 @@ class PatientProfileScreen extends ConsumerWidget {
               Row(
                 children: [
                   const Expanded(child: _SectionLabel('Alergias')),
+                  if (registraClinico)
                   TextButton.icon(
                     onPressed: () => _editarAlergias(context, ref, p),
                     icon: const Icon(Icons.edit_outlined, size: 18),
@@ -230,6 +259,7 @@ class PatientProfileScreen extends ConsumerWidget {
               Row(
                 children: [
                   const Expanded(child: _SectionLabel('Vacunas')),
+                  if (registraClinico)
                   TextButton.icon(
                     onPressed: () => _editarVacunas(context, ref, p),
                     icon: const Icon(Icons.edit_outlined, size: 18),
@@ -269,6 +299,7 @@ class PatientProfileScreen extends ConsumerWidget {
                 children: [
                   const Expanded(
                       child: _SectionLabel('Contactos de emergencia')),
+                  if (editaFicha)
                   TextButton.icon(
                     onPressed: () => _editarContactos(context, ref, p),
                     icon: const Icon(Icons.edit_outlined, size: 18),
@@ -279,8 +310,6 @@ class PatientProfileScreen extends ConsumerWidget {
               _ContactosEmergenciaCard(patientId: patientId),
               const _SectionLabel('Teléfonos de emergencia'),
               const _TelefonosEmergencia(),
-              const _SectionLabel('Hoja de emergencia'),
-              _HojaEmergenciaCard(patientId: patientId, nombre: p.fullName),
               const _SectionLabel('Expediente'),
               AppCard(
                 padding: EdgeInsets.zero,
@@ -754,7 +783,7 @@ Future<void> _editarNombre(
   final ok = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Nombre del paciente'),
+      title: const Text('Nombre del adulto mayor'),
       content: SingleChildScrollView(
         child: Form(
           key: formKey,
@@ -1146,8 +1175,15 @@ Future<void> _editarAlergias(
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setLocal) {
         Future<void> agregar() async {
-          final code = elegido?.code ?? libreCtrl.text.trim();
-          if (code.length < 2) return;
+          if (elegido == null) {
+            final error = validateAllergenName(libreCtrl.text);
+            if (error != null) {
+              showAppSnackBar(ctx, error, error: true);
+              return;
+            }
+          }
+          final code = elegido?.code ??
+              libreCtrl.text.trim().replaceAll(RegExp(r'\s+'), ' ');
           final cat = elegido?.category ?? categoria;
           final nueva = AllergyDetail(
             substance: code,
@@ -1224,7 +1260,7 @@ Future<void> _editarAlergias(
                         labelText: 'Alérgeno (del catálogo)'),
                     items: [
                       const DropdownMenuItem(
-                          value: null, child: Text('— Escribir otro —')),
+                          value: null, child: Text('Otra (escribir)')),
                       for (final c in catalogo)
                         DropdownMenuItem(
                             value: c,
@@ -1237,9 +1273,10 @@ Future<void> _editarAlergias(
                     const SizedBox(height: 8),
                     TextField(
                       controller: libreCtrl,
+                      textCapitalization: TextCapitalization.sentences,
                       decoration: const InputDecoration(
-                        labelText: 'Alérgeno (texto libre)',
-                        hintText: 'Ej: kiwi',
+                        labelText: '¿A qué es alérgico?',
+                        hintText: 'Ej: Kiwi, Contraste yodado',
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -1881,6 +1918,17 @@ Future<void> _editarContactos(
 
 /// Acción para generar la hoja de emergencia en PDF: un resumen clínico que se
 /// puede mostrar o enviar a un paramédico / doctor de turno en una urgencia.
+/// Rol de quien mira sobre ESTE adulto mayor; sin membresía conocida, su
+/// tipo de cuenta.
+RoleType? _rolSobre(WidgetRef ref, String patientId) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return null;
+  for (final m in user.memberships) {
+    if (m.patientId == patientId) return m.role;
+  }
+  return user.primaryRole;
+}
+
 class _HojaEmergenciaCard extends ConsumerStatefulWidget {
   const _HojaEmergenciaCard({required this.patientId, required this.nombre});
   final String patientId;

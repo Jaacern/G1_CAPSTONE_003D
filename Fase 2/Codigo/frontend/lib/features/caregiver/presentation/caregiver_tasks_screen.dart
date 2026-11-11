@@ -31,8 +31,8 @@ class CaregiverTasksScreen extends ConsumerWidget {
       body: patient == null
           ? const EmptyView(
               icon: Icons.person_off_rounded,
-              title: 'Sin paciente seleccionado',
-              subtitle: 'Selecciona un paciente para ver sus tareas.',
+              title: 'Sin adulto mayor seleccionado',
+              subtitle: 'Elige a un adulto mayor para ver sus tareas.',
             )
           : tasksAsync.when(
               loading: () => const LoadingView(),

@@ -1,11 +1,7 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../../core/network/upload_service.dart';
 import '../../../core/speech/speech_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
@@ -43,15 +39,9 @@ class ElderPhotosScreen extends ConsumerWidget {
             style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
         toolbarHeight: 72,
       ),
-      floatingActionButton: patientId == null
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: () => _addPhoto(context, ref, patientId),
-              backgroundColor: AppColors.primary,
-              icon: const Icon(Icons.add_a_photo_rounded, size: 30),
-              label: const Text('Agregar foto',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-            ),
+      // Sin botón de agregar: publicar fotos es del familiar (RF-60). El
+      // backend ya le responde 403 al adulto mayor; mostrarle el botón era
+      // ofrecerle algo que siempre fallaba.
       body: patientId == null
           ? const EmptyView(
               icon: Icons.photo_library_rounded,
@@ -61,7 +51,9 @@ class ElderPhotosScreen extends ConsumerWidget {
           : photosAsync.when(
               loading: () => const LoadingView(),
               error: (e, _) => ErrorView(
-                message: e is Exception ? e.toString() : 'No se pudieron cargar las fotos.',
+                message: e is Exception
+                    ? e.toString()
+                    : 'No se pudieron cargar las fotos.',
                 onRetry: () => ref.invalidate(photosProvider),
               ),
               data: (photos) {
@@ -89,8 +81,8 @@ class ElderPhotosScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _react(
-      BuildContext context, WidgetRef ref, String photoId, String reaction) async {
+  Future<void> _react(BuildContext context, WidgetRef ref, String photoId,
+      String reaction) async {
     try {
       await ref.read(elderRepositoryProvider).reactPhoto(photoId, reaction);
       ref.invalidate(photosProvider);
@@ -102,64 +94,6 @@ class ElderPhotosScreen extends ConsumerWidget {
         showAppSnackBar(context, 'No se pudo enviar la reacción', error: true);
       }
     }
-  }
-
-  Future<void> _addPhoto(
-      BuildContext context, WidgetRef ref, String patientId) async {
-    try {
-      final picked = await ImagePicker()
-          .pickImage(source: ImageSource.gallery, imageQuality: 85, maxWidth: 2000);
-      if (picked == null) return;
-      if (!context.mounted) return;
-
-      final caption = await _askCaption(context);
-      if (!context.mounted) return;
-
-      showAppSnackBar(context, 'Subiendo la foto...');
-      final uploaded = await ref
-          .read(uploadServiceProvider)
-          .uploadFile(File(picked.path), kind: 'photo', patientId: patientId);
-      await ref.read(elderRepositoryProvider).addPhoto(
-            patientId,
-            fileUrl: uploaded.fileUrl,
-            caption: caption,
-          );
-      ref.invalidate(photosProvider);
-      if (context.mounted) showAppSnackBar(context, 'Foto agregada');
-    } catch (_) {
-      if (context.mounted) {
-        showAppSnackBar(context, 'No se pudo agregar la foto', error: true);
-      }
-    }
-  }
-
-  Future<String?> _askCaption(BuildContext context) {
-    final controller = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('¿Qué muestra la foto?',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: const TextStyle(fontSize: 20),
-          decoration: const InputDecoration(
-            hintText: 'Ej. Mis nietos en la playa',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, null),
-            child: const Text('Omitir', style: TextStyle(fontSize: 18)),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Guardar', style: TextStyle(fontSize: 18)),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -183,8 +117,7 @@ class _PhotoCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ClipRRect(
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(16)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             child: AspectRatio(
               aspectRatio: 4 / 3,
               child: RemoteFileImage(photo.url),

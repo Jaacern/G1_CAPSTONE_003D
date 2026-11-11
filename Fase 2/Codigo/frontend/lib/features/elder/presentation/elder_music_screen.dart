@@ -102,8 +102,9 @@ class _NoteButtonState extends State<_NoteButton> {
   @override
   Widget build(BuildContext context) {
     // Marino sobre dorado (contraste), blanco en el resto — regla de la guía.
-    final onColor =
-        widget.note.color == AgeColors.gold500 ? AgeColors.navy800 : Colors.white;
+    final onColor = widget.note.color == AgeColors.gold500
+        ? AgeColors.navy800
+        : Colors.white;
     return Semantics(
       button: true,
       label: 'Nota ${widget.note.label}',

@@ -5,11 +5,13 @@ import 'package:go_router/go_router.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/speech/speech_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/common.dart';
 import '../../alerts/presentation/sos_button.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../medications/domain/models.dart' as meds;
-import '../../medications/presentation/dose_actions.dart';
 import '../application/elder_providers.dart';
+import '../data/elder_repository.dart';
+import 'elder_content_screen.dart';
 import 'elder_music_screen.dart';
 import 'elder_photos_screen.dart';
 
@@ -53,6 +55,17 @@ class ElderHomeScreen extends ConsumerWidget {
           speak: 'Fotos. Ver fotos de la familia.',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const ElderPhotosScreen()),
+          ),
+        ),
+        _ElderAction(
+          icon: Icons.auto_stories_rounded,
+          title: 'Para ti',
+          subtitle: 'Chistes, recuerdos y consejos',
+          accentFg: AgeColors.info600,
+          accentBg: AgeColors.teal100,
+          speak: 'Para ti. Chistes, recuerdos y consejos para leer o escuchar.',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ElderContentScreen()),
           ),
         ),
         _ElderAction(
@@ -102,10 +115,11 @@ class ElderHomeScreen extends ConsumerWidget {
                 _HelpButton(
                   onTap: () => speech.speak(
                     'Esta es tu pantalla de inicio. Arriba están tus remedios '
-                    'de hoy, con un botón para avisar cuando te tomes uno. '
+                    'de hoy y a qué hora te toca cada uno. '
                     'Después puedes decirnos cómo te sientes hoy. Más abajo, '
                     'toca un botón grande para hablar con tu familia, ver tus '
-                    'fotos o entretenerte con la música. El botón rojo es '
+                    'fotos, leer algo para ti o entretenerte con la música. '
+                    'El botón rojo es '
                     'para pedir ayuda en una emergencia.',
                   ),
                 ),
@@ -174,32 +188,64 @@ class ElderHomeScreen extends ConsumerWidget {
   }
 }
 
-/// Tarjeta "¿Cómo te sientes hoy?" con tres caras grandes. Al elegir una, se
-/// confirma en voz alta y queda marcada (feedback visual + sonoro, sin iconos
-/// de estado crípticos).
-class _MoodCheckIn extends StatefulWidget {
+/// Tarjeta "¿Cómo te sientes hoy?" con tres caras grandes (RF-38, un
+/// check-in por día). Al elegir una se guarda en el servidor, se confirma en
+/// voz alta y queda marcada. Volver a tocar otra cara corrige la de hoy.
+///
+/// "Mal" pone el semáforo del adulto mayor en amarillo con su motivo, y así
+/// lo ve la familia en su pantalla. Por eso la voz dice eso y no "avisaremos
+/// a tu familia": no se envía ningún aviso aparte.
+class _MoodCheckIn extends ConsumerStatefulWidget {
   const _MoodCheckIn({required this.speech});
   final SpeechService speech;
 
   @override
-  State<_MoodCheckIn> createState() => _MoodCheckInState();
+  ConsumerState<_MoodCheckIn> createState() => _MoodCheckInState();
 }
 
-class _MoodCheckInState extends State<_MoodCheckIn> {
+class _MoodCheckInState extends ConsumerState<_MoodCheckIn> {
   static const _moods = <_Mood>[
-    _Mood('bien', '😀', 'Bien', AgeColors.ok600, AgeColors.ok100,
+    _Mood('good', '😀', 'Bien', AgeColors.ok600, AgeColors.ok100,
         'Me alegra que te sientas bien hoy.'),
     _Mood('regular', '😐', 'Regular', AgeColors.warn500, AgeColors.warn100,
         'Gracias por contarnos. Cuídate mucho hoy.'),
-    _Mood('mal', '😟', 'Mal', AgeColors.attention600, AgeColors.attention100,
-        'Lamento que te sientas así. Avisaremos a tu familia.'),
+    _Mood('bad', '😟', 'Mal', AgeColors.attention600, AgeColors.attention100,
+        'Lamento que te sientas así. Tu familia lo verá en su pantalla.'),
   ];
 
-  String? _selected;
+  /// Lo elegido en esta sesión, mientras se guarda. Manda sobre lo cargado.
+  String? _elegido;
+  bool _guardando = false;
+
+  Future<void> _elegir(_Mood mood) async {
+    final patientId = ref.read(elderPatientIdProvider);
+    if (patientId == null || _guardando) return;
+    setState(() {
+      _elegido = mood.id;
+      _guardando = true;
+    });
+    try {
+      await ref.read(elderRepositoryProvider).saveMood(patientId, mood.id);
+      ref.invalidate(animoDeHoyProvider);
+      // La voz es un extra: si no hay red o servicio de voz, lo guardado
+      // sigue guardado y la cara queda marcada.
+      widget.speech.speak(mood.spoken).catchError((_) {});
+    } catch (_) {
+      if (!mounted) return;
+      // Si no se guardó, la cara no queda marcada: marcarla sería decirle
+      // que lo contó cuando no llegó a nadie.
+      setState(() => _elegido = null);
+      showAppSnackBar(context, 'No se pudo guardar. Inténtalo de nuevo.',
+          error: true);
+    } finally {
+      if (mounted) setState(() => _guardando = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final seleccion = _elegido ?? ref.watch(animoDeHoyProvider).valueOrNull;
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
       decoration: BoxDecoration(
@@ -223,11 +269,8 @@ class _MoodCheckInState extends State<_MoodCheckIn> {
               for (final mood in _moods)
                 _MoodFace(
                   mood: mood,
-                  selected: _selected == mood.id,
-                  onTap: () {
-                    setState(() => _selected = mood.id);
-                    widget.speech.speak(mood.spoken);
-                  },
+                  selected: seleccion == mood.id,
+                  onTap: () => _elegir(mood),
                 ),
             ],
           ),
@@ -603,30 +646,13 @@ class _RemediosDeHoy extends ConsumerWidget {
                   ' · a las ${proxima.timeLabel}',
                   style: AgeText.bodyL.copyWith(color: scheme.onSurfaceVariant),
                 ),
-                const SizedBox(height: 16),
-                // Un solo boton, del ancho de la tarjeta. Las otras opciones
-                // (posponer, no la tome) viven en la pantalla de la dosis,
-                // que la familia y la cuidadora si tienen: aqui la respuesta
-                // normal es una sola.
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      backgroundColor: AgeColors.teal600,
-                    ),
-                    onPressed: () async {
-                      final ok = await registrarDosis(
-                        context: context,
-                        ref: ref,
-                        dose: proxima,
-                        status: meds.DoseStatus.taken,
-                      );
-                      if (ok) ref.invalidate(dosisDeHoyProvider);
-                    },
-                    icon: const Icon(Icons.check_rounded, size: 26),
-                    label: const Text('Ya me lo tomé', style: AgeText.bodyL),
-                  ),
+                const SizedBox(height: 12),
+                // Sin botón de "ya me lo tomé": registrar la toma es de la
+                // cuidadora (RF-29). Aquí el adulto mayor ve qué le toca y a
+                // qué hora (RF-28), que es lo que necesita saber.
+                Text(
+                  'Tu cuidadora lo anota cuando te lo tomas.',
+                  style: AgeText.body.copyWith(color: scheme.onSurfaceVariant),
                 ),
               ],
               const SizedBox(height: 10),

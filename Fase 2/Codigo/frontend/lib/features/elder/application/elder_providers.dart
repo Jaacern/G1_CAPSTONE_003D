@@ -46,3 +46,10 @@ final contentFeedProvider = FutureProvider.autoDispose
     .family<List<ContentItem>, String?>((ref, category) async {
   return ref.watch(elderRepositoryProvider).contentFeed(category: category);
 });
+
+/// Cómo dijo sentirse hoy el adulto mayor (RF-38), o null si aún no responde.
+final animoDeHoyProvider = FutureProvider.autoDispose<String?>((ref) async {
+  final patientId = ref.watch(elderPatientIdProvider);
+  if (patientId == null) return null;
+  return ref.watch(elderRepositoryProvider).todayMood(patientId);
+});

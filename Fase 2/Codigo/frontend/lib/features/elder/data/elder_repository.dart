@@ -13,6 +13,14 @@ abstract class ElderRepository {
   Future<void> reactPhoto(String photoId, String reaction);
   Future<void> deletePhoto(String photoId);
   Future<List<ContentItem>> contentFeed({String? category});
+
+  /// Check-in diario (RF-38): cómo dijo sentirse hoy (`good`, `regular`,
+  /// `bad`), o null si aún no responde.
+  Future<String?> todayMood(String patientId);
+
+  /// Responde o corrige el check-in de hoy. Uno por día: el servidor guarda
+  /// lo último que dijo.
+  Future<void> saveMood(String patientId, String mood);
 }
 
 // ---------------------------------------------------------------------------
@@ -45,9 +53,8 @@ class ElderRepositoryHttp implements ElderRepository {
   }
 
   @override
-  Future<void> reactPhoto(String photoId, String reaction) =>
-      _api.post<void>('/photos/$photoId/reactions',
-          data: {'reaction': reaction});
+  Future<void> reactPhoto(String photoId, String reaction) => _api
+      .post<void>('/photos/$photoId/reactions', data: {'reaction': reaction});
 
   @override
   Future<void> deletePhoto(String photoId) =>
@@ -57,12 +64,26 @@ class ElderRepositoryHttp implements ElderRepository {
   Future<List<ContentItem>> contentFeed({String? category}) async {
     final data = await _api.get<Map<String, dynamic>>(
       '/content/feed',
-      query: {if (category != null && category.isNotEmpty) 'category': category},
+      query: {
+        if (category != null && category.isNotEmpty) 'category': category
+      },
     );
     return ((data['items'] ?? []) as List)
         .map((e) => ContentItem.fromJson(e as Map<String, dynamic>))
         .toList();
   }
+
+  @override
+  Future<String?> todayMood(String patientId) async {
+    final data = await _api
+        .get<Map<String, dynamic>>('/patients/$patientId/checkins/today');
+    final c = data['checkin'] as Map<String, dynamic>?;
+    return c?['mood'] as String?;
+  }
+
+  @override
+  Future<void> saveMood(String patientId, String mood) => _api
+      .put<void>('/patients/$patientId/checkins/today', data: {'mood': mood});
 }
 
 // ---------------------------------------------------------------------------
@@ -74,6 +95,19 @@ class ElderRepositoryMock implements ElderRepository {
   }
 
   final List<FamilyPhoto> _photos = [];
+  final Map<String, String> _moods = {};
+
+  @override
+  Future<String?> todayMood(String patientId) async {
+    await Future.delayed(const Duration(milliseconds: 150));
+    return _moods[patientId];
+  }
+
+  @override
+  Future<void> saveMood(String patientId, String mood) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    _moods[patientId] = mood;
+  }
 
   void _seed() {
     final now = DateTime.now();

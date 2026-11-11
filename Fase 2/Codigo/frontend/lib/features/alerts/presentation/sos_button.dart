@@ -28,11 +28,21 @@ class _SosButtonState extends ConsumerState<SosButton> {
   bool _sending = false;
 
   Future<void> _onPressed() async {
-    final patient = ref.read(selectedPatientProvider);
-    if (patient == null) {
+    // El adulto mayor no tiene selector: el paciente es él mismo, y sale de
+    // su membresía. Leer el seleccionado lo dejaba en null en el primer toque
+    // (nadie lo había elegido) y el SOS no salía.
+    final user = ref.read(currentUserProvider);
+    final propia = user?.primaryRole == RoleType.elder &&
+            (user?.memberships.isNotEmpty ?? false)
+        ? user!.memberships.first
+        : null;
+    final seleccionado = ref.read(selectedPatientProvider);
+    final patientId = propia?.patientId ?? seleccionado?.patientId;
+    final nombre = propia?.patientName ?? seleccionado?.fullName;
+    if (patientId == null) {
       showAppSnackBar(
         context,
-        'Selecciona un paciente antes de enviar un SOS.',
+        'Elige a un adulto mayor antes de enviar un SOS.',
         error: true,
       );
       return;
@@ -44,9 +54,14 @@ class _SosButtonState extends ConsumerState<SosButton> {
         icon:
             const Icon(Icons.sos_rounded, color: AppColors.critical, size: 40),
         title: const Text('¿Enviar alerta SOS?'),
+        // Hoy el aviso es una alerta crítica que la red de cuidado ve en su
+        // app; el envío push (RF-45) aún no está. No se promete más que eso.
         content: Text(
-          'Se notificará de inmediato a la red de cuidado de ${patient.fullName}. '
-          'Úsalo solo en una emergencia real.',
+          propia != null
+              ? 'Tu familia y tu cuidadora verán una alerta de emergencia en '
+                  'su teléfono. Úsalo solo en una emergencia real.'
+              : 'La red de cuidado de $nombre verá una alerta de emergencia. '
+                  'Úsalo solo en una emergencia real.',
         ),
         actions: [
           TextButton(
@@ -68,7 +83,7 @@ class _SosButtonState extends ConsumerState<SosButton> {
     try {
       final pos = await _tryGetLocation();
       await ref.read(alertsRepositoryProvider).sendSos(
-            patient.patientId,
+            patientId,
             lat: pos?.latitude,
             lng: pos?.longitude,
           );
@@ -77,8 +92,8 @@ class _SosButtonState extends ConsumerState<SosButton> {
       showAppSnackBar(
         context,
         pos != null
-            ? 'SOS enviado con la ubicación actual.'
-            : 'SOS enviado (sin ubicación).',
+            ? 'Alerta de emergencia creada, con tu ubicación.'
+            : 'Alerta de emergencia creada (sin ubicación).',
       );
     } on ApiException catch (e) {
       if (mounted) showAppSnackBar(context, e.message, error: true);

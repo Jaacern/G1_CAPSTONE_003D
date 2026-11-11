@@ -42,6 +42,11 @@ log = logging.getLogger(__name__)
 _A_BASE = {
     "receta":         "prescription",
     "estudio":        "lab_result",
+    "imagen":         "imaging",
+    "informe":        "report",
+    "epicrisis":      "discharge",
+    "consentimiento": "consent",
+    "prevision":      "insurance",
     "identificacion": "identification",
     "general":        "other",
     "otro":           "other",
@@ -49,12 +54,18 @@ _A_BASE = {
 _CODIGOS = {"prescription", "lab_result", "imaging", "report", "discharge",
             "consent", "insurance", "identification", "other"}
 
-# Del codigo de la base a la clave de la pantalla. Los codigos que la
-# pantalla no sabe dibujar caen en 'general', que es su grupo por defecto y
-# ya tiene icono y titulo propios.
+# Del codigo de la base a la clave de la pantalla. Antes solo se traducian
+# tres y una imagen, un informe o una epicrisis caian en 'Otros': el
+# expediente no se podia filtrar por lo que el medico de verdad busca.
+# Un codigo desconocido cae en 'general', que la pantalla dibuja como Otros.
 _A_PANTALLA = {
     "prescription":   "receta",
     "lab_result":     "estudio",
+    "imaging":        "imagen",
+    "report":         "informe",
+    "discharge":      "epicrisis",
+    "consent":        "consentimiento",
+    "insurance":      "prevision",
     "identification": "identificacion",
 }
 

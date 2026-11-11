@@ -307,3 +307,218 @@ async def mark_read(
         marked=len(filas),
         read_at=filas[0] if filas else datetime.now(timezone.utc),
     )
+
+# ---------------------------------------------------------------------------
+# RF-54: WebSocket de chat en tiempo real
+# ---------------------------------------------------------------------------
+# CÓMO FUNCIONA
+#   1. El cliente abre ws://host/api/v1/patients/{id}/chat/ws?token=<jwt>
+#   2. El backend valida el JWT y comprueba que el usuario pertenece al
+#      círculo del paciente.
+#   3. Se registra la sesión en chat_ws_sessions.
+#   4. El backend abre una conexión asyncpg dedicada y hace LISTEN
+#      "chat_new_message". Cuando llega un NOTIFY (disparado por el trigger
+#      de la tabla messages), se consulta el mensaje completo y se envía al
+#      cliente por el WebSocket.
+#   5. Al cerrar la conexión (normal o por error) se borra la sesión.
+#
+# POR QUÉ LISTEN/NOTIFY Y NO POLLING
+#   El cliente ya usaba polling (GET /chat/messages cada N segundos).
+#   LISTEN/NOTIFY entrega el aviso en milisegundos y sin tráfico innecesario.
+#   No necesita Redis ni un broker externo: Postgres ya está.
+#
+# PING/PONG
+#   El cliente manda texto "ping" y el servidor responde "pong".
+#   Sirve para detectar conexiones muertas sin esperar el timeout del SO.
+
+import asyncio
+import json
+import os
+
+import asyncpg
+from fastapi import WebSocket, WebSocketDisconnect
+from app.security import decode_access_token
+
+
+@router.websocket("/patients/{patient_id}/chat/ws")
+async def chat_websocket(
+    patient_id: str,
+    websocket: WebSocket,
+    token: str = "",
+):
+    """WebSocket del chat en tiempo real (RF-54).
+
+    El token JWT va como query param: ws://...?token=<access_token>
+    Los WebSockets no permiten cabeceras Authorization en el handshake
+    del navegador, así que es la forma estándar.
+    """
+    # --- Autenticación ---
+    try:
+        payload = decode_access_token(token)
+        user_id = payload.get("sub")
+        if not user_id:
+            await websocket.close(code=4001)
+            return
+    except Exception:
+        await websocket.close(code=4001)
+        return
+
+    # --- Autorización: miembro del círculo ---
+    from app.db import engine as _engine
+    async with _engine.connect() as conn:
+        miembro = (await conn.execute(
+            text(
+                """
+                SELECT role FROM patient_members
+                WHERE patient_id = CAST(:pid AS uuid)
+                  AND user_id    = CAST(:uid AS uuid)
+                  AND removed_at IS NULL
+                """
+            ),
+            {"pid": patient_id, "uid": user_id},
+        )).scalar()
+
+    if miembro is None:
+        await websocket.close(code=4003)
+        return
+
+    await websocket.accept()
+
+    # --- Registrar sesión ---
+    async with _engine.begin() as conn:
+        await conn.execute(
+            text(
+                """
+                INSERT INTO chat_ws_sessions
+                    (user_id, patient_id, worker_pid)
+                VALUES (CAST(:uid AS uuid), CAST(:pid AS uuid), :wpid)
+                ON CONFLICT (user_id, patient_id)
+                DO UPDATE SET worker_pid = EXCLUDED.worker_pid,
+                              connected_at = now(),
+                              last_ping_at = now()
+                """
+            ),
+            {"uid": user_id, "pid": patient_id, "wpid": os.getpid()},
+        )
+
+    # --- Conexión asyncpg dedicada para LISTEN ---
+    from app.config import get_settings
+    s = get_settings()
+    dsn = (
+        f"postgresql://{s.postgres_user}:{s.postgres_password}"
+        f"@{s.postgres_host}:{s.postgres_port}/{s.postgres_db}"
+    )
+
+    pg_conn = await asyncpg.connect(dsn)
+
+    # Cola local para pasar los eventos del callback (hilo asyncpg) al loop.
+    queue: asyncio.Queue = asyncio.Queue()
+
+    def _on_notify(conn_ref, pid, channel, payload_str):
+        try:
+            data = json.loads(payload_str)
+            if str(data.get("conversation_id")) or True:
+                queue.put_nowait(data)
+        except Exception:
+            pass
+
+    await pg_conn.add_listener("chat_new_message", _on_notify)
+
+    async def _leer_ws():
+        """Recibe ping del cliente; devuelve pong. Cierra al desconectar."""
+        while True:
+            try:
+                msg = await websocket.receive_text()
+                if msg == "ping":
+                    await websocket.send_text("pong")
+                    # Actualizar last_ping_at.
+                    async with _engine.begin() as conn:
+                        await conn.execute(
+                            text(
+                                "UPDATE chat_ws_sessions SET last_ping_at = now() "
+                                "WHERE user_id = CAST(:uid AS uuid) "
+                                "  AND patient_id = CAST(:pid AS uuid)"
+                            ),
+                            {"uid": user_id, "pid": patient_id},
+                        )
+            except WebSocketDisconnect:
+                queue.put_nowait(None)  # señal de cierre
+                return
+            except Exception:
+                queue.put_nowait(None)
+                return
+
+    async def _enviar_eventos():
+        """Lee la cola y manda los mensajes nuevos al cliente."""
+        while True:
+            evento = await queue.get()
+            if evento is None:
+                return  # cierre
+            # Filtrar: solo la conversación del paciente correcto.
+            # El NOTIFY lleva conversation_id; verificamos que pertenezca
+            # al paciente de esta conexión para no cruzar conversaciones.
+            async with _engine.connect() as conn:
+                conv_pid = (await conn.execute(
+                    text(
+                        "SELECT patient_id FROM conversations "
+                        "WHERE id = CAST(:cid AS uuid)"
+                    ),
+                    {"cid": str(evento.get("conversation_id", ""))},
+                )).scalar()
+
+            if str(conv_pid) != patient_id:
+                continue  # no es esta conversación
+
+            # Leer el mensaje completo para enviarlo.
+            async with _engine.connect() as conn:
+                fila = (await conn.execute(
+                    text(
+                        """
+                        SELECT m.id, m.sender_id, m.kind, m.body, m.file_id,
+                               m.created_at, u.full_name,
+                               pm.role
+                        FROM messages m
+                        JOIN users u ON u.id = m.sender_id
+                        LEFT JOIN patient_members pm
+                               ON pm.patient_id = CAST(:pid AS uuid)
+                              AND pm.user_id = m.sender_id
+                        WHERE m.id = CAST(:mid AS uuid)
+                        """
+                    ),
+                    {"mid": str(evento.get("message_id", "")),
+                     "pid": patient_id},
+                )).mappings().first()
+
+            if fila is None:
+                continue
+
+            out = _salida(
+                {**dict(fila), "leido_por": []},
+                patient_id,
+            )
+            try:
+                await websocket.send_text(out.model_dump_json())
+            except Exception:
+                return
+
+    try:
+        await asyncio.gather(_leer_ws(), _enviar_eventos())
+    finally:
+        # Limpiar al desconectar.
+        try:
+            await pg_conn.remove_listener("chat_new_message", _on_notify)
+            await pg_conn.close()
+        except Exception:
+            pass
+        try:
+            async with _engine.begin() as conn:
+                await conn.execute(
+                    text(
+                        "DELETE FROM chat_ws_sessions "
+                        "WHERE user_id = CAST(:uid AS uuid) "
+                        "  AND patient_id = CAST(:pid AS uuid)"
+                    ),
+                    {"uid": user_id, "pid": patient_id},
+                )
+        except Exception:
+            pass

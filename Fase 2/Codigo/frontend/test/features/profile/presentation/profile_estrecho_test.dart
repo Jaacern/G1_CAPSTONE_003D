@@ -17,11 +17,11 @@ void main() {
       overrides: [
         currentUserProvider.overrideWith((ref) => const User(
               userId: 'u-1',
-              fullName: 'Benjamín Andrés Camus Rojas',
-              firstName: 'Benjamín',
-              secondName: 'Andrés',
-              lastName: 'Camus',
-              secondLastName: 'Rojas',
+              fullName: 'Daniela Ignacia Fuentes Rosales',
+              firstName: 'Daniela',
+              secondName: 'Ignacia',
+              lastName: 'Fuentes',
+              secondLastName: 'Rosales',
               accountType: RoleType.family,
               email: 'familia@agecare.app',
               memberships: [
@@ -40,7 +40,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     // El nombre va en cuatro campos, no en uno que hay que partir adivinando.
-    for (final parte in ['Benjamín', 'Andrés', 'Camus', 'Rojas']) {
+    for (final parte in ['Daniela', 'Ignacia', 'Fuentes', 'Rosales']) {
       expect(find.text(parte), findsOneWidget);
     }
     // El familiar no tiene perfil profesional ni ofertas de trabajo.
@@ -56,14 +56,14 @@ void main() {
       overrides: [
         currentUserProvider.overrideWith((ref) => const User(
               userId: 'u-2',
-              fullName: 'Rosa Medina Díaz',
-              firstName: 'Rosa',
-              lastName: 'Medina',
-              secondLastName: 'Díaz',
+              fullName: 'Marisol Andrea Tapia Vergara',
+              firstName: 'Marisol',
+              lastName: 'Tapia',
+              secondLastName: 'Vergara',
               rut: '15.234.567-4',
               phone: '+56987654321',
               accountType: RoleType.caregiver,
-              email: 'rosa@cuidados.cl',
+              email: 'cuidadora@agecare.cl',
             )),
       ],
       child: MaterialApp(theme: AppTheme.light(), home: const ProfileScreen()),

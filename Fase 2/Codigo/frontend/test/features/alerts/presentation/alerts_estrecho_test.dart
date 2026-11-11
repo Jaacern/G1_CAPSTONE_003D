@@ -25,7 +25,7 @@ void main() {
         // los botones de gestión que esta prueba mide (el familiar no los ve).
         currentUserProvider.overrideWith((ref) => const User(
               userId: 'u-care',
-              fullName: 'Rosa Millán',
+              fullName: 'Marisol Tapia',
               accountType: RoleType.caregiver,
               email: 'cuidadora@agecare.app',
               memberships: [

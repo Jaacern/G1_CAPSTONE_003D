@@ -103,7 +103,7 @@ Future<MarketplaceRepoFake> montarMarketplace(
       currentUserProvider.overrideWith(
         (ref) => User(
           userId: 'u-1',
-          fullName: 'Benjamín Camus',
+          fullName: 'Daniela Fuentes',
           accountType: rol,
           email: 'familia@agecare.app',
           memberships: [

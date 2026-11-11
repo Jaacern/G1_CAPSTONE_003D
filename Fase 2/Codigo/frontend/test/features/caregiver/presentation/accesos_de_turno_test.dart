@@ -35,7 +35,7 @@ void main() {
             .overrideWithValue(DashboardRepositoryMock()),
         currentUserProvider.overrideWith((ref) => const User(
               userId: 'u-cuid',
-              fullName: 'Rosa Fuentes',
+              fullName: 'Marisol Tapia',
               accountType: RoleType.caregiver,
               email: 'cuidadora@agecare.app',
               memberships: [

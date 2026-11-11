@@ -65,6 +65,7 @@ class User {
     this.secondLastName,
     this.rut,
     this.doctorVerified = false,
+    this.isStaff = false,
     this.phone,
     this.avatarUrl,
     this.locale = 'es',
@@ -94,6 +95,11 @@ class User {
 
   /// Solo aplica a médicos: habilitación vigente del personal de AgeCare.
   final bool doctorVerified;
+
+  /// Personal de AgeCare. El servidor lo guarda como cuenta "family", pero no
+  /// es familia de nadie: se administra desde el panel web y la app no le
+  /// ofrece crear ni cuidar adultos mayores.
+  final bool isStaff;
   final List<Membership> memberships;
 
   /// Rol con el que se arma la vista. Es el tipo de cuenta, no la primera
@@ -116,6 +122,7 @@ class User {
         email: json['email'] as String,
         accountType: RoleType.fromApi((json['account_type'] ?? '') as String),
         doctorVerified: (json['doctor_verified'] ?? false) as bool,
+        isStaff: (json['is_staff'] ?? false) as bool,
         phone: json['phone'] as String?,
         avatarUrl: json['avatar_url'] as String?,
         locale: (json['locale'] ?? 'es') as String,
@@ -135,6 +142,7 @@ class User {
         email: email,
         accountType: accountType,
         doctorVerified: doctorVerified,
+        isStaff: isStaff,
         phone: phone,
         avatarUrl: avatarUrl,
         locale: locale,

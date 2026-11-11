@@ -44,7 +44,7 @@ Map<String, dynamic> _observacion(String id, String hora, String texto) => {
       'category': 'mood',
       'media_url': null,
       'created_at': '2026-11-01T$hora:00Z',
-      'author_name': 'Rosa Millán',
+      'author_name': 'Marisol Tapia',
     };
 
 /// Servidor falso que responde la bitácora y anota las rutas pedidas.
@@ -86,7 +86,7 @@ Future<void> montar(WidgetTester tester,
       // El botón SOS lee la sesión; sin esto queda un timer pendiente.
       currentUserProvider.overrideWith((ref) => const User(
             userId: 'u-1',
-            fullName: 'Benjamín Camus',
+            fullName: 'Daniela Fuentes',
             accountType: RoleType.family,
             email: 'familia@agecare.app',
           )),
@@ -112,7 +112,7 @@ void main() {
     expect(
         find.text('Se notó algo cansada después de la siesta, sin molestias.'),
         findsOneWidget);
-    expect(find.text('Rosa Millán'), findsWidgets);
+    expect(find.text('Marisol Tapia'), findsWidgets);
     expect(find.text('Ánimo'), findsOneWidget);
 
     // Y el aviso falso que ocupaba la tarjeta ya no está.

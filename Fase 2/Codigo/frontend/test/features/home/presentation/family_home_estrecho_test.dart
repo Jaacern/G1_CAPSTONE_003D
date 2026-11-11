@@ -29,7 +29,7 @@ void main() {
         // arranque deja un timer de reintentos pendiente al terminar la prueba.
         currentUserProvider.overrideWith((ref) => const User(
               userId: 'u-1',
-              fullName: 'Benjamín Camus',
+              fullName: 'Daniela Fuentes',
               accountType: RoleType.family,
               email: 'familia@agecare.app',
             )),

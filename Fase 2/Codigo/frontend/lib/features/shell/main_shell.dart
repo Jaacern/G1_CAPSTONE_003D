@@ -31,6 +31,12 @@ class MainShell extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final role = user?.primaryRole ?? RoleType.family;
 
+    // Personal de AgeCare: no cuida ni es familia de nadie. Sin esto veía la
+    // app de la familia, con "Agregar adulto mayor" incluido.
+    if (user != null && user.isStaff) {
+      return const _CuentaDePersonal();
+    }
+
     if (role == RoleType.elder) {
       return const ElderHomeScreen();
     }
@@ -134,6 +140,54 @@ class MainShell extends ConsumerWidget {
     ShellTab('Salud', '❤️', HealthScreen()),
     ShellTab('Más', '☰', MoreScreen()),
   ];
+}
+
+/// Pantalla para una cuenta del personal de AgeCare que entra a la app móvil.
+class _CuentaDePersonal extends ConsumerWidget {
+  const _CuentaDePersonal();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.admin_panel_settings_outlined,
+                      size: 56, color: AppColors.primary),
+                  const SizedBox(height: 16),
+                  const Text('Esta cuenta es del personal de AgeCare',
+                      textAlign: TextAlign.center,
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Los usuarios, planes y habilitaciones se administran desde '
+                    'el panel web. En la app, los adultos mayores los crea la '
+                    'familia y la cuidadora o el médico entran por invitación.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 24),
+                  OutlinedButton.icon(
+                    onPressed: () =>
+                        ref.read(authControllerProvider.notifier).logout(),
+                    icon: const Icon(Icons.logout_rounded),
+                    label: const Text('Cerrar sesión'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Pantalla para un médico cuya habilitación no está vigente.

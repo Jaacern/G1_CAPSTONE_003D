@@ -114,24 +114,28 @@ class AuthRepositoryHttp implements AuthRepository {
 // Implementación Mock (demo sin backend)
 // ---------------------------------------------------------------------------
 class AuthRepositoryMock implements AuthRepository {
-  static const demoEmail = 'demo@agecare.app';
-  static const demoDoctorEmail = 'doctor@agecare.app';
-  static const demoCaregiverEmail = 'cuidadora@agecare.app';
+  // Mismos correos y clave que las cuentas de prueba del backend
+  // (947_cuentas_demo.sql): se prueba igual en modo demo y contra el servidor.
+  static const demoEmail = 'familiar@agecare.cl';
+  static const demoDoctorEmail = 'doctora@agecare.cl';
+  static const demoCaregiverEmail = 'cuidadora@agecare.cl';
   // En producción el adulto mayor no usa contraseña (911_elder_account.sql):
   // autentica el dispositivo vinculado. Solo en modo demo se expone esta
   // cuenta para poder revisar su vista desde el navegador.
-  static const demoElderEmail = 'adultomayor@agecare.app';
+  static const demoElderEmail = 'adultomayor@agecare.cl';
   static const demoPassword = 'agecare123';
 
   User? _currentUser;
 
   static const _demoUser = User(
     userId: 'u-demo-1',
-    fullName: 'María José González Pérez',
-    firstName: 'María',
-    secondName: 'José',
-    lastName: 'González',
-    secondLastName: 'Pérez',
+    fullName: 'Daniela Ignacia Fuentes Rosales',
+    firstName: 'Daniela',
+    secondName: 'Ignacia',
+    lastName: 'Fuentes',
+    secondLastName: 'Rosales',
+    rut: '14.876.543-K',
+    phone: '+56912345678',
     email: demoEmail,
     accountType: RoleType.family,
     memberships: [
@@ -144,9 +148,13 @@ class AuthRepositoryMock implements AuthRepository {
 
   static const _demoDoctor = User(
     userId: 'u-demo-doctor',
-    fullName: 'Dra. Carolina Soto',
+    fullName: 'Carolina Beatriz Soto Valenzuela',
     firstName: 'Carolina',
+    secondName: 'Beatriz',
     lastName: 'Soto',
+    secondLastName: 'Valenzuela',
+    rut: '13.456.789-9',
+    phone: '+56922223333',
     email: demoDoctorEmail,
     accountType: RoleType.doctor,
     doctorVerified: true,
@@ -164,11 +172,13 @@ class AuthRepositoryMock implements AuthRepository {
 
   static const _demoCaregiver = User(
     userId: 'u-demo-caregiver',
-    fullName: 'Rosa Millán Díaz',
-    firstName: 'Rosa',
-    lastName: 'Millán',
-    secondLastName: 'Díaz',
+    fullName: 'Marisol Andrea Tapia Vergara',
+    firstName: 'Marisol',
+    secondName: 'Andrea',
+    lastName: 'Tapia',
+    secondLastName: 'Vergara',
     rut: '15.234.567-4',
+    phone: '+56987654321',
     email: demoCaregiverEmail,
     accountType: RoleType.caregiver,
     memberships: [
@@ -187,9 +197,13 @@ class AuthRepositoryMock implements AuthRepository {
   // vista del rol elder sin un dispositivo vinculado.
   static const _demoElder = User(
     userId: 'u-demo-elder',
-    fullName: 'Elena Ramírez',
+    fullName: 'Elena Rosa Ramírez Riquelme',
     firstName: 'Elena',
+    secondName: 'Rosa',
     lastName: 'Ramírez',
+    secondLastName: 'Riquelme',
+    rut: '5.123.456-1',
+    phone: '+56911112222',
     email: demoElderEmail,
     accountType: RoleType.elder,
     memberships: [

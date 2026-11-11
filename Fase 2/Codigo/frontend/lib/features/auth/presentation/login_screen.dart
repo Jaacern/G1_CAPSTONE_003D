@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -186,9 +187,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                             ],
                           ),
-                          if (AppConfig.useMocks)
+                          // Demo: datos simulados. Compilación de desarrollo
+                          // contra el backend real: las mismas cuentas del
+                          // seed. En release no sale nunca (kDebugMode).
+                          if (AppConfig.useMocks || kDebugMode)
                             _DemoBadge(
-                                onSelect: (correo) => _email.text = correo),
+                              real: !AppConfig.useMocks,
+                              onSelect: (correo) => setState(() {
+                                _email.text = correo;
+                                _password.text =
+                                    AuthRepositoryMock.demoPassword;
+                              }),
+                            ),
                         ],
                       ),
                     ),
@@ -283,9 +293,13 @@ class _FormPanel extends StatelessWidget {
 /// producción el adulto mayor autentica su dispositivo (sin contraseña); aquí
 /// se incluye solo para poder revisar su vista desde el navegador.
 class _DemoBadge extends StatelessWidget {
-  const _DemoBadge({required this.onSelect});
+  const _DemoBadge({required this.onSelect, this.real = false});
 
   final ValueChanged<String> onSelect;
+
+  /// true: backend real en una compilación de desarrollo. Suma al
+  /// administrador, que solo existe en la base real.
+  final bool real;
 
   static const _personas = <(String, String)>[
     ('Familiar', AuthRepositoryMock.demoEmail),
@@ -293,6 +307,7 @@ class _DemoBadge extends StatelessWidget {
     ('Médico', AuthRepositoryMock.demoDoctorEmail),
     ('Adulto mayor', AuthRepositoryMock.demoElderEmail),
   ];
+  static const _administrador = ('Administrador', 'administrador@agecare.cl');
 
   @override
   Widget build(BuildContext context) {
@@ -313,9 +328,12 @@ class _DemoBadge extends StatelessWidget {
             children: [
               Icon(Icons.science_outlined, size: 14, color: tint),
               const SizedBox(width: 6),
-              Text('Modo demo · contraseña ${AuthRepositoryMock.demoPassword}',
+              Text(
+                  '${real ? 'Cuentas de desarrollo' : 'Modo demo'} · contraseña ${AuthRepositoryMock.demoPassword}',
                   style: TextStyle(
-                      fontSize: 11.5, fontWeight: FontWeight.w600, color: tint)),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: tint)),
             ],
           ),
           const SizedBox(height: 6),
@@ -324,7 +342,10 @@ class _DemoBadge extends StatelessWidget {
             spacing: 6,
             runSpacing: 6,
             children: [
-              for (final (rol, correo) in _personas)
+              for (final (rol, correo) in [
+                ..._personas,
+                if (real) _administrador,
+              ])
                 InkWell(
                   onTap: () => onSelect(correo),
                   borderRadius: BorderRadius.circular(999),

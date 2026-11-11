@@ -24,6 +24,7 @@ from fastapi.routing import APIRoute  # noqa: E402
 from jose import jwt  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
+from _ajeno import AJENO  # noqa: E402  (cuenta autentica fuera del circulo)
 from app import acceso  # noqa: E402
 from app import assistant_provider as ap  # noqa: E402
 from app.config import get_settings  # noqa: E402
@@ -32,7 +33,6 @@ from app.main import app  # noqa: E402
 
 FAMILIAR  = "11111111-1111-4111-8111-111111111111"
 CUIDADORA = "22222222-2222-4222-8222-222222222222"
-AJENO     = "eeeeeee1-0000-4000-8000-000000000001"
 ELENA = "33333333-3333-4333-8333-333333333333"
 LUIS  = "33333333-3333-4333-8333-333333333334"
 BASE = f"/api/v1/patients/{ELENA}"
@@ -176,16 +176,13 @@ async def main(client):
         await client.get(BASE + "/vitals/latest", headers=h)
     check("consultar lo mismo tres veces seguidas no suma filas",
           (await secciones()).count("vitals") == 1, await secciones())
-    # Aunque el proceso pierda la memoria (un reinicio), la base no duplica.
     acceso.olvidar_recientes()
     await client.get(BASE + "/vitals/latest", headers=h)
     check("ni despues de un reinicio del servidor",
           (await secciones()).count("vitals") == 1, await secciones())
-    # Otra seccion del mismo grupo cuenta como la misma consulta...
     await client.get(BASE + "/vitals/thresholds", headers=h)
     check("otra pantalla de la misma seccion tampoco",
           (await secciones()).count("vitals") == 1, await secciones())
-    # ...pero pasada la ventana es un acceso nuevo.
     async with engine.begin() as c:
         await c.execute(text(
             "UPDATE record_access_log SET accessed_at = accessed_at "
@@ -266,9 +263,6 @@ async def main(client):
     # ---------------- el asistente ----------------
     print("--- asistente ---")
     await borrar_rastro()
-    # Con la cuidadora, que es quien tiene un plan con consultas al asistente.
-    # Se le deja el contador del mes en cero para no depender de cuantas
-    # preguntas hicieron las otras pruebas.
     hc = token(CUIDADORA)
     async with engine.begin() as c:
         sub = (await c.execute(text(
@@ -276,8 +270,6 @@ async def main(client):
             {"u": CUIDADORA})).scalar()
         await c.execute(text(
             "DELETE FROM usage_counters WHERE subscription_id = :s"), {"s": sub})
-        # La pregunta de prueba puede caer en una conversacion que ya existia
-        # y ponerle titulo. Se guardan los titulos para devolverlos.
         titulos = (await c.execute(text(
             "SELECT id, title FROM conversations WHERE user_id = :u "
             "AND type = 'assistant'"), {"u": CUIDADORA})).all()
@@ -309,9 +301,6 @@ async def main(client):
     finally:
         ap.get_assistant = original
         async with engine.begin() as c:
-            # La conversacion tambien se borra, no solo sus preguntas: si
-            # queda, la prueba del asistente la encuentra primera en la lista
-            # y falla por algo que dejo esta.
             hechas = (await c.execute(text(
                 "SELECT id, conversation_id FROM assistant_queries "
                 "WHERE query_text LIKE 'PRUEBA-ACCESOS%'"))).all()

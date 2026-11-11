@@ -174,7 +174,8 @@ class SosIn(BaseModel):
 
 class EmergencyContactOut(BaseModel):
     full_name: str
-    phone: str
+    # Un miembro del grupo puede no haber cargado su teléfono en el perfil.
+    phone: str | None = None
     role: str | None = None
 
 
@@ -566,15 +567,21 @@ async def trigger_sos(
         )
     ).scalar_one()
 
-    # Contactos de emergencia, en orden de escalamiento.
+    # Contactos de emergencia vigentes (rotación activa). Nombre y teléfono
+    # salen del perfil del miembro cuando el contacto es del grupo (406).
     contact_rows = (
         await db.execute(
             text(
                 """
-                SELECT full_name, phone, relationship
-                FROM emergency_contacts
-                WHERE patient_id = :pid AND deleted_at IS NULL
-                ORDER BY escalation_order
+                SELECT COALESCE(u.full_name, ec.full_name) AS full_name,
+                       COALESCE(u.phone, ec.phone)         AS phone,
+                       ec.relationship
+                FROM emergency_contacts ec
+                LEFT JOIN users u ON u.id = ec.member_user_id
+                WHERE ec.patient_id = :pid
+                  AND ec.deleted_at IS NULL
+                  AND ec.is_active
+                ORDER BY COALESCE(u.full_name, ec.full_name)
                 """
             ),
             {"pid": ctx.patient_id},

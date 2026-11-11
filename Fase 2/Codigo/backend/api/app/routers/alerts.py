@@ -15,9 +15,10 @@ Notas:
   y ck_alerts_order impiden resolver sin haber atendido antes.
 """
 import json
+from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -187,6 +188,11 @@ class SosOut(BaseModel):
     notified_count: int
     emergency_contacts: list[EmergencyContactOut]
 
+
+class AvisoRecibidoIn(BaseModel):
+    # delivered = la notificación llegó al teléfono.
+    # opened    = la persona la tocó.
+    event: Literal["delivered", "opened"]
 
 
 # --------------------------------------------------------------------------
@@ -511,6 +517,66 @@ async def update_notification_settings(
     await db.commit()
 
     return await get_notification_settings(user=user, db=db)
+
+
+# --------------------------------------------------------------------------
+# 9.7 Confirmar que un aviso llegó al teléfono
+# --------------------------------------------------------------------------
+@router.post("/users/me/deliveries/{delivery_id}/ack", status_code=204)
+async def confirmar_aviso(
+    delivery_id: UUID,
+    payload: AvisoRecibidoIn,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """La aplicación avisa que la notificación llegó, o que la abrieron.
+
+    El proveedor de push no informa si el mensaje llegó al aparato: solo que
+    lo aceptó. La única que lo sabe es la aplicación, que recibe el
+    delivery_id dentro de la notificación y lo devuelve aquí. Con eso se
+    llena delivered_at, y la diferencia con sent_at es la latencia que pide
+    medir RNF-05 (menos de 30 segundos).
+
+    Llegar y enterarse son hechos distintos y se guardan por separado:
+    'opened' es que la persona tocó la notificación.
+
+    Se puede repetir sin daño. Cada marca se escribe una sola vez y queda la
+    primera, que es la que dice cuándo pasó de verdad. Abrir implica que
+    llegó, así que 'opened' completa delivered_at si faltaba.
+
+    Solo sobre las entregas propias: 404 para la de otra persona, igual que
+    si no existiera.
+    """
+    fila = (
+        await db.execute(
+            text(
+                """
+                UPDATE alert_deliveries
+                   SET delivered_at = coalesce(delivered_at, now()),
+                       opened_at = CASE WHEN :abierto
+                                        THEN coalesce(opened_at, now())
+                                        ELSE opened_at END,
+                       status = CASE
+                           WHEN :abierto OR status = 'opened' THEN 'opened'
+                           ELSE 'delivered' END
+                 WHERE id = :did
+                   AND user_id = :uid
+                   AND status IN ('sent', 'delivered', 'opened')
+                RETURNING id
+                """
+            ),
+            {"did": str(delivery_id), "uid": user.user_id,
+             "abierto": payload.event == "opened"},
+        )
+    ).first()
+    if fila is None:
+        raise ApiError(
+            status_code=404,
+            code="NOT_FOUND",
+            message="El recurso solicitado no existe o no está disponible.",
+        )
+    await db.commit()
+    return Response(status_code=204)
 
 
 # --------------------------------------------------------------------------

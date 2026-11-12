@@ -29,7 +29,7 @@ dependencies:
   health: ^12.0.0
 
   # Tiempo real y multimedia
-  web_socket_channel: ^3.0.3     # chat WS (/ws/patients/{id}/chat)
+  web_socket_channel: ^3.0.3     # chat en tiempo real (/patients/{id}/chat/ws)
   image_picker: ^1.1.2           # fotos, escaneo de recetas
   record: ^7.1.1                 # captura de notas de voz (STT)
   audioplayers: ^6.1.0           # reproducción de notas de voz y TTS

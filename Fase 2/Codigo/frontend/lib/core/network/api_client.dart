@@ -55,8 +55,15 @@ class ApiException implements Exception {
         fieldErrors: fields,
       );
     }
+    // Los cuatro son lo mismo para quien esta mirando la pantalla: la
+    // peticion no llego a destino o no volvio. El modo sin conexion (RF-80)
+    // se apoya en este codigo para saber cuando mostrar lo guardado, asi que
+    // un corte a mitad de respuesta tiene que contar igual que no poder
+    // conectar.
     if (e.type == DioExceptionType.connectionTimeout ||
-        e.type == DioExceptionType.connectionError) {
+        e.type == DioExceptionType.connectionError ||
+        e.type == DioExceptionType.receiveTimeout ||
+        e.type == DioExceptionType.sendTimeout) {
       return ApiException(
         statusCode: 0,
         code: 'NETWORK_ERROR',

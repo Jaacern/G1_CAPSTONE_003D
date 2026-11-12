@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../alerts/presentation/sos_button.dart';
 import '../../home/application/home_providers.dart';
 import '../../medications/presentation/medications_screen.dart';
 import '../../medications/presentation/prn_banner.dart';
@@ -40,6 +41,9 @@ class CaregiverHomeScreen extends ConsumerWidget {
     }
 
     return Scaffold(
+      // La cuidadora es, junto con el adulto mayor, quien la API autoriza a
+      // disparar un SOS, y era la única que no tenía el botón a mano.
+      floatingActionButton: const SosButton(),
       body: Column(
         children: [
           // Tarjeta de estado del paciente (semáforo + motivo), de summary/today.

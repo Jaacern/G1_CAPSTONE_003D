@@ -107,6 +107,21 @@ class User {
   /// un médico recién registrados veían la app de la familia.
   RoleType get primaryRole => accountType;
 
+  /// Rol de esta persona SOBRE UN PACIENTE concreto, o null si no es del
+  /// círculo de ese paciente.
+  ///
+  /// No es lo mismo que [primaryRole]. Una misma persona puede ser cuidadora
+  /// de un paciente y familiar de otro, y lo que la API permite lo decide la
+  /// membresía en ese paciente, no el tipo de cuenta. Todo permiso que se
+  /// dibuje en pantalla tiene que preguntar por aquí, o la app muestra
+  /// acciones que el servidor después rechaza.
+  RoleType? roleOn(String patientId) {
+    for (final m in memberships) {
+      if (m.patientId == patientId) return m.role;
+    }
+    return null;
+  }
+
   /// Médico cuya cuenta no está (o dejó de estar) habilitada.
   bool get isUnverifiedDoctor =>
       accountType == RoleType.doctor && !doctorVerified;

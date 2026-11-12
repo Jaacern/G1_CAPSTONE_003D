@@ -56,6 +56,11 @@ class EmailSettings(BaseSettings):
     email_use_ssl: bool = False  # SSL directo (puerto 465)
     email_from: str = ""         # "AgeCare <no-reply@agecare.cl>"
     email_timeout_seconds: int = 10
+    # Para las plantillas (email_templates.py). Vacíos = no se muestran
+    # enlaces ni imagen; no se inventa ninguna dirección.
+    email_logo_url: str = ""
+    email_terms_url: str = ""
+    email_privacy_url: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
@@ -79,9 +84,13 @@ class EmailProvider(ABC):
     @abstractmethod
     async def enviar(
         self, *, destinatario: str, asunto: str, cuerpo_html: str,
-        cuerpo_texto: str,
+        cuerpo_texto: str, imagenes_inline: dict[str, bytes] | None = None,
     ) -> Envio:
         """Envía un correo.
+
+        imagenes_inline: PNG que el HTML referencia como <img src="cid:nombre">.
+        Viajan dentro del propio correo, así el logo se ve sin alojarlo en
+        ningún servidor y sin que el cliente pida bloquear imágenes remotas.
 
         Nunca lanza. Los errores van en el resultado para que quien llama
         pueda seguir enviando al resto de los destinatarios.
@@ -126,6 +135,7 @@ class Smtp(EmailProvider):
     def _enviar_sync(
         self, destinatario: str, asunto: str,
         cuerpo_html: str, cuerpo_texto: str,
+        imagenes_inline: dict[str, bytes] | None = None,
     ) -> Envio:
         cfg = self._cfg
         msg = EmailMessage()
@@ -134,6 +144,12 @@ class Smtp(EmailProvider):
         msg["To"] = destinatario
         msg.set_content(cuerpo_texto)
         msg.add_alternative(cuerpo_html, subtype="html")
+        # Las imagenes se asocian a la parte HTML (multipart/related) para que
+        # Gmail, Outlook y los clientes moviles las muestren en linea.
+        for cid, datos in (imagenes_inline or {}).items():
+            msg.get_payload()[1].add_related(
+                datos, maintype="image", subtype="png", cid=f"<{cid}>",
+                disposition="inline")
 
         try:
             if cfg.email_use_ssl:
@@ -161,12 +177,13 @@ class Smtp(EmailProvider):
     async def enviar(
         self, *, destinatario: str, asunto: str,
         cuerpo_html: str, cuerpo_texto: str,
+        imagenes_inline: dict[str, bytes] | None = None,
     ) -> Envio:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
             None,
             self._enviar_sync,
-            destinatario, asunto, cuerpo_html, cuerpo_texto,
+            destinatario, asunto, cuerpo_html, cuerpo_texto, imagenes_inline,
         )
 
 

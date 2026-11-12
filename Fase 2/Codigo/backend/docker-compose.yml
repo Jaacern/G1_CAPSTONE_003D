@@ -102,6 +102,26 @@ services:
       PUSH_PROVIDER: ${PUSH_PROVIDER:-none}
       FCM_CREDENTIALS_JSON: ${FCM_CREDENTIALS_JSON:-}
       FCM_CREDENTIALS_FILE: ${FCM_CREDENTIALS_FILE:-}
+
+      # Correo (app/email_provider.py y app/email_templates.py): recuperar
+      # contrasena (RF-05) y aviso alternativo cuando el push falla (RF-82).
+      # Estas variables tienen que estar AQUI: el contenedor no lee el .env
+      # del host, solo lo que este bloque le pasa. Sin ellas EMAIL_PROVIDER
+      # quedaba siempre en 'none' aunque estuviera configurado en el .env.
+      # Con 'none' no se envia nada y cada intento queda anotado como fallido.
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-none}
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-true}
+      EMAIL_USE_SSL: ${EMAIL_USE_SSL:-false}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_TIMEOUT_SECONDS: ${EMAIL_TIMEOUT_SECONDS:-10}
+      # Plantilla del correo: logo y textos legales. Vacios = no se muestran.
+      EMAIL_LOGO_URL: ${EMAIL_LOGO_URL:-}
+      EMAIL_TERMS_URL: ${EMAIL_TERMS_URL:-}
+      EMAIL_PRIVACY_URL: ${EMAIL_PRIVACY_URL:-}
       SPEECH_REGION: ${SPEECH_REGION:-}
       SPEECH_API_KEY: ${SPEECH_API_KEY:-}
     ports:

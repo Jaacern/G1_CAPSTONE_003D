@@ -42,5 +42,10 @@ LIMIT_DEVICE_LINK = "12/minute"  # F1/F3: fuerza bruta del codigo de 6 digitos.
 # /invitations/accept y /auth/register, que tambien acepta el codigo: sin
 # limite en las dos puertas, cerrar una sola no serviria de nada.
 LIMIT_INVITE_CODE = "12/minute"
+# Recuperar contrasena (RF-05). El codigo es de 6 digitos, asi que el limite
+# por IP es una segunda barrera ademas del tope de intentos por codigo. Pedir
+# el codigo tambien se limita: cada pedido es un correo que sale.
+LIMIT_PASSWORD_RECOVERY = "5/minute"
+LIMIT_PASSWORD_RESET = "10/minute"
 LIMIT_SOS = "20/minute"          # evita spam de alertas criticas.
 LIMIT_AI = "20/minute"           # IA/voz: tienen costo por uso del proveedor.

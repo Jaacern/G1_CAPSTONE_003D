@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/aviso_sin_conexion.dart';
 import '../auth/application/auth_controller.dart';
 import '../auth/domain/models.dart';
 import '../alerts/application/alerts_providers.dart';
@@ -79,6 +80,10 @@ class MainShell extends ConsumerWidget {
         child: Column(
           children: [
             _ShellTitleBar(title: tab.full ?? tab.label),
+            // Arriba de todo y en el contenedor y no en cada pantalla: el
+            // aviso vale para cualquier pestaña y mientras hay conexion no
+            // ocupa alto (RF-80).
+            const AvisoSinConexion(),
             if (showPatientSelector) const PatientSelectorBar(),
             Expanded(
               child: IndexedStack(

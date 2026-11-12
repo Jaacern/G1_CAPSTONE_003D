@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/speech/speech_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/aviso_sin_conexion.dart';
 import '../../../core/widgets/common.dart';
 import '../../alerts/presentation/sos_button.dart';
 import '../../auth/application/auth_controller.dart';
@@ -87,6 +88,9 @@ class ElderHomeScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
           children: [
+            // Sin conexión también se avisa aquí, con la letra de esta
+            // pantalla (RF-80). Mientras hay conexión no ocupa alto.
+            const AvisoSinConexion(grande: true),
             // Encabezado: saludo + fecha + botón de ayuda por voz.
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,

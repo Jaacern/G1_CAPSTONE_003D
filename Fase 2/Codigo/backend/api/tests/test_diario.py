@@ -42,7 +42,9 @@ async def main():
           (dia_local, dia_zona))
 
     orden = [n for n, _ in m.DIARIO]
-    check("estan las ocho tareas", len(orden) == 8, orden)
+    check("estan las nueve tareas", len(orden) == 9, orden)
+    check("el barrido de claves de reenvio esta en el diario",
+          "barrer-claves" in orden, orden)
     check("las dosis se generan antes de vencerlas",
           orden.index("generar-dosis") < orden.index("marcar-vencidas"), orden)
     check("se vencen antes de alertarlas",
@@ -57,7 +59,7 @@ async def main():
           and orden.index("avisar") > orden.index("alertar-reloj"), orden)
 
     r = await m.correr_todo(verbose=False)
-    check("corre todo sin fallas", r == {"tareas": 8, "fallas": 0}, r)
+    check("corre todo sin fallas", r == {"tareas": 9, "fallas": 0}, r)
 
     # Una tarea que revienta no debe arrastrar a las demas.
     original = m.DIARIO

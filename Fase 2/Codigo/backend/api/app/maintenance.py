@@ -1009,6 +1009,42 @@ async def avisar_alertas(*, verbose: bool = True) -> dict[str, int]:
     return r
 
 
+# Cuanto se recuerda una clave de reenvio. La cola de la app reintenta en
+# minutos u horas, no en dias; una semana es holgado de sobra y evita que la
+# tabla crezca para siempre.
+DIAS_CLAVES_DE_REENVIO = 7
+
+
+async def barrer_claves_de_reenvio(*, verbose: bool = True) -> dict[str, int]:
+    """Borra las claves de reenvio viejas (RF-81).
+
+    Estas filas no son informacion del expediente, son memoria de corto plazo
+    para que un reintento de la app no duplique una accion. Pasada la ventana
+    en que un reintento tiene sentido, no sirven para nada y solo ocupan.
+
+    Es el unico barrido que borra filas de verdad, al contrario del de
+    subidas, que solo cambia estados. La diferencia es esa: aqui no hay nada
+    que constar.
+    """
+    async with engine.begin() as conn:
+        borradas = (
+            await conn.execute(
+                text(
+                    """
+                    DELETE FROM idempotency_keys
+                     WHERE created_at < now() - make_interval(days => :dias)
+                    """
+                ),
+                {"dias": DIAS_CLAVES_DE_REENVIO},
+            )
+        ).rowcount or 0
+
+    if verbose:
+        print(f"claves de reenvio borradas: {borradas}")
+
+    return {"borradas": borradas}
+
+
 # El orden no es casual y es la razon de que esto exista como una sola
 # tarea en vez de cinco lineas en el crontab.
 #
@@ -1032,6 +1068,9 @@ async def avisar_alertas(*, verbose: bool = True) -> dict[str, int]:
 #   8. barrer-subidas   no depende de nada ni nada depende de ella; va al
 #                       final porque es la unica que toca archivos y no
 #                       datos clinicos, y si se cae no arrastra al resto.
+#   9. barrer-claves    tampoco depende de nada ni nada de ella. Borra
+#                       memoria de corto plazo de los reenvios de la app,
+#                       no datos del expediente.
 DIARIO = (
     ("generar-dosis",   generar_dosis),
     ("marcar-vencidas", marcar_dosis_vencidas),
@@ -1041,6 +1080,7 @@ DIARIO = (
     ("avisar",          avisar_alertas),
     ("semaforo",        calcular_semaforo),
     ("barrer-subidas",  barrer_subidas_vencidas),
+    ("barrer-claves",   barrer_claves_de_reenvio),
 )
 
 
@@ -1083,6 +1123,7 @@ async def correr_todo(*, verbose: bool = True) -> dict[str, int]:
 
 async def _main(argv: list[str]) -> int:
     tareas = {"barrer-subidas": barrer_subidas_vencidas,
+              "barrer-claves": barrer_claves_de_reenvio,
               "generar-dosis": generar_dosis,
               "marcar-vencidas": marcar_dosis_vencidas,
               "alertar-dosis": alertar_dosis_omitidas,

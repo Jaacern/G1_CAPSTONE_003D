@@ -198,7 +198,15 @@ async def generar_dosis(*, dias: int = 14, verbose: bool = True) -> dict[str, in
                                  WHERE md.medication_id = m.id
                                    AND md.day_of_week = EXTRACT(isodow FROM g.d))
                   )
-                ON CONFLICT (medication_id, scheduled_at) DO NOTHING
+                -- Revivir y no ignorar: una fila cancelada es la marca de
+                -- que esa hora dejo de corresponder (968). Si el plan vuelve
+                -- a incluirla, por ejemplo porque el medico deshace un
+                -- cambio de horario, tiene que volver a estar pendiente. Sin
+                -- esto el UNIQUE la daria por existente y esa toma no
+                -- aparecería nunca mas.
+                ON CONFLICT (medication_id, scheduled_at) DO UPDATE
+                    SET status = 'pending', reason = NULL
+                    WHERE scheduled_doses.status = 'cancelled'
                 """
             ),
             {"zona": ZONA, "dias": dias},
@@ -239,7 +247,9 @@ async def generar_dosis(*, dias: int = 14, verbose: bool = True) -> dict[str, in
                                    AND td.day_of_week = EXTRACT(isodow FROM g.d))
                   )
                 ON CONFLICT (treatment_item_id, scheduled_at)
-                    WHERE treatment_item_id IS NOT NULL DO NOTHING
+                    WHERE treatment_item_id IS NOT NULL DO UPDATE
+                    SET status = 'pending', reason = NULL
+                    WHERE scheduled_doses.status = 'cancelled'
                 """
             ),
             {"zona": ZONA, "dias": dias},

@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.deps import CurrentUser, PatientContext, get_current_user, get_patient_member
 from app.errors import ApiError
+from app.plan_dosis import cancelar_futuras_de_tratamiento
 
 router = APIRouter(prefix="/api/v1", tags=["treatments"])
 
@@ -411,6 +412,12 @@ async def create_treatment(
                  "WHERE id = :tid"),
             {"ts": effective_from, "tid": anterior_id},
         )
+        # Y con él dejan de corresponder sus tomas futuras (RF-26). Las del
+        # tratamiento nuevo las crea el generador desde sus propias
+        # indicaciones; una indicación que se mantuvo igual recupera su hora
+        # cuando pasa, porque revive la fila cancelada en vez de duplicarla.
+        await cancelar_futuras_de_tratamiento(
+            db, anterior_id, motivo="Se reemplazó el tratamiento")
 
     # Crea el nuevo vigente.
     nuevo = (

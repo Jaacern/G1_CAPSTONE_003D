@@ -18,6 +18,7 @@ from app.db import get_db
 from app.deps import CurrentUser, PatientContext, get_current_user, get_patient_member
 from app.errors import ApiError
 from app.ocr_provider import OcrFallo, OcrNotConfigured, get_ocr
+from app.plan_dosis import cancelar_futuras_de_medicamento
 from app.receta_lector import leer_receta
 from app.routers.logbook import _archivo_del_paciente
 from app.storage import get_storage
@@ -367,6 +368,19 @@ async def update_medication(
         days = fields["days_of_week"] if fields["days_of_week"] else _DEFAULT_DAYS
         await _replace_days(db, medication_id, days)
 
+    # RF-26: modificar regenera SOLO las tomas futuras. Las ya generadas
+    # siguen el horario viejo, asi que se cancelan y el generador vuelve a
+    # crearlas con el nuevo; las que coincidan con una hora que no cambio las
+    # revive tal cual, sin duplicar.
+    #
+    # Solo si cambio algo que afecte la agenda. Corregir el nombre o las
+    # instrucciones no tiene por que mover ninguna toma.
+    AGENDA = {"times", "days_of_week", "start_date", "end_date",
+              "dose_amount", "dose_unit"}
+    if AGENDA & fields.keys():
+        await cancelar_futuras_de_medicamento(
+            db, medication_id, motivo="Cambió la indicación")
+
     await db.commit()
     return await _load_medication(db, ctx.patient_id, medication_id)
 
@@ -386,6 +400,12 @@ async def discontinue_medication(
              "WHERE id = :mid AND patient_id = :pid AND discontinued_at IS NULL"),
         {"mid": medication_id, "pid": ctx.patient_id},
     )
+    # RF-27: descontinuar conserva el historial, pero lo que todavía no pasó
+    # deja de corresponder. Sin esto le seguían apareciendo las tomas de un
+    # remedio suspendido, el barrido horario las marcaba omitidas y le
+    # bajaban la adherencia sin que nadie hiciera nada mal.
+    await cancelar_futuras_de_medicamento(
+        db, medication_id, motivo="Se descontinuó el medicamento")
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -417,6 +437,10 @@ async def list_doses(
                 LEFT JOIN treatments tr ON tr.id = ti.treatment_id
                 WHERE COALESCE(m.patient_id, tr.patient_id) = :pid
                   AND sd.scheduled_at::date = :d
+                  -- Una toma cancelada dejó de corresponder: no se muestra
+                  -- ni se puede registrar. Queda en la tabla por el
+                  -- expediente, no para la pantalla del día.
+                  AND sd.status <> 'cancelled'
                 ORDER BY sd.scheduled_at
                 """
             ),

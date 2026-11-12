@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/notifications/push_device_id.dart';
+import '../../../core/offline/almacen_local.dart';
 import '../data/auth_repository.dart';
 import '../domain/models.dart';
 
@@ -54,6 +55,10 @@ class AuthController extends Notifier<AuthState> {
 
   Future<void> login(String email, String password) async {
     final session = await _repo.login(email: email, password: password);
+    // Lo guardado para ver sin conexion es de la sesion anterior (RF-80). Si
+    // en este mismo telefono entra otra persona del circulo, o la misma a
+    // otra cuenta, no puede quedar viendo el expediente que quedo de antes.
+    await ref.read(almacenLocalProvider).limpiarTodo();
     await ref
         .read(tokenStorageProvider)
         .save(access: session.accessToken, refresh: session.refreshToken);
@@ -122,6 +127,9 @@ class AuthController extends Notifier<AuthState> {
       } catch (_) {/* best effort */}
     }
     await tokens.clear();
+    // Al salir tambien, y no solo al entrar: el telefono puede quedar en
+    // manos de otra persona antes de que alguien vuelva a entrar.
+    await ref.read(almacenLocalProvider).limpiarTodo();
     state = const Unauthenticated();
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/offline/cache_de_lectura.dart';
 import '../domain/models.dart';
 
 /// Una página de alertas tal como la devuelve 9.1: los ítems de esa página,
@@ -58,8 +59,9 @@ abstract class AlertsRepository {
 // HTTP
 // ---------------------------------------------------------------------------
 class AlertsRepositoryHttp implements AlertsRepository {
-  AlertsRepositoryHttp(this._api);
+  AlertsRepositoryHttp(this._api, this._cache);
   final ApiClient _api;
+  final CacheDeLectura _cache;
 
   @override
   Future<AlertsPage> listAlerts(
@@ -67,15 +69,26 @@ class AlertsRepositoryHttp implements AlertsRepository {
       bool activeOnly = false,
       int page = 1,
       int pageSize = 20}) async {
-    final data = await _api.get<Map<String, dynamic>>(
-      '/users/me/alerts',
-      query: {
-        'status': activeOnly ? 'active' : 'all',
-        'page': page,
-        'page_size': pageSize,
-        if (patientId != null) 'patient_id': patientId,
-      },
-    );
+    Future<Map<String, dynamic>> delServidor() =>
+        _api.get<Map<String, dynamic>>(
+          '/users/me/alerts',
+          query: {
+            'status': activeOnly ? 'active' : 'all',
+            'page': page,
+            'page_size': pageSize,
+            if (patientId != null) 'patient_id': patientId,
+          },
+        );
+
+    // Solo la primera pagina. Guardar las siguientes serviria de poco: sin
+    // conexion nadie va a paginar un historial, y lo que importa es poder
+    // ver las alertas activas del paciente que se esta viendo.
+    final data = page != 1
+        ? await delServidor()
+        : await _cache.leer(
+            'alertas_${patientId ?? 'todas'}_${activeOnly ? 'activas' : 'todas'}',
+            delServidor,
+          );
     final items = ((data['items'] ?? []) as List)
         .map((e) => Alert.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -268,5 +281,6 @@ class AlertsRepositoryMock implements AlertsRepository {
 
 final alertsRepositoryProvider = Provider<AlertsRepository>((ref) {
   if (AppConfig.useMocks) return AlertsRepositoryMock();
-  return AlertsRepositoryHttp(ref.watch(apiClientProvider));
+  return AlertsRepositoryHttp(
+      ref.watch(apiClientProvider), ref.watch(cacheDeLecturaProvider));
 });

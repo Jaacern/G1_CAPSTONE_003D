@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/offline/cache_de_lectura.dart';
 import '../domain/models.dart';
 
 abstract class MedicationsRepository {
@@ -25,13 +26,16 @@ abstract class MedicationsRepository {
 // HTTP
 // ---------------------------------------------------------------------------
 class MedicationsRepositoryHttp implements MedicationsRepository {
-  MedicationsRepositoryHttp(this._api);
+  MedicationsRepositoryHttp(this._api, this._cache);
   final ApiClient _api;
+  final CacheDeLectura _cache;
 
   @override
   Future<List<Medication>> listMedications(String patientId) async {
-    final data = await _api
-        .get<Map<String, dynamic>>('/patients/$patientId/medications');
+    final data = await _cache.leer(
+        'medicamentos_$patientId',
+        () => _api.get<Map<String, dynamic>>(
+            '/patients/$patientId/medications'));
     return ((data['items'] ?? []) as List)
         .map((e) => Medication.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -72,11 +76,17 @@ class MedicationsRepositoryHttp implements MedicationsRepository {
 
   @override
   Future<List<Dose>> listDoses(String patientId, {DateTime? date}) async {
-    final data = await _api.get<Map<String, dynamic>>(
-      '/patients/$patientId/doses',
-      query: {
-        if (date != null) 'date': _dateOnly(date),
-      },
+    // La clave lleva el dia: las tomas de hoy y las de ayer son dos cosas
+    // distintas y guardar una sobre la otra mostraria el horario equivocado.
+    final dia = date == null ? 'hoy' : _dateOnly(date);
+    final data = await _cache.leer(
+      'dosis_${patientId}_$dia',
+      () => _api.get<Map<String, dynamic>>(
+        '/patients/$patientId/doses',
+        query: {
+          if (date != null) 'date': _dateOnly(date),
+        },
+      ),
     );
     return ((data['items'] ?? []) as List)
         .map((e) => Dose.fromJson(e as Map<String, dynamic>))
@@ -388,5 +398,6 @@ String _dateOnly(DateTime d) =>
 
 final medicationsRepositoryProvider = Provider<MedicationsRepository>((ref) {
   if (AppConfig.useMocks) return MedicationsRepositoryMock();
-  return MedicationsRepositoryHttp(ref.watch(apiClientProvider));
+  return MedicationsRepositoryHttp(
+      ref.watch(apiClientProvider), ref.watch(cacheDeLecturaProvider));
 });

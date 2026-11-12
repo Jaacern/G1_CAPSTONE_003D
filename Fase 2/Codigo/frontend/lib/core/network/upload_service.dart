@@ -11,6 +11,20 @@ class UploadedFile {
   const UploadedFile({required this.fileUrl, required this.uploadId});
   final String fileUrl;
   final String uploadId;
+
+  /// Id del archivo, sacado de [fileUrl].
+  ///
+  /// Casi todos los endpoints reciben el `media_url` entero y resuelven el id
+  /// en el servidor. El de música lo pide suelto (`file_id`), así que hay que
+  /// sacarlo de la URL, que es la única forma en que el front lo conoce. Vive
+  /// aquí y no en cada pantalla para que haya un solo lugar donde arreglarlo
+  /// si la forma de la URL cambia.
+  String? get fileId => _uuid.firstMatch(fileUrl)?.group(0);
+
+  static final RegExp _uuid = RegExp(
+    r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-'
+    r'[0-9a-fA-F]{4}-[0-9a-fA-F]{12}',
+  );
 }
 
 /// Servicio de subida de binarios (fotos, audios, documentos, recetas).

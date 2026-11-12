@@ -180,8 +180,11 @@ class ApiClient {
     }
   }
 
-  Future<T> post<T>(String path, {Object? data}) =>
-      _wrap(() => _dio.post<T>(path, data: data));
+  /// [query] va en la URL. Hace falta porque no toda la API recibe los datos
+  /// en el cuerpo: el registro de una creación musical, por ejemplo, declara
+  /// sus campos como parámetros de consulta.
+  Future<T> post<T>(String path, {Object? data, Map<String, dynamic>? query}) =>
+      _wrap(() => _dio.post<T>(path, data: data, queryParameters: query));
 
   Future<T> patch<T>(String path, {Object? data}) =>
       _wrap(() => _dio.patch<T>(path, data: data));

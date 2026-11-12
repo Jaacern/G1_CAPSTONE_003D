@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/offline/cache_de_lectura.dart';
 import '../../../core/theme/app_theme.dart';
 import '../domain/models.dart';
 
@@ -56,12 +57,17 @@ abstract class CaregiverRepository {
 // HTTP
 // ---------------------------------------------------------------------------
 class CaregiverRepositoryHttp implements CaregiverRepository {
-  CaregiverRepositoryHttp(this._api);
+  CaregiverRepositoryHttp(this._api, this._cache);
   final ApiClient _api;
+  final CacheDeLectura _cache;
 
   @override
   Future<CaregiverToday> getToday() async {
-    final data = await _api.get<Map<String, dynamic>>('/caregiver/today');
+    // La pantalla con la que la cuidadora arranca el turno. Guardada,
+    // porque llegar a una casa sin senal y no poder ver a quien cuida ni que
+    // le toca es justamente lo que RF-80 viene a resolver.
+    final data = await _cache.leer('cuidadora_hoy',
+        () => _api.get<Map<String, dynamic>>('/caregiver/today'));
     return CaregiverToday.fromJson(data);
   }
 
@@ -109,8 +115,8 @@ class CaregiverRepositoryHttp implements CaregiverRepository {
 
   @override
   Future<List<CareTask>> listTasks(String patientId) async {
-    final data =
-        await _api.get<Map<String, dynamic>>('/patients/$patientId/tasks');
+    final data = await _cache.leer('tareas_$patientId',
+        () => _api.get<Map<String, dynamic>>('/patients/$patientId/tasks'));
     return ((data['items'] ?? []) as List)
         .map((e) => CareTask.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -530,5 +536,6 @@ class CaregiverRepositoryMock implements CaregiverRepository {
 
 final caregiverRepositoryProvider = Provider<CaregiverRepository>((ref) {
   if (AppConfig.useMocks) return CaregiverRepositoryMock();
-  return CaregiverRepositoryHttp(ref.watch(apiClientProvider));
+  return CaregiverRepositoryHttp(
+      ref.watch(apiClientProvider), ref.watch(cacheDeLecturaProvider));
 });

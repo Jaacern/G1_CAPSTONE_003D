@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:agecare_app/core/network/api_client.dart';
+import 'package:agecare_app/core/offline/cache_de_lectura.dart';
 import 'package:agecare_app/core/storage/token_storage.dart';
 import 'package:agecare_app/core/theme/app_theme.dart';
 import 'package:agecare_app/features/auth/application/auth_controller.dart';
@@ -127,8 +128,9 @@ void main() {
     ]);
     final dio = Dio()..httpClientAdapter = servidor;
     await montar(tester,
-        repo:
-            CaregiverRepositoryHttp(ApiClient(_FakeTokenStorage(), dio: dio)));
+        repo: CaregiverRepositoryHttp(
+            ApiClient(_FakeTokenStorage(), dio: dio),
+            const CacheDeLectura.sinGuardar()));
 
     expect(find.text('Merendó fruta y tomó la medicación.'), findsOneWidget);
     // Solo la última: la bitácora completa vive en su propia pantalla.
@@ -140,8 +142,9 @@ void main() {
       (tester) async {
     final dio = Dio()..httpClientAdapter = _ServidorDeBitacora([]);
     await montar(tester,
-        repo:
-            CaregiverRepositoryHttp(ApiClient(_FakeTokenStorage(), dio: dio)));
+        repo: CaregiverRepositoryHttp(
+            ApiClient(_FakeTokenStorage(), dio: dio),
+            const CacheDeLectura.sinGuardar()));
 
     expect(find.textContaining('todavía no ha registrado una observación'),
         findsOneWidget);

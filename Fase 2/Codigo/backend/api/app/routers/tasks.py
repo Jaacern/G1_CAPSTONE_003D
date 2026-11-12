@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.deps import CurrentUser, PatientContext, get_current_user, get_patient_member
 from app.errors import ApiError
+from app.idempotencia import Idem, idempotencia
 from app.routers.logbook import _sin_tildes, _texto_con_contenido
 
 router = APIRouter(prefix="/api/v1", tags=["tasks"])
@@ -150,6 +151,7 @@ async def create_task(
     payload: TaskIn,
     ctx: PatientContext = Depends(get_patient_member(["caregiver", "family"])),
     db: AsyncSession = Depends(get_db),
+    idem: Idem = Depends(idempotencia),
 ):
     """Crea una tarea de cuidado.
 
@@ -157,6 +159,12 @@ async def create_task(
     fecha. Cuando no viene, la tarea es para hoy: es lo que significa una
     tarea sin fecha en una pantalla que muestra el dia.
     """
+    # Reenvio de la cola de la app (RF-81): si esta accion ya se registro
+    # con esta clave, se devuelve la misma respuesta sin repetirla.
+    previa = await idem.previa(db, ctx.user.user_id, TaskOut)
+    if previa is not None:
+        return previa
+
     categoria = _resolver_categoria(payload.category)
 
     if payload.due is None:
@@ -221,9 +229,11 @@ async def create_task(
             },
         )
     ).mappings().first()
+    salida = _salida(fila)
+    await idem.guardar(db, ctx.user.user_id, salida, status_code=201)
     await db.commit()
 
-    return _salida(fila)
+    return salida
 
 
 class TaskStatusIn(BaseModel):
@@ -236,6 +246,7 @@ async def set_task_status(
     payload: TaskStatusIn,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    idem: Idem = Depends(idempotencia),
 ):
     """Cambia el estado de una tarea.
 
@@ -244,6 +255,12 @@ async def set_task_status(
     comprobar que quien pide el cambio es del circulo. Sin eso, cualquier
     usuario autenticado que tuviera un id de tarea podria marcarla.
     """
+    # Reenvio de la cola de la app (RF-81): si esta accion ya se registro
+    # con esta clave, se devuelve la misma respuesta sin repetirla.
+    previa = await idem.previa(db, user.user_id, TaskOut)
+    if previa is not None:
+        return previa
+
     estado = _ESTADO_A_BASE.get(_sin_tildes(payload.status))
     if estado is None:
         raise ApiError(
@@ -320,6 +337,8 @@ async def set_task_status(
              "completada": estado == "completed"},
         )
     ).mappings().first()
+    salida = _salida(fila)
+    await idem.guardar(db, user.user_id, salida, status_code=200)
     await db.commit()
 
-    return _salida(fila)
+    return salida

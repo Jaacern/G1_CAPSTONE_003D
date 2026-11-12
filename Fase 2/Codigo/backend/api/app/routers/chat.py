@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.deps import PatientContext, get_patient_member
 from app.errors import ApiError
+from app.idempotencia import Idem, idempotencia
 from app.routers.logbook import _archivo_del_paciente
 from app.storage import get_storage
 
@@ -177,6 +178,7 @@ async def send_message(
     payload: MessageIn,
     ctx: PatientContext = Depends(get_patient_member()),
     db: AsyncSession = Depends(get_db),
+    idem: Idem = Depends(idempotencia),
 ):
     """Envia un mensaje al chat del circulo.
 
@@ -184,6 +186,12 @@ async def send_message(
     uno de voz o foto traiga archivo. Se valida aca para que el usuario
     reciba un 422 que explica que falto, en vez del error del motor.
     """
+    # Reenvio de la cola de la app (RF-81): si esta accion ya se registro
+    # con esta clave, se devuelve la misma respuesta sin repetirla.
+    previa = await idem.previa(db, ctx.user.user_id, MessageOut)
+    if previa is not None:
+        return previa
+
     tipo = payload.type.strip().lower()
     if tipo not in _TIPOS:
         raise ApiError(
@@ -250,13 +258,15 @@ async def send_message(
              "WHERE id = :conv"),
         {"conv": conv},
     )
-    await db.commit()
-
-    return _salida(
+    salida = _salida(
         {**dict(fila), "full_name": ctx.user.full_name, "role": ctx.role,
          "leido_por": []},
         ctx.patient_id,
     )
+    await idem.guardar(db, ctx.user.user_id, salida, status_code=201)
+    await db.commit()
+
+    return salida
 
 
 class ReadOut(BaseModel):

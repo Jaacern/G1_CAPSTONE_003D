@@ -17,6 +17,7 @@ from app.avisos import despachar
 from app.db import get_db
 from app.deps import CurrentUser, PatientContext, get_current_user, get_patient_member
 from app.errors import ApiError
+from app.idempotencia import Idem, idempotencia
 from app.ocr_provider import OcrFallo, OcrNotConfigured, get_ocr
 from app.plan_dosis import cancelar_futuras_de_medicamento
 from app.receta_lector import leer_receta
@@ -478,7 +479,14 @@ async def log_dose(
     segundo_plano: BackgroundTasks,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    idem: Idem = Depends(idempotencia),
 ):
+    # Reenvio de la cola de la app (RF-81): si esta accion ya se registro
+    # con esta clave, se devuelve la misma respuesta sin repetirla.
+    previa = await idem.previa(db, user.user_id, DoseLogOut)
+    if previa is not None:
+        return previa
+
     # scheduled_doses no tiene patient_id → obtenemos el paciente por JOIN
     dose = (
         await db.execute(
@@ -630,11 +638,13 @@ async def log_dose(
         )
         alert_triggered = True
 
+    salida = DoseLogOut(dose_id=dose_id, status=payload.status,
+                        alert_triggered=alert_triggered)
+    await idem.guardar(db, user.user_id, salida, status_code=200)
     await db.commit()
     if alert_triggered:
         segundo_plano.add_task(despachar)
-    return DoseLogOut(dose_id=dose_id, status=payload.status,
-                      alert_triggered=alert_triggered)
+    return salida
 
 
 # --------------------------------------------------------------------------

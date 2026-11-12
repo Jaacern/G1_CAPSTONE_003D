@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
 from app.deps import PatientContext, get_patient_member
+from app.idempotencia import Idem, idempotencia
 
 router = APIRouter(prefix="/api/v1", tags=["checkins"])
 
@@ -91,7 +92,17 @@ async def responder_hoy(
     payload: CheckinIn,
     ctx: PatientContext = Depends(get_patient_member(["elder", "caregiver"])),
     db: AsyncSession = Depends(get_db),
+    idem: Idem = Depends(idempotencia),
 ):
+    # Reenvio de la cola de la app (RF-81): si esta accion ya se registro
+    # con esta clave, se devuelve la misma respuesta sin repetirla.
+    # Aca importa de verdad: el check-in es uno por dia y se reemplaza, asi
+    # que un reenvio tardio de la cola pisaria una respuesta mas nueva que la
+    # persona ya corrigio en la pantalla.
+    previa = await idem.previa(db, ctx.user.user_id, CheckinOut)
+    if previa is not None:
+        return previa
+
     source = "elder" if ctx.role == "elder" else "caregiver"
     fila = (
         await db.execute(
@@ -116,8 +127,10 @@ async def responder_hoy(
              "ate": payload.ate_well, "note": payload.note, "src": source},
         )
     ).mappings().first()
+    salida = _salida(fila)
+    await idem.guardar(db, ctx.user.user_id, salida, status_code=200)
     await db.commit()
-    return _salida(fila)
+    return salida
 
 
 @router.get("/patients/{patient_id}/checkins/today", response_model=CheckinTodayOut)

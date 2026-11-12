@@ -28,6 +28,7 @@ from app.avisos import despachar
 from app.db import get_db
 from app.deps import PatientContext, get_patient_member
 from app.errors import ApiError
+from app.idempotencia import Idem, idempotencia
 # ahora() entra con nombre propio: 'ahora' ya se usa como variable.
 from app.fechas import ahora as ahora_local
 from app.fechas import zona
@@ -248,8 +249,15 @@ async def create_observation(
     payload: ObservationIn,
     ctx: PatientContext = Depends(get_patient_member(["caregiver", "family"])),
     db: AsyncSession = Depends(get_db),
+    idem: Idem = Depends(idempotencia),
 ):
     """Registra una observacion en la bitacora (RF-34)."""
+    # Reenvio de la cola de la app (RF-81): si esta accion ya se registro
+    # con esta clave, se devuelve la misma respuesta sin repetirla.
+    previa = await idem.previa(db, ctx.user.user_id, ObservationOut)
+    if previa is not None:
+        return previa
+
     categoria = _resolver_categoria(payload.category)
     file_id = await _archivo_del_paciente(db, payload.media_url, ctx.patient_id)
 
@@ -272,9 +280,7 @@ async def create_observation(
             },
         )
     ).mappings().first()
-    await db.commit()
-
-    return ObservationOut(
+    salida = ObservationOut(
         id=fila["id"],
         text=fila["note"],
         category=fila["category"],
@@ -282,6 +288,10 @@ async def create_observation(
         created_at=fila["observed_at"],
         author_name=ctx.user.full_name,
     )
+    await idem.guardar(db, ctx.user.user_id, salida, status_code=201)
+    await db.commit()
+
+    return salida
 
 
 # ---------------------------------------------------------------------------
@@ -357,8 +367,15 @@ async def create_incident(
     segundo_plano: BackgroundTasks,
     ctx: PatientContext = Depends(get_patient_member(["caregiver", "family"])),
     db: AsyncSession = Depends(get_db),
+    idem: Idem = Depends(idempotencia),
 ):
     """Reporta un incidente (RF-36)."""
+    # Reenvio de la cola de la app (RF-81): si esta accion ya se registro
+    # con esta clave, se devuelve la misma respuesta sin repetirla.
+    previa = await idem.previa(db, ctx.user.user_id, IncidentOut)
+    if previa is not None:
+        return previa
+
     plano = _sin_tildes(payload.type)
     tipo = plano if plano in _TIPOS_BASE else _TIPO_INCIDENTE.get(plano)
     if tipo is None:
@@ -438,13 +455,7 @@ async def create_incident(
             },
         )
     ).mappings().first()
-    await db.commit()
-    # Un incidente grave o critico nacio con su alerta: el aviso al telefono
-    # sale ahora, en segundo plano, y no cuando pase el repartidor.
-    if alert_id is not None:
-        segundo_plano.add_task(despachar)
-
-    return IncidentOut(
+    salida = IncidentOut(
         id=fila["id"],
         type=fila["type"],
         severity=fila["severity"],
@@ -453,6 +464,14 @@ async def create_incident(
         occurred_at=fila["occurred_at"],
         author_name=ctx.user.full_name,
     )
+    await idem.guardar(db, ctx.user.user_id, salida, status_code=201)
+    await db.commit()
+    # Un incidente grave o critico nacio con su alerta: el aviso al telefono
+    # sale ahora, en segundo plano, y no cuando pase el repartidor.
+    if alert_id is not None:
+        segundo_plano.add_task(despachar)
+
+    return salida
 
 
 class IncidentListItem(BaseModel):
@@ -618,6 +637,7 @@ async def create_handover_note(
     payload: HandoverIn,
     ctx: PatientContext = Depends(get_patient_member(["caregiver", "family"])),
     db: AsyncSession = Depends(get_db),
+    idem: Idem = Depends(idempotencia),
 ):
     """Deja la nota de relevo del turno en curso (RF-37).
 
@@ -626,6 +646,12 @@ async def create_handover_note(
     convenga rechazar: la cuidadora esta corrigiendo o agregando a lo que ya
     escribio. Se reemplaza el texto de esa nota.
     """
+    # Reenvio de la cola de la app (RF-81): si esta accion ya se registro
+    # con esta clave, se devuelve la misma respuesta sin repetirla.
+    previa = await idem.previa(db, ctx.user.user_id, HandoverOut)
+    if previa is not None:
+        return previa
+
     ahora = ahora_local()
     turno = _turno_de(ahora)
 
@@ -684,9 +710,7 @@ async def create_handover_note(
             },
         )
     ).mappings().first()
-    await db.commit()
-
-    return HandoverOut(
+    salida = HandoverOut(
         id=fila["id"],
         text=fila["note"],
         author_name=ctx.user.full_name,
@@ -694,6 +718,10 @@ async def create_handover_note(
         shift=fila["shift"],
         shift_date=fila["shift_date"].isoformat(),
     )
+    await idem.guardar(db, ctx.user.user_id, salida, status_code=201)
+    await db.commit()
+
+    return salida
 
 
 # ---------------------------------------------------------------------------

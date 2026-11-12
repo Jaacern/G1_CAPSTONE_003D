@@ -1,6 +1,10 @@
 -- AgeCare — Datos de demostracion (SOLO DESARROLLO)
 -- 999_seed_demo_extra.sql — Retirado
 -- MIGRACION IDEMPOTENTE
+-- SEMILLA
+-- Datos de ejemplo, no un cambio de esquema. Por eso no lleva revert
+-- en sql/revertir/: deshacerla seria borrar datos de demostracion, que
+-- es otra cosa que deshacer una migracion (RNF-24).
 --
 -- Este archivo sembraba un segundo circulo de cuidado (tres cuentas y tres
 -- pacientes de relleno). La demostracion usa un solo circulo, completo, y el

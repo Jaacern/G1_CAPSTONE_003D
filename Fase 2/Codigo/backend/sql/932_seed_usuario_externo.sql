@@ -1,5 +1,9 @@
 -- AgeCare — Usuario externo para las pruebas
 -- MIGRACION IDEMPOTENTE
+-- SEMILLA
+-- Datos de ejemplo, no un cambio de esquema. Por eso no lleva revert
+-- en sql/revertir/: deshacerla seria borrar datos de demostracion, que
+-- es otra cosa que deshacer una migracion (RNF-24).
 --
 -- Una cuenta valida que no pertenece al circulo de cuidado de ningun
 -- paciente. Existe solo para poder probar la diferencia entre dos respuestas

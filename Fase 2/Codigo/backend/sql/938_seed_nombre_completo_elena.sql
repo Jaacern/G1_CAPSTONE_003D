@@ -1,6 +1,10 @@
 -- AgeCare — Datos de demostracion (SOLO DESARROLLO)
 -- 938_seed_nombre_completo_elena.sql — La paciente de prueba con sus cuatro nombres
 -- MIGRACION IDEMPOTENTE
+-- SEMILLA
+-- Datos de ejemplo, no un cambio de esquema. Por eso no lleva revert
+-- en sql/revertir/: deshacerla seria borrar datos de demostracion, que
+-- es otra cosa que deshacer una migracion (RNF-24).
 --
 -- Desde 934 el paciente guarda primer nombre, segundo nombre, primer apellido
 -- y segundo apellido. La paciente de demostracion seguia como "Elena Rosales",

@@ -1,6 +1,10 @@
 -- AgeCare — Datos de demostracion (SOLO DESARROLLO)
 -- 947_cuentas_demo.sql — Cuentas de prueba con correos neutros y una sola clave
 -- MIGRACION IDEMPOTENTE
+-- SEMILLA
+-- Datos de ejemplo, no un cambio de esquema. Por eso no lleva revert
+-- en sql/revertir/: deshacerla seria borrar datos de demostracion, que
+-- es otra cosa que deshacer una migracion (RNF-24).
 --
 -- POR QUE
 --   Las cuentas de prueba usaban correos y dominios sueltos y una clave

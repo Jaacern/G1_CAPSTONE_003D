@@ -120,6 +120,17 @@ async def main(client):
 
     # ---------------- contactos libres, como antes ----------------
     print("--- contactos libres ---")
+    # Los nombres salen de la base y no escritos aqui: son datos del seed de
+    # demostracion, que cambia cuando el equipo renueva las cuentas de
+    # ejemplo, y una prueba no deberia caerse por eso.
+    async with engine.begin() as c:
+        libres = (await c.execute(text(
+            "SELECT full_name, relationship FROM emergency_contacts "
+            "WHERE patient_id = :p AND deleted_at IS NULL AND is_active "
+            "  AND member_user_id IS NULL ORDER BY full_name"),
+            {"p": ELENA})).mappings().all()
+    check("el paciente de prueba tiene contactos libres", len(libres) >= 2,
+          len(libres))
     r = await sos(client, ELENA, ADULTO, "libres")
     check("201 cuando lo aprieta la propia paciente", r.status_code == 201,
           f"{r.status_code} {r.text[:120]}")
@@ -127,13 +138,14 @@ async def main(client):
         d = r.json()
         nombres = [c["full_name"] for c in d["emergency_contacts"]]
         check("los contactos libres siguen saliendo con su nombre",
-              "Javier Cerna" in nombres and len(nombres) >= 3, nombres)
+              all(x["full_name"] in nombres for x in libres), (nombres, libres))
         check("y con su telefono",
               all(c["phone"] for c in d["emergency_contacts"]),
               d["emergency_contacts"])
+        roles = {c["full_name"]: c["role"] for c in d["emergency_contacts"]}
         check("conservan el parentesco",
-              any(c["role"] == "Hijo" for c in d["emergency_contacts"]),
-              d["emergency_contacts"])
+              all(roles.get(x["full_name"]) == x["relationship"] for x in libres),
+              (roles, [dict(x) for x in libres]))
         check("sin orden de escalamiento: van por nombre",
               nombres == sorted(nombres), nombres)
         async with engine.begin() as c:

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/upload_service.dart';
+import '../../../core/speech/grabacion.dart';
 import '../../../core/speech/speech_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
@@ -206,7 +205,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       setState(() => _busyMedia = true);
       final uploaded = await ref
           .read(uploadServiceProvider)
-          .uploadFile(File(picked.path), kind: 'photo', patientId: _patientId!);
+          .uploadFile(picked, kind: 'photo', patientId: _patientId!);
       final sent = await ref.read(chatRepositoryProvider).sendMessage(
             _patientId!,
             type: MessageType.photo,
@@ -230,6 +229,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     try {
       await ref.read(speechServiceProvider).startRecording();
       setState(() => _recording = true);
+    } on SinFormatoSoportado catch (e) {
+      // Navegador que no puede grabar nada que el servidor acepte. Es otra
+      // cosa que un permiso negado, asi que se dice lo que pasa de verdad.
+      if (mounted) showAppSnackBar(context, e.toString(), error: true);
     } catch (_) {
       if (mounted) {
         showAppSnackBar(

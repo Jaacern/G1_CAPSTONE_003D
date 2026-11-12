@@ -1,14 +1,13 @@
-import 'dart:io';
-
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/audio/tone_service.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/upload_service.dart';
+import '../../../core/speech/grabacion.dart';
 import '../../../core/theme/app_theme.dart';
 import '../application/elder_providers.dart';
 
@@ -50,6 +49,8 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
   ];
 
   final _recorder = AudioRecorder();
+  /// Formato con el que se esta grabando, para nombrar bien lo que se sube.
+  FormatoGrabacion? _formato;
   bool _grabando = false;
   bool _subiendo = false;
   int _duracionSeg = 0;
@@ -79,12 +80,22 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
       }
       return;
     }
-    final dir = await getTemporaryDirectory();
-    final path =
-        '${dir.path}/musica_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    // El formato no se fija de antemano: en el navegador depende de lo que
+    // soporte el MediaRecorder, y el servidor solo acepta algunos.
+    final FormatoGrabacion formato;
+    try {
+      formato = await formatoDeGrabacion(_recorder);
+    } on SinFormatoSoportado catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+      return;
+    }
+    _formato = formato;
     await _recorder.start(
-      const RecordConfig(encoder: AudioEncoder.aacLc),
-      path: path,
+      RecordConfig(encoder: formato.encoder),
+      path: await rutaDeGrabacion('musica', formato.extension),
     );
     _stopwatch
       ..reset()
@@ -115,9 +126,7 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
     final titulo = await _pedirTitulo();
     if (titulo == null || !mounted) {
       // Usuario canceló: borrar archivo temporal.
-      try {
-        await File(path).delete();
-      } catch (_) {}
+      await borrarGrabacion(path);
       return;
     }
 
@@ -130,8 +139,15 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
       final api = ref.read(apiClientProvider);
 
       // 1. Subir el audio.
+      // Con nombre y tipo puestos a mano: en el navegador la ruta que
+      // devuelve el grabador es un blob sin extension, y el servidor decide
+      // si acepta el archivo por su tipo.
       final uploaded = await uploads.uploadFile(
-        File(path),
+        XFile(
+          path,
+          name: 'musica.${_formato?.extension ?? 'm4a'}',
+          mimeType: _formato?.mime,
+        ),
         kind: 'audio',
         patientId: patientId,
       );
@@ -181,9 +197,7 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
       }
     } finally {
       if (mounted) setState(() => _subiendo = false);
-      try {
-        await File(path).delete();
-      } catch (_) {}
+      await borrarGrabacion(path);
     }
   }
 

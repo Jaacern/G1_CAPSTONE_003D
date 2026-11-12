@@ -1,7 +1,8 @@
-import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:cross_file/cross_file.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'api_client.dart';
@@ -38,23 +39,33 @@ class UploadedFile {
 /// [signedUrl]: el file_url guardado apunta a la API y necesita credencial,
 /// y los widgets de imagen no mandan cabeceras.
 class UploadService {
-  UploadService(this._api);
+  /// [raw] solo existe para reemplazar el cliente HTTP real por uno falso en
+  /// los tests (ver test/core/network/subida_de_archivos_test.dart). En la
+  /// app nunca se pasa: el PUT del binario va directo al almacenamiento, sin
+  /// los interceptores ni la URL base de [ApiClient].
+  UploadService(this._api, {@visibleForTesting Dio? raw})
+      : _raw = raw ?? Dio();
   final ApiClient _api;
-  final Dio _raw = Dio();
+  final Dio _raw;
 
+  /// Sube un archivo elegido por el usuario (selector de fotos, grabadora).
+  ///
+  /// Recibe un XFile y no un File de dart:io porque en el navegador lo que
+  /// entrega el selector no es un archivo del disco sino un blob, y la ruta
+  /// que trae no se puede abrir. XFile.readAsBytes funciona en las dos
+  /// plataformas, que es lo unico que necesita la subida.
   Future<UploadedFile> uploadFile(
-    File file, {
+    XFile file, {
     required String kind, // 'photo' | 'document' | 'audio' | 'prescription' | 'avatar' | 'catalog' | 'certification'
     String? patientId,
     String? contentType,
   }) async {
     final bytes = await file.readAsBytes();
-    final name = file.path.split(Platform.pathSeparator).last;
     return uploadBytes(bytes,
-        filename: name,
+        filename: file.name,
         kind: kind,
         patientId: patientId,
-        contentType: contentType);
+        contentType: contentType ?? _tipoDe(file));
   }
 
   Future<UploadedFile> uploadBytes(
@@ -81,7 +92,10 @@ class UploadService {
       data: Stream.fromIterable([bytes]),
       options: Options(
         headers: {
-          Headers.contentLengthHeader: bytes.length,
+          // El navegador no deja fijar Content-Length a mano: lo pone solo y
+          // rechaza el intento con un aviso en la consola. En telefono si hay
+          // que declararlo, porque el cuerpo va como flujo.
+          if (!kIsWeb) Headers.contentLengthHeader: bytes.length,
           'Content-Type': ct,
           'x-ms-blob-type': 'BlockBlob', // Azure Blob
         },
@@ -123,6 +137,18 @@ class UploadService {
   static bool _esUuid(String s) => RegExp(
         r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
       ).hasMatch(s);
+
+  /// Tipo del archivo elegido.
+  ///
+  /// Se prefiere la extension porque el servidor solo acepta una lista corta
+  /// de tipos y la extension es la que decide cual es. El mimeType que
+  /// informa el navegador queda como respaldo, para cuando el nombre no trae
+  /// una extension reconocible.
+  String _tipoDe(XFile file) {
+    final porNombre = _guessContentType(file.name);
+    if (porNombre != 'application/octet-stream') return porNombre;
+    return file.mimeType ?? porNombre;
+  }
 
   String _guessContentType(String filename) {
     final ext = filename.toLowerCase().split('.').last;

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -90,7 +88,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       setState(() => _uploadingAvatar = true);
       final uploaded = await ref
           .read(uploadServiceProvider)
-          .uploadFile(File(picked.path), kind: 'avatar');
+          .uploadFile(picked, kind: 'avatar');
       await ref
           .read(profileRepositoryProvider)
           .updateProfile(avatarUrl: uploaded.fileUrl);

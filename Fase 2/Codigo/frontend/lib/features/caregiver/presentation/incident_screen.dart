@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +7,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/network/upload_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../../core/widgets/vista_previa_archivo.dart';
 import '../application/caregiver_providers.dart';
 import '../data/caregiver_repository.dart';
 
@@ -49,7 +48,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
   ];
   String? _type;
   _Severity _severity = _Severity.medium;
-  File? _image;
+  XFile? _image;
   bool _saving = false;
 
   Future<void> _pick(ImageSource source) async {
@@ -57,7 +56,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
       final picked = await _picker.pickImage(
           source: source, imageQuality: 85, maxWidth: 2000);
       if (picked == null) return;
-      setState(() => _image = File(picked.path));
+      setState(() => _image = picked);
     } catch (_) {
       if (mounted) {
         showAppSnackBar(context, 'No se pudo obtener la imagen.', error: true);
@@ -172,8 +171,8 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.file(_image!,
-                        height: 180, width: double.infinity, fit: BoxFit.cover),
+                    child: VistaPreviaArchivo(_image!,
+                        height: 180, width: double.infinity),
                   ),
                   Positioned(
                     top: 8,

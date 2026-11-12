@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network/upload_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../../core/widgets/vista_previa_archivo.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/models.dart';
 import '../application/documents_providers.dart';
@@ -423,7 +422,7 @@ class _UploadSheetState extends ConsumerState<_UploadSheet> {
   final _picker = ImagePicker();
   final _titleCtrl = TextEditingController();
   late DocumentCategory _categoria = widget.categoriaInicial;
-  File? _file;
+  XFile? _file;
   bool _busy = false;
 
   @override
@@ -437,7 +436,7 @@ class _UploadSheetState extends ConsumerState<_UploadSheet> {
       final picked = await _picker.pickImage(
           source: source, imageQuality: 90, maxWidth: 2400);
       if (picked == null) return;
-      setState(() => _file = File(picked.path));
+      setState(() => _file = picked);
     } catch (_) {
       if (mounted) {
         showAppSnackBar(context, 'No se pudo obtener el archivo.',
@@ -494,7 +493,7 @@ class _UploadSheetState extends ConsumerState<_UploadSheet> {
             if (_file != null) ...[
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.file(_file!, height: 140, fit: BoxFit.cover),
+                child: VistaPreviaArchivo(_file!, height: 140),
               ),
               const SizedBox(height: 12),
             ],

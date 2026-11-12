@@ -1,12 +1,11 @@
-import 'dart:io';
-
 import 'package:audioplayers/audioplayers.dart';
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 import '../network/api_client.dart';
 import '../network/upload_service.dart';
+import 'grabacion.dart';
 
 /// Servicio de voz: grabación de notas, transcripción (STT) y lectura (TTS).
 ///
@@ -23,33 +22,44 @@ class SpeechService {
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _player = AudioPlayer();
 
-  String? _currentPath;
+  FormatoGrabacion? _formato;
 
   Future<bool> get hasPermission => _recorder.hasPermission();
 
-  /// Comienza a grabar una nota de voz en un archivo temporal.
+  /// Comienza a grabar una nota de voz.
+  ///
+  /// Levanta [SinFormatoSoportado] si la plataforma no puede grabar en
+  /// ninguno de los formatos que el servidor acepta.
   Future<void> startRecording() async {
     if (!await _recorder.hasPermission()) {
       throw StateError('Permiso de micrófono no concedido.');
     }
-    final dir = await getTemporaryDirectory();
-    _currentPath =
-        '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    final formato = await formatoDeGrabacion(_recorder);
+    _formato = formato;
     await _recorder.start(
-      const RecordConfig(encoder: AudioEncoder.aacLc),
-      path: _currentPath!,
+      RecordConfig(encoder: formato.encoder),
+      path: await rutaDeGrabacion('voice', formato.extension),
     );
   }
 
-  /// Detiene la grabación y devuelve el archivo resultante.
-  Future<File?> stopRecording() async {
+  /// Detiene la grabación y devuelve el audio resultante.
+  ///
+  /// Va con nombre y tipo puestos a mano porque en el navegador la ruta que
+  /// devuelve el grabador es un blob sin extension, y el servidor decide si
+  /// acepta el archivo justamente por su tipo.
+  Future<XFile?> stopRecording() async {
     final path = await _recorder.stop();
     if (path == null) return null;
-    return File(path);
+    final f = _formato;
+    return XFile(
+      path,
+      name: f == null ? 'nota_de_voz' : 'nota_de_voz.${f.extension}',
+      mimeType: f?.mime,
+    );
   }
 
   /// Sube el audio y devuelve su URL (para adjuntar a un mensaje).
-  Future<String> uploadVoiceNote(File audio,
+  Future<String> uploadVoiceNote(XFile audio,
       {required String patientId}) async {
     final uploaded = await _uploads
         .uploadFile(audio, kind: 'audio', patientId: patientId);
@@ -64,7 +74,7 @@ class SpeechService {
   }
 
   /// Graba, sube y transcribe en un solo paso.
-  Future<({String text, String audioUrl})> recordAndTranscribe(File audio,
+  Future<({String text, String audioUrl})> recordAndTranscribe(XFile audio,
       {required String patientId}) async {
     final url = await uploadVoiceNote(audio, patientId: patientId);
     final text = await transcribe(url);

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +8,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/upload_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../../core/widgets/vista_previa_archivo.dart';
 import '../data/medications_repository.dart';
 import '../domain/models.dart';
 import '../domain/treatment.dart' show TreatmentItemDraft;
@@ -31,7 +30,7 @@ class _PrescriptionScanScreenState
     extends ConsumerState<PrescriptionScanScreen> {
   final _picker = ImagePicker();
 
-  File? _image;
+  XFile? _image;
   bool _scanning = false;
   String? _error;
   List<_DraftEntry>? _drafts;
@@ -42,7 +41,7 @@ class _PrescriptionScanScreenState
           source: source, imageQuality: 85, maxWidth: 2000);
       if (picked == null) return;
       setState(() {
-        _image = File(picked.path);
+        _image = picked;
         _drafts = null;
         _error = null;
       });
@@ -166,7 +165,7 @@ class _PrescriptionScanScreenState
                 if (_image != null)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.file(_image!, height: 180, fit: BoxFit.cover),
+                    child: VistaPreviaArchivo(_image!, height: 180),
                   )
                 else
                   Container(

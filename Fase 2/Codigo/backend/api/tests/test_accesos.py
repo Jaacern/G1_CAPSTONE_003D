@@ -29,10 +29,12 @@ from app import assistant_provider as ap  # noqa: E402
 from app.config import get_settings  # noqa: E402
 from app.db import engine  # noqa: E402
 from app.main import app  # noqa: E402
+# Cuenta sin circulo, creada y borrada por la prueba. Antes era una constante y
+# dependia de que otra prueba hubiera dejado la cuenta en la base.
+from _ajeno import AJENO  # noqa: E402
 
 FAMILIAR  = "11111111-1111-4111-8111-111111111111"
 CUIDADORA = "22222222-2222-4222-8222-222222222222"
-AJENO     = "eeeeeee1-0000-4000-8000-000000000001"
 ELENA = "33333333-3333-4333-8333-333333333333"
 LUIS  = "33333333-3333-4333-8333-333333333334"
 BASE = f"/api/v1/patients/{ELENA}"

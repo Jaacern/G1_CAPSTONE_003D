@@ -25,6 +25,7 @@ DECISIONES DE DISEÑO
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
@@ -159,7 +160,11 @@ async def list_music(
                 FROM music_creations mc
                 WHERE mc.patient_id = CAST(:pid AS uuid)
                   AND mc.deleted_at IS NULL
-                  AND (:before::timestamptz IS NULL OR mc.created_at < :before)
+                  -- CAST y no ":before::timestamptz": SQLAlchemy no reconoce
+                  -- como parametro un nombre seguido de "::", y el SQL llegaba
+                  -- a Postgres con el ":before" literal (error de sintaxis, 500).
+                  AND (CAST(:before AS timestamptz) IS NULL
+                       OR mc.created_at < CAST(:before AS timestamptz))
                 ORDER BY mc.created_at DESC
                 LIMIT :lim
                 """
@@ -246,9 +251,12 @@ async def create_music(
                 VALUES (
                     CAST(:pid AS uuid), CAST(:uid AS uuid), :title,
                     CAST(:fid AS uuid), :dur,
-                    CAST(:cuid AS uuid)
+                    -- client_uuid es NOT NULL (914): un NULL explicito no
+                    -- activa el DEFAULT, asi que sin uno del dispositivo se
+                    -- genera aqui.
+                    COALESCE(CAST(:cuid AS uuid), gen_random_uuid())
                 )
-                RETURNING id, created_at
+                RETURNING id, created_at, client_uuid
                 """
             ),
             {
@@ -261,6 +269,35 @@ async def create_music(
             },
         )
     ).mappings().first()
+
+    # RF-69: la creacion es una sesion de la actividad 'music'. Va en la misma
+    # transaccion que la creacion y solo en la rama que la crea: un reintento
+    # idempotente (RF-66) devuelve antes de llegar aqui, asi no cuenta dos veces.
+    # La duracion de la sesion se toma de la de la melodia; el dispositivo no
+    # manda hoy cuando abrio y cerro la pantalla.
+    await db.execute(
+        text(
+            """
+            INSERT INTO activity_sessions
+                (patient_id, activity, started_at, ended_at,
+                 interactions_count, completed, meta)
+            VALUES (
+                CAST(:pid AS uuid), 'music',
+                CAST(:fin AS timestamptz)
+                    - make_interval(secs => CAST(:dur AS double precision)),
+                CAST(:fin AS timestamptz), 1, true,
+                CAST(:meta AS jsonb)
+            )
+            """
+        ),
+        {
+            "pid": ctx.patient_id,
+            "fin": nueva_id["created_at"],
+            "dur": duration_seconds,
+            "meta": json.dumps({"creation_id": str(nueva_id["id"]),
+                                "created_by": user.user_id}),
+        },
+    )
     await db.commit()
 
     return {
@@ -270,7 +307,7 @@ async def create_music(
         "duration_seconds": duration_seconds,
         "audio_url": _audio_url(str(file_id)),
         "created_by": user.user_id,
-        "client_uuid": str(client_uuid) if client_uuid else None,
+        "client_uuid": str(nueva_id["client_uuid"]),
         "play_count": 0,
         "created_at": nueva_id["created_at"].isoformat(),
         "already_existed": False,

@@ -30,6 +30,9 @@ SECCIONES: dict[str, str] = {
     "/doses":                   "doses",
     "/adherence":               "doses",
     "/timeline":                "logbook",
+    # Check-in diario del adulto mayor (RF-38): es parte de la bitacora.
+    "/checkins":                "logbook",
+    "/checkins/today":          "logbook",
     "/chat/messages":           "chat",
     "/assistant/conversations": "assistant",
     "/music":                  "music",

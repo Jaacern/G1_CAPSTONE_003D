@@ -37,7 +37,7 @@ app.include_router(alerts.router)
 FAMILIAR  = "11111111-1111-4111-8111-111111111111"   # Javier, familiar de los dos
 CUIDADORA = "22222222-2222-4222-8222-222222222222"   # Rosa, cuidadora de los dos
 ADULTO    = "99999999-9999-4999-8999-999999999999"   # Elena, la propia paciente
-AJENO     = "eeeeeee1-0000-4000-8000-000000000001"   # existe, fuera del circulo
+from _ajeno import AJENO  # noqa: E402  (cuenta fuera del circulo, creada por la prueba)
 ELENA = "33333333-3333-4333-8333-333333333333"       # contactos libres
 LUIS  = "33333333-3333-4333-8333-333333333334"       # contacto que es miembro
 

@@ -96,6 +96,13 @@ class AuthController extends Notifier<AuthState> {
   Future<void> recoverPassword(String email) =>
       _repo.requestPasswordRecovery(email);
 
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) =>
+      _repo.resetPassword(email: email, code: code, newPassword: newPassword);
+
   /// Refresca el perfil (ej. tras crear un paciente o aceptar invitación).
   Future<void> refreshProfile() async {
     if (state is! Authenticated) return;

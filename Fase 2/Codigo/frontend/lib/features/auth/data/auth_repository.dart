@@ -27,6 +27,14 @@ abstract class AuthRepository {
 
   Future<void> requestPasswordRecovery(String email);
 
+  /// Cambia la contraseña con el código de 6 dígitos que llegó al correo
+  /// (RF-05). El servidor cierra todas las sesiones abiertas de la cuenta.
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  });
+
   Future<User> me();
 
   /// [deviceId] es el id del aparato registrado para push. Si se manda, el
@@ -100,6 +108,15 @@ class AuthRepositoryHttp implements AuthRepository {
   @override
   Future<void> requestPasswordRecovery(String email) =>
       _api.post<void>('/auth/password/recovery', data: {'email': email});
+
+  @override
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) =>
+      _api.post<void>('/auth/password/reset',
+          data: {'email': email, 'code': code, 'new_password': newPassword});
 
   @override
   Future<User> me() async {
@@ -345,6 +362,26 @@ class AuthRepositoryMock implements AuthRepository {
   @override
   Future<void> requestPasswordRecovery(String email) async {
     await Future.delayed(const Duration(milliseconds: 300));
+  }
+
+  /// En la demo el único código que vale es [demoResetCode]; cualquier otro
+  /// falla igual que en el servidor, para poder ver el mensaje de error.
+  static const demoResetCode = '123456';
+
+  @override
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (code != demoResetCode) {
+      throw ApiException(
+        statusCode: 400,
+        code: 'INVALID_RESET_CODE',
+        message: 'El código es inválido o expiró. Revísalo o solicita uno nuevo.',
+      );
+    }
   }
 
   @override

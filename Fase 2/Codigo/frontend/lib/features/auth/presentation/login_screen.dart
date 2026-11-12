@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -371,7 +372,12 @@ class _DemoBadge extends StatelessWidget {
   }
 }
 
-/// Pantalla de recuperación de contraseña.
+/// Pantalla de recuperación de contraseña (RF-05), en dos pasos:
+/// 1) la persona escribe su correo y recibe un código de 6 dígitos;
+/// 2) escribe el código y la contraseña nueva.
+///
+/// El servidor responde igual exista o no el correo, así que la pantalla del
+/// paso 2 dice "si el correo está registrado" y no confirma nada.
 class RecoverPasswordScreen extends ConsumerStatefulWidget {
   const RecoverPasswordScreen({super.key});
 
@@ -380,27 +386,85 @@ class RecoverPasswordScreen extends ConsumerStatefulWidget {
       _RecoverPasswordScreenState();
 }
 
+enum _Paso { correo, codigo }
+
 class _RecoverPasswordScreenState extends ConsumerState<RecoverPasswordScreen> {
+  // Mismas reglas que el servidor (auth.py): 8+ caracteres con letra y número.
+  static final _reClave = RegExp(r'^(?=.*[A-Za-z])(?=.*\d).{8,}$');
+
   final _email = TextEditingController();
-  bool _sent = false;
+  final _code = TextEditingController();
+  final _pass = TextEditingController();
+  final _pass2 = TextEditingController();
+  _Paso _paso = _Paso.correo;
   bool _loading = false;
+  bool _obscure = true;
+  String? _error;
 
   @override
   void dispose() {
     _email.dispose();
+    _code.dispose();
+    _pass.dispose();
+    _pass2.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    if (!_email.text.contains('@')) return;
-    setState(() => _loading = true);
+  /// Pide el código. También se usa para reenviarlo desde el paso 2.
+  Future<void> _pedirCodigo() async {
+    final correo = _email.text.trim();
+    if (!correo.contains('@')) {
+      setState(() => _error = 'Escribe un correo válido.');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      await ref
-          .read(authControllerProvider.notifier)
-          .recoverPassword(_email.text.trim());
-      setState(() => _sent = true);
+      await ref.read(authControllerProvider.notifier).recoverPassword(correo);
+      if (!mounted) return;
+      if (_paso == _Paso.codigo) {
+        showAppSnackBar(context, 'Si el correo está registrado, enviamos un código nuevo.');
+      }
+      setState(() => _paso = _Paso.codigo);
     } on ApiException catch (e) {
-      if (mounted) showAppSnackBar(context, e.message, error: true);
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _cambiarClave() async {
+    final codigo = _code.text.replaceAll(RegExp(r'\s'), '');
+    if (!RegExp(r'^\d{6}$').hasMatch(codigo)) {
+      setState(() => _error = 'El código tiene 6 dígitos.');
+      return;
+    }
+    if (!_reClave.hasMatch(_pass.text)) {
+      setState(() => _error =
+          'La contraseña debe tener al menos 8 caracteres, con letras y números.');
+      return;
+    }
+    if (_pass.text != _pass2.text) {
+      setState(() => _error = 'Las contraseñas no coinciden.');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await ref.read(authControllerProvider.notifier).resetPassword(
+            email: _email.text.trim(),
+            code: codigo,
+            newPassword: _pass.text,
+          );
+      if (!mounted) return;
+      showAppSnackBar(context, 'Listo. Ya puedes entrar con tu contraseña nueva.');
+      context.go('/login');
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -408,38 +472,117 @@ class _RecoverPasswordScreenState extends ConsumerState<RecoverPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final enCodigo = _paso == _Paso.codigo;
     return Scaffold(
-      appBar: AppBar(title: const Text('Recuperar contraseña')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: _sent
-            ? const EmptyView(
-                icon: Icons.mark_email_read_outlined,
-                title: 'Revisa tu correo',
-                subtitle:
-                    'Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.',
+      appBar: AppBar(
+        title: const Text('Recuperar contraseña'),
+        leading: enCodigo
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                tooltip: 'Cambiar el correo',
+                onPressed: _loading
+                    ? null
+                    : () => setState(() {
+                          _paso = _Paso.correo;
+                          _error = null;
+                        }),
               )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                      'Escribe tu correo y te enviaremos un enlace para restablecer tu contraseña.',
-                      style: TextStyle(color: AppColors.textSecondary)),
-                  const SizedBox(height: 24),
-                  TextField(
-                    controller: _email,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                        labelText: 'Correo electrónico',
-                        prefixIcon: Icon(Icons.mail_outline)),
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: _loading ? null : _submit,
-                    child: const Text('Enviar enlace'),
-                  ),
-                ],
+            : null,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!enCodigo) ...[
+              const Text(
+                  'Escribe tu correo y te enviaremos un código de 6 dígitos para restablecer tu contraseña.',
+                  style: TextStyle(color: AppColors.textSecondary)),
+              const SizedBox(height: 24),
+              TextField(
+                controller: _email,
+                keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email],
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _loading ? null : _pedirCodigo(),
+                decoration: const InputDecoration(
+                    labelText: 'Correo electrónico',
+                    prefixIcon: Icon(Icons.mail_outline)),
               ),
+            ] else ...[
+              Text(
+                  'Si ${_email.text.trim()} está registrado, te enviamos un código de 6 dígitos. '
+                  'Revisa también la carpeta de spam. El código vence en pocos minutos.',
+                  style: const TextStyle(color: AppColors.textSecondary)),
+              const SizedBox(height: 24),
+              TextField(
+                controller: _code,
+                keyboardType: TextInputType.number,
+                autofillHints: const [AutofillHints.oneTimeCode],
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9 ]')),
+                  LengthLimitingTextInputFormatter(7),
+                ],
+                decoration: const InputDecoration(
+                    labelText: 'Código de 6 dígitos',
+                    prefixIcon: Icon(Icons.pin_outlined)),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _pass,
+                obscureText: _obscure,
+                autofillHints: const [AutofillHints.newPassword],
+                decoration: InputDecoration(
+                  labelText: 'Contraseña nueva',
+                  helperText: 'Mínimo 8 caracteres, con letras y números',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscure
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined),
+                    tooltip:
+                        _obscure ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                    onPressed: () => setState(() => _obscure = !_obscure),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _pass2,
+                obscureText: _obscure,
+                autofillHints: const [AutofillHints.newPassword],
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _loading ? null : _cambiarClave(),
+                decoration: const InputDecoration(
+                    labelText: 'Repite la contraseña nueva',
+                    prefixIcon: Icon(Icons.lock_outline)),
+              ),
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: 16),
+              InlineError(
+                  message: _error!,
+                  onDismiss: () => setState(() => _error = null)),
+            ],
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: _loading
+                  ? null
+                  : (enCodigo ? _cambiarClave : _pedirCodigo),
+              child: _loading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(enCodigo ? 'Cambiar contraseña' : 'Enviar código'),
+            ),
+            if (enCodigo)
+              TextButton(
+                onPressed: _loading ? null : _pedirCodigo,
+                child: const Text('Reenviar código'),
+              ),
+          ],
+        ),
       ),
     );
   }

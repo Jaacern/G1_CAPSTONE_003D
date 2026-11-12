@@ -42,3 +42,6 @@ local.properties
 # Kiro (config local del IDE) y material de apoyo del skill de auditoria.
 .kiro/
 security-audit-skill/
+
+# Empaquetados temporales de trabajo.
+.tmp-*.tgz

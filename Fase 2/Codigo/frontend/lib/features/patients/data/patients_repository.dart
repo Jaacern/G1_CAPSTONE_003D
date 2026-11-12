@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/offline/cache_de_lectura.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/validation/identity_validators.dart' show formatRut;
 import '../../auth/domain/models.dart';
@@ -87,15 +88,20 @@ abstract class PatientsRepository {
 // HTTP
 // ---------------------------------------------------------------------------
 class PatientsRepositoryHttp implements PatientsRepository {
-  PatientsRepositoryHttp(this._api);
+  PatientsRepositoryHttp(this._api, this._cache);
   final ApiClient _api;
+  final CacheDeLectura _cache;
 
   @override
   Future<List<PatientCard>> listMyPatients() async {
     // /patients ya calcula el semáforo real y trae edad, enfermedades, RUT y
     // el mini-resumen de vitales. Antes se combinaba con /users/me/dashboard y
     // al reconstruir la tarjeta se perdían esos campos nuevos; ya no hace falta.
-    final data = await _api.get<Map<String, dynamic>>('/patients');
+    // Guardada para poder abrir la app sin conexion y al menos saber a
+    // quien se esta cuidando (RF-80). Es la primera pantalla de todas: sin
+    // esto, sin senal no hay por donde entrar.
+    final data = await _cache.leer('pacientes',
+        () => _api.get<Map<String, dynamic>>('/patients'));
     return ((data['items'] ?? []) as List)
         .map((e) => PatientCard.fromJson(e as Map<String, dynamic>))
         .map((p) => p.topReason == null
@@ -106,7 +112,8 @@ class PatientsRepositoryHttp implements PatientsRepository {
 
   @override
   Future<Patient> getPatient(String patientId) async {
-    final data = await _api.get<Map<String, dynamic>>('/patients/$patientId');
+    final data = await _cache.leer('paciente_$patientId',
+        () => _api.get<Map<String, dynamic>>('/patients/$patientId'));
     return Patient.fromJson(data);
   }
 
@@ -792,5 +799,6 @@ class PatientsRepositoryMock implements PatientsRepository {
 
 final patientsRepositoryProvider = Provider<PatientsRepository>((ref) {
   if (AppConfig.useMocks) return PatientsRepositoryMock();
-  return PatientsRepositoryHttp(ref.watch(apiClientProvider));
+  return PatientsRepositoryHttp(
+      ref.watch(apiClientProvider), ref.watch(cacheDeLecturaProvider));
 });

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/offline/cache_de_lectura.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/domain/models.dart';
 import '../../patients/domain/models.dart';
@@ -19,19 +20,23 @@ abstract class DashboardRepository {
 // HTTP
 // ---------------------------------------------------------------------------
 class DashboardRepositoryHttp implements DashboardRepository {
-  DashboardRepositoryHttp(this._api);
+  DashboardRepositoryHttp(this._api, this._cache);
   final ApiClient _api;
+  final CacheDeLectura _cache;
 
   @override
   Future<TodaySummary> todaySummary(String patientId) async {
-    final data =
-        await _api.get<Map<String, dynamic>>('/patients/$patientId/summary/today');
+    final data = await _cache.leer(
+        'resumen_$patientId',
+        () => _api.get<Map<String, dynamic>>(
+            '/patients/$patientId/summary/today'));
     return TodaySummary.fromJson(data);
   }
 
   @override
   Future<List<PatientCard>> dashboard() async {
-    final data = await _api.get<Map<String, dynamic>>('/users/me/dashboard');
+    final data = await _cache.leer('tablero',
+        () => _api.get<Map<String, dynamic>>('/users/me/dashboard'));
     return ((data['items'] ?? []) as List)
         .map((e) => PatientCard.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -147,5 +152,6 @@ class DashboardRepositoryMock implements DashboardRepository {
 
 final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
   if (AppConfig.useMocks) return DashboardRepositoryMock();
-  return DashboardRepositoryHttp(ref.watch(apiClientProvider));
+  return DashboardRepositoryHttp(
+      ref.watch(apiClientProvider), ref.watch(cacheDeLecturaProvider));
 });

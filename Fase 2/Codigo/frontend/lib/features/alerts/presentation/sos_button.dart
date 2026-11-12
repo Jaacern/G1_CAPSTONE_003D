@@ -17,6 +17,10 @@ import '../data/alerts_repository.dart';
 /// El backend (9.6) solo autoriza a disparar SOS a la cuidadora y al adulto
 /// mayor. Para el familiar/médico el botón no se muestra (coherente con el
 /// wireframe: el familiar observa y escala desde el centro de alertas).
+///
+/// Quién puede se decide por el rol en EL PACIENTE QUE SE ESTÁ VIENDO, no por
+/// el tipo de cuenta: quien es cuidadora de un paciente y familiar de otro
+/// solo puede apretarlo en el primero, y así lo resuelve la API.
 class SosButton extends ConsumerStatefulWidget {
   const SosButton({super.key});
 
@@ -27,18 +31,30 @@ class SosButton extends ConsumerStatefulWidget {
 class _SosButtonState extends ConsumerState<SosButton> {
   bool _sending = false;
 
-  Future<void> _onPressed() async {
-    // El adulto mayor no tiene selector: el paciente es él mismo, y sale de
-    // su membresía. Leer el seleccionado lo dejaba en null en el primer toque
-    // (nadie lo había elegido) y el SOS no salía.
+  /// Paciente sobre el que actuaría el botón, y si es el del propio usuario.
+  ///
+  /// El adulto mayor no tiene selector: el paciente es él mismo, y sale de su
+  /// membresía. Leer el seleccionado lo dejaba en null en el primer toque
+  /// (nadie lo había elegido) y el SOS no salía.
+  ({String? id, String? nombre, bool propia}) _objetivo() {
     final user = ref.read(currentUserProvider);
     final propia = user?.primaryRole == RoleType.elder &&
             (user?.memberships.isNotEmpty ?? false)
         ? user!.memberships.first
         : null;
     final seleccionado = ref.read(selectedPatientProvider);
-    final patientId = propia?.patientId ?? seleccionado?.patientId;
-    final nombre = propia?.patientName ?? seleccionado?.fullName;
+    return (
+      id: propia?.patientId ?? seleccionado?.patientId,
+      nombre: propia?.patientName ?? seleccionado?.fullName,
+      propia: propia != null,
+    );
+  }
+
+  Future<void> _onPressed() async {
+    final objetivo = _objetivo();
+    final patientId = objetivo.id;
+    final nombre = objetivo.nombre;
+    final propia = objetivo.propia;
     if (patientId == null) {
       showAppSnackBar(
         context,
@@ -57,7 +73,7 @@ class _SosButtonState extends ConsumerState<SosButton> {
         // Hoy el aviso es una alerta crítica que la red de cuidado ve en su
         // app; el envío push (RF-45) aún no está. No se promete más que eso.
         content: Text(
-          propia != null
+          propia
               ? 'Tu familia y tu cuidadora verán una alerta de emergencia en '
                   'su teléfono. Úsalo solo en una emergencia real.'
               : 'La red de cuidado de $nombre verá una alerta de emergencia. '
@@ -132,9 +148,17 @@ class _SosButtonState extends ConsumerState<SosButton> {
   @override
   Widget build(BuildContext context) {
     // Solo cuidadora y adulto mayor pueden disparar SOS (roles del backend).
-    final role = ref.watch(currentUserProvider)?.primaryRole;
-    final canTriggerSos = role == RoleType.caregiver || role == RoleType.elder;
-    if (!canTriggerSos) return const SizedBox.shrink();
+    // Se mira el rol en el paciente que se está viendo: con el tipo de cuenta
+    // el botón aparecía también sobre pacientes donde la persona es familiar,
+    // y el servidor respondía 403.
+    final user = ref.watch(currentUserProvider);
+    // El selector se observa para volver a dibujar al cambiar de paciente.
+    ref.watch(selectedPatientProvider);
+    final objetivo = _objetivo();
+    final rol = objetivo.id == null ? null : user?.roleOn(objetivo.id!);
+    if (rol != RoleType.caregiver && rol != RoleType.elder) {
+      return const SizedBox.shrink();
+    }
 
     return FloatingActionButton.extended(
       onPressed: _sending ? null : _onPressed,

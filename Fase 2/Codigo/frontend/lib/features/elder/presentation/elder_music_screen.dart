@@ -10,8 +10,6 @@ import '../../../core/audio/tone_service.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/upload_service.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/common.dart';
-import '../../auth/application/auth_controller.dart';
 import '../application/elder_providers.dart';
 
 /// Director Musical (RF-65 a RF-67, RF-69).
@@ -54,7 +52,6 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
   final _recorder = AudioRecorder();
   bool _grabando = false;
   bool _subiendo = false;
-  String? _archivoTemporal;
   int _duracionSeg = 0;
   late final Stopwatch _stopwatch;
 
@@ -94,7 +91,6 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
       ..start();
     setState(() {
       _grabando = true;
-      _archivoTemporal = path;
       _duracionSeg = 0;
     });
 
@@ -141,11 +137,16 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
       );
 
       // 2. Registrar la creación con client_uuid para idempotencia (RF-66).
+      // El endpoint pide el id del archivo suelto, no la URL entera.
+      final fileId = uploaded.fileId;
+      if (fileId == null) {
+        throw Exception('El audio se subió pero no se pudo identificar.');
+      }
       final clientUuid = const Uuid().v4();
       await api.post<void>(
         '/patients/$patientId/music',
         query: {
-          'file_id': uploaded.fileId,
+          'file_id': fileId,
           'title': titulo,
           'duration_seconds': _stopwatch.elapsed.inSeconds.clamp(1, 86400),
           'client_uuid': clientUuid,
@@ -411,7 +412,7 @@ class _NoteButtonState extends State<_NoteButton> {
                   ? []
                   : [
                       BoxShadow(
-                        color: widget.note.color.withOpacity(0.45),
+                        color: widget.note.color.withValues(alpha: 0.45),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),

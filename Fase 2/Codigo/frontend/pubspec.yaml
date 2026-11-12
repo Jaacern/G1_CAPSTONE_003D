@@ -31,6 +31,7 @@ dependencies:
   # Tiempo real y multimedia
   web_socket_channel: ^3.0.3     # chat en tiempo real (/patients/{id}/chat/ws)
   image_picker: ^1.1.2           # fotos, escaneo de recetas
+  cross_file: ^0.3.5             # archivo elegido, sirve igual en web y movil
   record: ^7.1.1                 # captura de notas de voz (STT)
   audioplayers: ^6.1.0           # reproducción de notas de voz y TTS
   url_launcher: ^6.3.1           # tel:, mailto:, enlaces de invitación

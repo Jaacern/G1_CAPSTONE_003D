@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
@@ -9,6 +10,7 @@ import '../../home/application/home_providers.dart';
 import '../../medications/presentation/medications_screen.dart';
 import '../../medications/presentation/prn_banner.dart';
 import '../../patients/application/patients_providers.dart';
+import '../application/caregiver_providers.dart';
 
 /// "Hoy" de la cuidadora, construido solo con endpoints que el backend soporta:
 /// resumen del día del paciente (summary/today) y la gestión de dosis del día
@@ -85,6 +87,9 @@ class CaregiverHomeScreen extends ConsumerWidget {
               },
             ),
           ),
+          // Lo primero que lee quien llega al turno: lo que dejo la anterior
+          // (RF-70).
+          const _UltimoRelevo(),
           // Accesos a su propio trabajo. Las cuatro pantallas que hay detras
           // existian sin ruta ni boton, asi que una cuidadora no podia marcar
           // una tarea, hacer su check-in, dejar una observacion, reportar un
@@ -206,6 +211,70 @@ class _Acceso extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Ultima nota de relevo del paciente que se esta viendo (RF-70).
+///
+/// La cuidadora que llega al turno tiene que saber primero que dejo dicho la
+/// anterior: si durmio mal, si no quiso almorzar. Antes eso estaba solo en
+/// la pantalla de relevo, a la que habia que entrar a buscarlo.
+///
+/// Usa las mismas notas que esa pantalla (GET .../handover-notes), que ya
+/// deja constancia de la lectura del expediente. Mientras carga, si falla o
+/// si todavia no hay notas no ocupa lugar: la medicacion de abajo es lo
+/// urgente y no tiene que saltar de posicion.
+class _UltimoRelevo extends ConsumerWidget {
+  const _UltimoRelevo();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final patient = ref.watch(selectedPatientProvider);
+    final notas = ref.watch(handoverNotesProvider).valueOrNull;
+    if (patient == null || notas == null || notas.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final ultima = notas.first;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: AppCard(
+        onTap: () =>
+            context.push('/cg/handover?patient=${patient.patientId}'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.swap_horiz_rounded,
+                    size: 18, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Último relevo · ${ultima.authorName}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                Text(
+                  DateFormat('d MMM · HH:mm', 'es').format(ultima.createdAt),
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              ultima.text,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13.5),
+            ),
+          ],
         ),
       ),
     );

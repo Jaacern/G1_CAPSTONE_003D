@@ -80,5 +80,10 @@
         <intent>
             <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
         </intent>
+        <!-- Dictado (speech_to_text): desde Android 11 la app tiene que
+             declarar que busca el servicio de reconocimiento de voz. -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
     </queries>
 </manifest>

@@ -60,6 +60,20 @@ void main() {
     expect(find.byIcon(Icons.play_arrow_rounded), findsNWidgets(2));
   });
 
+  testWidgets('cada melodia se puede compartir (RF-67)', (tester) async {
+    await montar(tester, [
+      Melodia(
+        id: 'm-1',
+        title: 'Melodía del lunes',
+        durationSeconds: 65,
+        audioUrl: '/files/1',
+        createdAt: DateTime(2026, 11, 9, 10, 30),
+      ),
+    ]);
+
+    expect(find.byTooltip('Compartir melodía'), findsOneWidget);
+  });
+
   testWidgets('sin melodias explica donde se graban', (tester) async {
     await montar(tester, const []);
 

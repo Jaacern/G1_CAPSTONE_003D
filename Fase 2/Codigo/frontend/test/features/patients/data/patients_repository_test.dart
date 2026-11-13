@@ -61,8 +61,8 @@ void main() {
     final invitation =
         await repo.invite(patientId: 'p-elena', role: RoleType.family);
 
-    // Recien creada: vale por 48 h, no deberia estar vencida.
+    // Recien creada: vale por 7 dias, igual que en el backend.
     expect(invitation.isExpired, isFalse);
-    expect(invitation.timeLeft.inHours, closeTo(48, 1));
+    expect(invitation.timeLeft.inHours, closeTo(7 * 24, 1));
   });
 }

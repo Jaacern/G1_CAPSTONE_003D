@@ -500,7 +500,8 @@ class PatientsRepositoryMock implements PatientsRepository {
       String? email}) async {
     await Future.delayed(const Duration(milliseconds: 300));
     final code = _generateUnusedCode();
-    final expiresAt = DateTime.now().add(const Duration(hours: 48));
+    // Misma vigencia que el backend (INVITATION_TTL_DAYS) y que la pantalla.
+    final expiresAt = DateTime.now().add(const Duration(days: 7));
     _pendingInvitations[code] =
         (patientId: patientId, role: role, expiresAt: expiresAt);
     return Invitation(

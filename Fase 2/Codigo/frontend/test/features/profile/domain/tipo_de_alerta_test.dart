@@ -21,4 +21,10 @@ void main() {
     // is_locked lo decide el servidor: no se manda de vuelta.
     expect(s.toJson(), {'alert_type': 'sos', 'push_enabled': true});
   });
+
+  test('un tipo que la app no conoce se trata como caida', () {
+    // Ante la duda se elige la alerta critica, que no se puede apagar,
+    // antes que perder un aviso.
+    expect(AlertType.fromApi('nuevo_tipo'), AlertType.fall);
+  });
 }

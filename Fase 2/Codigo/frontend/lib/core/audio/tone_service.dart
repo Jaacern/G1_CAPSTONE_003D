@@ -18,9 +18,18 @@ class ToneService {
   /// Un reproductor por voz permite que varias notas suenen encabalgadas
   /// (si el adulto mayor toca rápido) sin cortarse entre sí. Se rota en
   /// round-robin sobre un pequeño grupo.
-  final List<AudioPlayer> _pool =
-      List.generate(6, (_) => AudioPlayer()..setReleaseMode(ReleaseMode.stop));
+  ///
+  /// Se crean recien al tocar la primera nota (`late`): abrir la pantalla o
+  /// solo armar una melodia con [mezclar] no necesita reproductores.
+  late final List<AudioPlayer> _pool = _crearReproductores();
+  bool _hayReproductores = false;
   int _next = 0;
+
+  List<AudioPlayer> _crearReproductores() {
+    _hayReproductores = true;
+    return List.generate(
+        6, (_) => AudioPlayer()..setReleaseMode(ReleaseMode.stop));
+  }
 
   static const int _sampleRate = 44100;
 
@@ -156,6 +165,9 @@ class ToneService {
   }
 
   Future<void> dispose() async {
+    // Si nunca sono una nota no hay nada que cerrar (y no se crean solo para
+    // cerrarlos).
+    if (!_hayReproductores) return;
     for (final p in _pool) {
       await p.dispose();
     }

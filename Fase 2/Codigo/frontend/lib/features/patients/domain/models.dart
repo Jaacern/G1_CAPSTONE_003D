@@ -747,6 +747,18 @@ class NewAllergy {
 /// contacto de emergencia. Opcionales: segundo nombre y apellido,
 /// condiciones, alergias, previsión. Una lista vacía de alergias NO viaja: el
 /// backend la interpreta como "no informado", no como "sin alergias".
+/// Cuenta con la que el adulto mayor entra a la app. La crea su familia al
+/// crear el perfil (POST /patients, campo elder_account).
+class NewElderAccount {
+  const NewElderAccount({required this.email, required this.password});
+
+  final String email;
+  final String password;
+
+  Map<String, dynamic> toJson() =>
+      {'email': email.trim(), 'password': password};
+}
+
 class NewPatient {
   const NewPatient({
     required this.firstName,
@@ -761,6 +773,7 @@ class NewPatient {
     this.conditions = const [],
     this.allergies = const [],
     this.insurance,
+    this.elderAccount,
   });
 
   final String firstName;
@@ -779,6 +792,9 @@ class NewPatient {
 
   /// fonasa | isapre | particular | otra
   final String? insurance;
+
+  /// Si viene, se crea también la cuenta del adulto mayor.
+  final NewElderAccount? elderAccount;
 
   /// Nombre completo, igual a como lo arma la columna generada de la base.
   String get fullName => [firstName, secondName, lastName, secondLastName]
@@ -805,6 +821,7 @@ class NewPatient {
         if (allergies.isNotEmpty)
           'allergies': allergies.map((a) => a.toJson()).toList(),
         if (insurance != null) 'insurance': insurance,
+        if (elderAccount != null) 'elder_account': elderAccount!.toJson(),
       };
 }
 

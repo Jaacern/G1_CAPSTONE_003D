@@ -59,6 +59,19 @@ void main() {
 
     expect(repo.invitadosA, ['p-jose']);
   });
+  testWidgets('cambiar de adulto mayor esconde el codigo del anterior',
+      (tester) async {
+    await montar(tester);
+
+    await generar(tester);
+    expect(find.text('Copiar código'), findsOneWidget);
+    expect(find.textContaining('· Elena Ramírez'), findsOneWidget);
+
+    // Ese codigo es de Elena: no tiene que quedar a la vista como si fuera
+    // de Jose.
+    await elegir(tester, 'José Ramírez');
+    expect(find.text('Copiar código'), findsNothing);
+  });
 }
 
 /// Repositorio de demostracion que anota para quien se pidio cada codigo.

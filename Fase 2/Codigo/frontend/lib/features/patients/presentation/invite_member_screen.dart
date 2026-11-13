@@ -110,7 +110,12 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
                   DropdownMenuItem(
                       value: p.patientId, child: Text(p.fullName)),
               ],
-              onChanged: (id) => setState(() => _patientId = id),
+              // El código que estaba a la vista era del otro
+              // adulto mayor: se esconde para no compartirlo por error.
+              onChanged: (id) => setState(() {
+                _patientId = id;
+                _created = null;
+              }),
             ),
             const SizedBox(height: 20),
           ],
@@ -141,7 +146,11 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
                   icon: Icon(Icons.elderly_outlined)),
             ],
             selected: {_role},
-            onSelectionChanged: (s) => setState(() => _role = s.first),
+            // Igual con el rol: el código de la vista era para otro.
+            onSelectionChanged: (s) => setState(() {
+              _role = s.first;
+              _created = null;
+            }),
             multiSelectionEnabled: false,
             showSelectedIcon: false,
           ),
@@ -174,10 +183,14 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
                       const Icon(Icons.check_circle,
                           color: AppColors.statusOk),
                       const SizedBox(width: 8),
-                      Text(
-                        'Código para ${_created!.role.label.toLowerCase()}',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700),
+                      Expanded(
+                        child: Text(
+                          'Código para '
+                          '${_created!.role.label.toLowerCase()} · '
+                          '${patient.fullName}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700),
+                        ),
                       ),
                     ],
                   ),

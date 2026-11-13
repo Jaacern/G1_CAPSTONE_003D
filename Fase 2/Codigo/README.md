@@ -408,6 +408,14 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+#### Problemas comunes en Windows
+
+| Síntoma | Causa | Solución |
+|---------|-------|----------|
+| El contenedor `agecare-api` se reinicia sin parar y el log dice `bad interpreter` o `\r: command not found` | Los `.sh` se bajaron con fin de línea CRLF | Desde que existe `.gitattributes` se bajan en LF. En un clon anterior: `git rm --cached -r . -q && git reset --hard` (descarta cambios sin commitear) |
+| `flutter` no se reconoce como comando | Flutter no está en el PATH | `setx PATH "%PATH%;%USERPROFILE%\flutter\bin"` y abrir una terminal nueva |
+| La API no puede entrar a la base (`password authentication failed`) | El volumen `pgdata` se creó con otra contraseña que la del `.env` | `docker exec agecare-db psql -U agecare -c "ALTER USER agecare WITH PASSWORD '<la del .env>';"` o borrar el volumen con `docker compose down -v` (pierde los datos) |
+
 > 🚧 **Pendiente (más adelante):** el **OCR de recetas** está en desarrollo; cuando
 > se use, necesita el binario `tesseract` en el sistema
 > (`sudo apt-get install -y tesseract-ocr tesseract-ocr-spa`). La **guía de

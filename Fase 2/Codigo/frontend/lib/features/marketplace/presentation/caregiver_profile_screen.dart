@@ -104,7 +104,7 @@ class CaregiverProfileScreen extends ConsumerWidget {
                   runSpacing: 8,
                   children: [
                     for (final s in c.specialties)
-                      Chip2(s, color: AgeColors.teal100),
+                      Etiqueta(s, tono: AgeColors.teal700),
                   ],
                 ),
               ],
@@ -114,7 +114,7 @@ class CaregiverProfileScreen extends ConsumerWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    for (final i in c.languages) Chip2(nombreIdioma(i)),
+                    for (final i in c.languages) Etiqueta(nombreIdioma(i)),
                   ],
                 ),
               ],
@@ -124,7 +124,7 @@ class CaregiverProfileScreen extends ConsumerWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    for (final z in c.zones) Chip2(nombreComuna(z)),
+                    for (final z in c.zones) Etiqueta(nombreComuna(z)),
                   ],
                 ),
               ],

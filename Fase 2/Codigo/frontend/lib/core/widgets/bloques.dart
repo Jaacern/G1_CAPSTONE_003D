@@ -184,26 +184,47 @@ class TarjetaDeDato extends StatelessWidget {
   }
 }
 
-/// Etiqueta redondeada, para enumerar cosas cortas: especialidades, alergias,
-/// habilidades.
-class Chip2 extends StatelessWidget {
-  const Chip2(this.texto, {super.key, this.color});
+/// Etiqueta redondeada.
+///
+/// Sirve para dos cosas que se ven iguales. Sin [tono] enumera cosas cortas
+/// sin jerarquia entre ellas: especialidades, idiomas, comunas. Con [tono]
+/// dice un estado, y ahi el color es el mensaje: una toma pendiente en ambar
+/// y una omitida en rojo se distinguen antes de que alguien lea la palabra.
+///
+/// No es un chip de filtro. Lo que se puede elegir y deselecionar son
+/// ChoiceChip y FilterChip de Material, que ya traen su estado y su
+/// semantica para el lector de pantalla; esto es solo una etiqueta.
+class Etiqueta extends StatelessWidget {
+  const Etiqueta(this.texto, {super.key, this.tono});
 
   final String texto;
-  final Color? color;
+
+  /// Color del texto y, al doce por ciento, del fondo.
+  ///
+  /// Va un tono oscuro de la paleta, de los que terminan en 700: el texto se
+  /// dibuja con este mismo color y sobre su propio tinte un tono claro no
+  /// alcanza el contraste que pide la guia.
+  final Color? tono;
 
   @override
   Widget build(BuildContext context) {
     final esquema = Theme.of(context).colorScheme;
-    final fondo = color ?? esquema.surfaceContainerHighest;
+    final tinte = tono;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: fondo,
+        color: tinte == null
+            ? esquema.surfaceContainerHighest
+            : tinte.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(AgeRadius.full),
       ),
-      child: Text(texto,
-          style: AgeText.caption.copyWith(color: esquema.onSurface)),
+      child: Text(
+        texto,
+        style: AgeText.caption.copyWith(
+          color: tinte ?? esquema.onSurface,
+          fontWeight: tinte == null ? FontWeight.w400 : FontWeight.w700,
+        ),
+      ),
     );
   }
 }

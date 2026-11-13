@@ -50,6 +50,11 @@ void main() {
     return tono;
   }
 
+  /// Deja terminar el contador de segundos de la grabacion.
+  Future<void> esperarContador(WidgetTester tester) async {
+    await tester.pump(const Duration(seconds: 2));
+  }
+
   testWidgets('se dibuja entera en un telefono de 320 dp', (tester) async {
     await montar(tester, ancho: 320);
 
@@ -67,6 +72,18 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
 
     expect(tono.tocadas, [440.0]);
+  });
+
+  testWidgets('guardar sin haber tocado notas lo explica', (tester) async {
+    await montar(tester);
+
+    await tester.tap(find.text('Grabar'));
+    await tester.pump();
+    await tester.tap(find.text('Guardar'));
+    await tester.pump();
+
+    expect(find.textContaining('No tocaste ninguna nota'), findsOneWidget);
+    await esperarContador(tester);
   });
 }
 

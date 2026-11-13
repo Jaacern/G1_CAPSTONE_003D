@@ -82,6 +82,11 @@ abstract class PatientsRepository {
 
   /// Equipo de cuidado del paciente (miembros vivos con su profesión).
   Future<List<CareMember>> listMembers(String patientId);
+
+  /// Quita a un miembro del circulo de cuidado (RF-14). Solo el familiar
+  /// administrador puede hacerlo, y nunca sobre el administrador: la API
+  /// responde 400 CANNOT_REMOVE_OWNER.
+  Future<void> removeMember(String patientId, String userId);
 }
 
 // ---------------------------------------------------------------------------
@@ -282,6 +287,10 @@ class PatientsRepositoryHttp implements PatientsRepository {
         .map((e) => ConditionDetail.fromJson(e as Map<String, dynamic>))
         .toList();
   }
+
+  @override
+  Future<void> removeMember(String patientId, String userId) =>
+      _api.delete<void>('/patients/$patientId/members/$userId');
 
   @override
   Future<List<CareMember>> listMembers(String patientId) async {
@@ -780,6 +789,9 @@ class PatientsRepositoryMock implements PatientsRepository {
     return List.unmodifiable(lista);
   }
 
+  /// Miembros quitados en esta sesion de demostracion.
+  final _quitados = <String>{};
+
   @override
   Future<List<CareMember>> listMembers(String patientId) async => const [
         CareMember(
@@ -794,7 +806,19 @@ class PatientsRepositoryMock implements PatientsRepository {
             email: 'cuidadora@agecare.cl',
             role: 'caregiver',
             profession: 'cuidadora'),
-      ];
+      ].where((m) => !_quitados.contains(m.userId)).toList();
+
+  @override
+  Future<void> removeMember(String patientId, String userId) async {
+    // Igual que la API: al administrador no se le puede quitar.
+    if (userId == 'u1') {
+      throw ApiException(
+          statusCode: 400,
+          code: 'CANNOT_REMOVE_OWNER',
+          message: 'No puedes quitar al administrador del paciente.');
+    }
+    _quitados.add(userId);
+  }
 }
 
 final patientsRepositoryProvider = Provider<PatientsRepository>((ref) {

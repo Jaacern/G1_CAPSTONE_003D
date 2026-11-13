@@ -10,6 +10,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../application/auth_controller.dart';
 import '../data/auth_repository.dart';
+import 'auth_backdrop.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -59,139 +60,285 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (_error != null) setState(() => _error = null);
   }
 
+  /// Campo en píldora con relleno suave y sin borde. El texto de ayuda es la
+  /// etiqueta (no flota), así los lectores de pantalla lo siguen anunciando.
+  InputDecoration _fieldDecoration(
+    String label,
+    IconData icon, {
+    Widget? suffix,
+    required bool dark,
+  }) {
+    OutlineInputBorder border([Color? color, double width = 0]) =>
+        OutlineInputBorder(
+          borderRadius: BorderRadius.circular(28),
+          borderSide: color == null
+              ? BorderSide.none
+              : BorderSide(color: color, width: width),
+        );
+    return InputDecoration(
+      labelText: label,
+      floatingLabelBehavior: FloatingLabelBehavior.never,
+      prefixIcon: Icon(icon),
+      suffixIcon: suffix,
+      filled: true,
+      fillColor: dark ? AgeColors.darkSurfaceBg : AgeColors.surfaceSunken,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 17),
+      border: border(),
+      enabledBorder: border(),
+      disabledBorder: border(),
+      focusedBorder: border(dark ? AgeColors.darkTeal : AgeColors.teal600, 2),
+      errorBorder: border(AgeColors.attention600, 1.5),
+      focusedErrorBorder: border(AgeColors.attention600, 2),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary =
+        dark ? AgeColors.darkTextPrimary : AgeColors.textPrimary;
+    final textSecondary =
+        dark ? AgeColors.darkTextSecondary : AgeColors.textSecondary;
+
+    // El arte ocupa _headerH y el panel blanco lo tapa los últimos _overlap.
+    const headerH = 230.0;
+    const overlap = 32.0;
+
     return Scaffold(
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) => AutofillGroup(
-            child: SingleChildScrollView(
-              padding: _pagePadding,
-              child: ConstrainedBox(
-                // minHeight fuerza a centrar el bloque cuando sobra pantalla;
-                // con el teclado abierto el contenido sigue pudiendo scrollear.
-                constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight - _pagePadding.vertical),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
-                    child: Form(
-                      key: _formKey,
+      backgroundColor: dark ? AgeColors.darkSurfaceBg : AgeColors.navy100,
+      body: AuthPageBackground(
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, box) => AutofillGroup(
+              child: SingleChildScrollView(
+                padding: _pagePadding,
+                child: ConstrainedBox(
+                  // minHeight centra la tarjeta cuando sobra pantalla; con el
+                  // teclado abierto el contenido sigue pudiendo scrollear.
+                  constraints: BoxConstraints(
+                      minHeight: box.maxHeight - _pagePadding.vertical),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 400),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const _BrandHeader(),
-                          const SizedBox(height: 28),
-                          _FormPanel(
-                            dark: dark,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                TextFormField(
-                                  controller: _email,
-                                  enabled: !_loading,
-                                  keyboardType: TextInputType.emailAddress,
-                                  textInputAction: TextInputAction.next,
-                                  autocorrect: false,
-                                  autofillHints: const [AutofillHints.email],
-                                  onChanged: (_) => _clearError(),
-                                  decoration: const InputDecoration(
-                                      labelText: 'Correo electrónico',
-                                      prefixIcon: Icon(Icons.mail_outline)),
-                                  validator: (v) => v != null && v.contains('@')
-                                      ? null
-                                      : 'Escribe un correo válido',
-                                ),
-                                const SizedBox(height: 14),
-                                TextFormField(
-                                  controller: _password,
-                                  enabled: !_loading,
-                                  obscureText: _obscure,
-                                  textInputAction: TextInputAction.done,
-                                  autofillHints: const [AutofillHints.password],
-                                  onChanged: (_) => _clearError(),
-                                  decoration: InputDecoration(
-                                    labelText: 'Contraseña',
-                                    prefixIcon: const Icon(Icons.lock_outline),
-                                    suffixIcon: IconButton(
-                                      icon: Icon(_obscure
-                                          ? Icons.visibility_off
-                                          : Icons.visibility),
-                                      tooltip: _obscure
-                                          ? 'Mostrar contraseña'
-                                          : 'Ocultar contraseña',
-                                      onPressed: () =>
-                                          setState(() => _obscure = !_obscure),
-                                    ),
-                                  ),
-                                  validator: (v) => v != null && v.length >= 8
-                                      ? null
-                                      : 'Mínimo 8 caracteres',
-                                  onFieldSubmitted: (_) => _submit(),
-                                ),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(top: 4),
-                                    child: TextButton(
-                                      onPressed: _loading
-                                          ? null
-                                          : () => context.push('/recover'),
-                                      style: TextButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 4),
-                                        minimumSize: const Size(0, 36),
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(32),
+                              boxShadow: dark
+                                  ? null
+                                  : const [
+                                      BoxShadow(
+                                        color: Color(0x2612283F),
+                                        blurRadius: 40,
+                                        offset: Offset(0, 18),
                                       ),
-                                      child: const Text(
-                                          '¿Olvidaste tu contraseña?'),
+                                    ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(32),
+                              child: Stack(
+                                children: [
+                                  const Positioned(
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    height: headerH,
+                                    child: BrandArt(
+                                      logoSize: 140,
+                                      logoAlignment: Alignment(0, -.14),
                                     ),
                                   ),
-                                ),
-                                if (_error != null) ...[
-                                  const SizedBox(height: 8),
-                                  InlineError(
-                                      message: _error!, onDismiss: _clearError),
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                        top: headerH - overlap),
+                                    child: Container(
+                                      padding: const EdgeInsets.fromLTRB(
+                                          24, 26, 24, 20),
+                                      decoration: BoxDecoration(
+                                        color: dark
+                                            ? AgeColors.darkSurfaceCard
+                                            : AgeColors.surfaceCard,
+                                        borderRadius:
+                                            const BorderRadius.vertical(
+                                                top: Radius.circular(30)),
+                                      ),
+                                      child: Form(
+                                        key: _formKey,
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            Text('Iniciar sesión',
+                                                textAlign: TextAlign.center,
+                                                style: AgeText.h2.copyWith(
+                                                    color: textPrimary)),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                                'La tranquilidad de saber que está bien',
+                                                textAlign: TextAlign.center,
+                                                style: AgeText.small.copyWith(
+                                                    color: textSecondary)),
+                                            const SizedBox(height: 22),
+                                            TextFormField(
+                                              controller: _email,
+                                              enabled: !_loading,
+                                              keyboardType:
+                                                  TextInputType.emailAddress,
+                                              textInputAction:
+                                                  TextInputAction.next,
+                                              autocorrect: false,
+                                              autofillHints: const [
+                                                AutofillHints.email
+                                              ],
+                                              onChanged: (_) => _clearError(),
+                                              decoration: _fieldDecoration(
+                                                  'Correo electrónico',
+                                                  Icons.mail_outline,
+                                                  dark: dark),
+                                              validator: (v) => v != null &&
+                                                      v.contains('@')
+                                                  ? null
+                                                  : 'Escribe un correo válido',
+                                            ),
+                                            const SizedBox(height: 12),
+                                            TextFormField(
+                                              controller: _password,
+                                              enabled: !_loading,
+                                              obscureText: _obscure,
+                                              textInputAction:
+                                                  TextInputAction.done,
+                                              autofillHints: const [
+                                                AutofillHints.password
+                                              ],
+                                              onChanged: (_) => _clearError(),
+                                              decoration: _fieldDecoration(
+                                                'Contraseña',
+                                                Icons.lock_outline,
+                                                dark: dark,
+                                                suffix: IconButton(
+                                                  icon: Icon(_obscure
+                                                      ? Icons
+                                                          .visibility_off_outlined
+                                                      : Icons
+                                                          .visibility_outlined),
+                                                  tooltip: _obscure
+                                                      ? 'Mostrar contraseña'
+                                                      : 'Ocultar contraseña',
+                                                  onPressed: () => setState(
+                                                      () =>
+                                                          _obscure = !_obscure),
+                                                ),
+                                              ),
+                                              validator: (v) =>
+                                                  v != null && v.length >= 8
+                                                      ? null
+                                                      : 'Mínimo 8 caracteres',
+                                              onFieldSubmitted: (_) =>
+                                                  _submit(),
+                                            ),
+                                            Align(
+                                              alignment: Alignment.centerRight,
+                                              child: Padding(
+                                                padding: const EdgeInsets.only(
+                                                    top: 4),
+                                                child: TextButton(
+                                                  onPressed: _loading
+                                                      ? null
+                                                      : () => context
+                                                          .push('/recover'),
+                                                  style: TextButton.styleFrom(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 4),
+                                                    minimumSize:
+                                                        const Size(0, 36),
+                                                    tapTargetSize:
+                                                        MaterialTapTargetSize
+                                                            .shrinkWrap,
+                                                  ),
+                                                  child: const Text(
+                                                      '¿Olvidaste tu contraseña?'),
+                                                ),
+                                              ),
+                                            ),
+                                            if (_error != null) ...[
+                                              const SizedBox(height: 8),
+                                              InlineError(
+                                                  message: _error!,
+                                                  onDismiss: _clearError),
+                                            ],
+                                            const SizedBox(height: 12),
+                                            // Marino AgeCare: el tono oscuro
+                                            // de la marca para la acción
+                                            // principal.
+                                            FilledButton(
+                                              onPressed:
+                                                  _loading ? null : _submit,
+                                              style: FilledButton.styleFrom(
+                                                backgroundColor: dark
+                                                    ? AgeColors.darkTeal
+                                                    : AgeColors.navy800,
+                                                foregroundColor: dark
+                                                    ? AgeColors.darkSurfaceBg
+                                                    : Colors.white,
+                                                minimumSize:
+                                                    const Size.fromHeight(54),
+                                                shape: const StadiumBorder(),
+                                                textStyle: AgeText.label,
+                                              ),
+                                              child: _loading
+                                                  ? SizedBox(
+                                                      width: 22,
+                                                      height: 22,
+                                                      child: CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                          color: dark
+                                                              ? AgeColors
+                                                                  .darkSurfaceBg
+                                                              : Colors.white))
+                                                  : const Text(
+                                                      'Iniciar sesión'),
+                                            ),
+                                            const SizedBox(height: 10),
+                                            Wrap(
+                                              alignment: WrapAlignment.center,
+                                              crossAxisAlignment:
+                                                  WrapCrossAlignment.center,
+                                              children: [
+                                                Text('¿No tienes cuenta?',
+                                                    style: TextStyle(
+                                                        fontSize: 14,
+                                                        color: textSecondary)),
+                                                TextButton(
+                                                  onPressed: _loading
+                                                      ? null
+                                                      : () => context
+                                                          .push('/register'),
+                                                  child: const Text(
+                                                      'Regístrate aquí',
+                                                      style: TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w800)),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ],
-                                const SizedBox(height: 12),
-                                FilledButton(
-                                  onPressed: _loading ? null : _submit,
-                                  child: _loading
-                                      ? const SizedBox(
-                                          width: 22,
-                                          height: 22,
-                                          child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: Colors.white))
-                                      : const Text('Iniciar sesión'),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('¿No tienes cuenta?',
-                                  style: TextStyle(
-                                      fontSize: 14,
-                                      color: dark
-                                          ? AgeColors.darkTextSecondary
-                                          : AppColors.textSecondary)),
-                              TextButton(
-                                onPressed: _loading
-                                    ? null
-                                    : () => context.push('/register'),
-                                child: const Text('Regístrate'),
                               ),
-                            ],
+                            ),
                           ),
                           // Demo: datos simulados. Compilación de desarrollo
                           // contra el backend real: las mismas cuentas del
                           // seed. En release no sale nunca (kDebugMode).
-                          if (AppConfig.useMocks || kDebugMode)
+                          if (AppConfig.useMocks || kDebugMode) ...[
+                            const SizedBox(height: 16),
                             _DemoBadge(
                               real: !AppConfig.useMocks,
                               onSelect: (correo) => setState(() {
@@ -200,6 +347,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     AuthRepositoryMock.demoPassword;
                               }),
                             ),
+                          ],
                         ],
                       ),
                     ),
@@ -210,80 +358,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// Encabezado de marca: logo, bienvenida y lema. Separado del formulario para
-/// que la tarjeta de acceso no compita con el logo.
-class _BrandHeader extends StatelessWidget {
-  const _BrandHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return Column(
-      children: [
-        Image.asset(
-          'assets/images/Agecare.png',
-          width: 132,
-          height: 132,
-          fit: BoxFit.contain,
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'Bienvenido de vuelta',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -.2,
-            color: dark ? AgeColors.darkTextPrimary : AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'La tranquilidad de saber que está bien',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 14,
-            height: 1.3,
-            color: dark ? AgeColors.darkTextSecondary : AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Contenedor del formulario. Se usa `surfaceAlt` para que los campos blancos
-/// se despeguen del fondo de la tarjeta.
-class _FormPanel extends StatelessWidget {
-  const _FormPanel({required this.child, required this.dark});
-
-  final Widget child;
-  final bool dark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
-      decoration: BoxDecoration(
-        color: dark ? AppColors.darkSurface : AppColors.surfaceAlt,
-        borderRadius: BorderRadius.circular(22),
-        border:
-            Border.all(color: dark ? AppColors.darkDivider : AppColors.divider),
-        boxShadow: dark
-            ? null
-            : const [
-                BoxShadow(
-                  color: AppColors.cardShadow,
-                  blurRadius: 30,
-                  offset: Offset(0, 12),
-                ),
-              ],
-      ),
-      child: child,
     );
   }
 }
@@ -425,7 +499,8 @@ class _RecoverPasswordScreenState extends ConsumerState<RecoverPasswordScreen> {
       await ref.read(authControllerProvider.notifier).recoverPassword(correo);
       if (!mounted) return;
       if (_paso == _Paso.codigo) {
-        showAppSnackBar(context, 'Si el correo está registrado, enviamos un código nuevo.');
+        showAppSnackBar(
+            context, 'Si el correo está registrado, enviamos un código nuevo.');
       }
       setState(() => _paso = _Paso.codigo);
     } on ApiException catch (e) {
@@ -461,7 +536,8 @@ class _RecoverPasswordScreenState extends ConsumerState<RecoverPasswordScreen> {
             newPassword: _pass.text,
           );
       if (!mounted) return;
-      showAppSnackBar(context, 'Listo. Ya puedes entrar con tu contraseña nueva.');
+      showAppSnackBar(
+          context, 'Listo. Ya puedes entrar con tu contraseña nueva.');
       context.go('/login');
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -566,9 +642,8 @@ class _RecoverPasswordScreenState extends ConsumerState<RecoverPasswordScreen> {
             ],
             const SizedBox(height: 24),
             FilledButton(
-              onPressed: _loading
-                  ? null
-                  : (enCodigo ? _cambiarClave : _pedirCodigo),
+              onPressed:
+                  _loading ? null : (enCodigo ? _cambiarClave : _pedirCodigo),
               child: _loading
                   ? const SizedBox(
                       width: 20,

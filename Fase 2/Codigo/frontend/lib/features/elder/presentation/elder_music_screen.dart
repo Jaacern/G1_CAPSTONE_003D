@@ -52,6 +52,10 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
   /// asi lo grabado suena igual a lo que se escucho.
   static const _duracionNotaMs = 650;
 
+  /// Tope de una grabacion: tres minutos. Evita una que quedo corriendo sola
+  /// y mantiene el archivo lejos del limite del servidor (25 MB).
+  static const _maximoGrabacion = Duration(minutes: 3);
+
   /// Notas tocadas durante la grabacion: cuando (ms desde que empezo) y cual.
   final _notasGrabadas = <({int offsetMs, double frequency})>[];
   bool _grabando = false;
@@ -86,10 +90,14 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
       _duracionSeg = 0;
     });
 
-    // Actualizar el contador de segundos.
+    // Contador de segundos, y corte automatico al llegar al tope.
     Future.doWhile(() async {
       await Future.delayed(const Duration(seconds: 1));
       if (!mounted || !_grabando) return false;
+      if (_stopwatch.elapsed >= _maximoGrabacion) {
+        await _detenerYGuardar();
+        return false;
+      }
       setState(() => _duracionSeg = _stopwatch.elapsed.inSeconds);
       return true;
     });

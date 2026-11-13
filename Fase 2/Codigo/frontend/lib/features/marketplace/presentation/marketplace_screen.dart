@@ -149,6 +149,7 @@ class _CaregiversTabState extends ConsumerState<_CaregiversTab> {
               ),
               const SizedBox(width: 8),
               IconButton.filled(
+                tooltip: 'Buscar',
                 onPressed: _apply,
                 icon: const Icon(Icons.search_rounded),
               ),

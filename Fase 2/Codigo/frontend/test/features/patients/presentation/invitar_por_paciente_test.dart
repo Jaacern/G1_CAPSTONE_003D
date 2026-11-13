@@ -11,7 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  Future<_RepoQueAnota> montar(WidgetTester tester) async {
+  Future<_RepoQueAnota> montar(WidgetTester tester, {String? patientId}) async {
     final repo = _RepoQueAnota();
     await tester.binding.setSurfaceSize(const Size(400, 1200));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -19,7 +19,7 @@ void main() {
       overrides: [patientsRepositoryProvider.overrideWithValue(repo)],
       child: MaterialApp(
         theme: AppTheme.light(),
-        home: const InviteMemberScreen(),
+        home: InviteMemberScreen(patientId: patientId),
       ),
     ));
     // El modo de demostracion tarda un poco en entregar los pacientes.
@@ -71,6 +71,13 @@ void main() {
     // de Jose.
     await elegir(tester, 'José Ramírez');
     expect(find.text('Copiar código'), findsNothing);
+  });
+
+  testWidgets('abierta para un adulto mayor, parte con ese', (tester) async {
+    await montar(tester, patientId: 'p-jose');
+
+    expect(find.text('Invitar a alguien al cuidado de José Ramírez'),
+        findsOneWidget);
   });
 }
 

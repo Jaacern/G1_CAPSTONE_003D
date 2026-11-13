@@ -17,7 +17,11 @@ import '../domain/models.dart';
 /// en la pantalla para cuál es; antes se usaba siempre el seleccionado en la
 /// app, que casi siempre era el primero de la lista.
 class InviteMemberScreen extends ConsumerStatefulWidget {
-  const InviteMemberScreen({super.key});
+  const InviteMemberScreen({super.key, this.patientId});
+
+  /// Adulto mayor con el que se abre la pantalla (/invite?patient=<id>).
+  /// Sin él, se usa el seleccionado en la app.
+  final String? patientId;
 
   @override
   ConsumerState<InviteMemberScreen> createState() => _InviteMemberScreenState();
@@ -31,7 +35,7 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
 
   /// Adulto mayor elegido para el código. null = el que corresponde por
   /// defecto (ver [_porDefecto]).
-  String? _patientId;
+  late String? _patientId = widget.patientId;
 
   /// Si no se eligió ninguno: el seleccionado en la app, si es de los que
   /// esta persona puede invitar; si no, el primero.

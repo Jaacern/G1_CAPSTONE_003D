@@ -113,7 +113,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           path: '/patients/create',
           builder: (_, __) => const CreatePatientScreen()),
       // Invita al miembro sobre el paciente seleccionado (selectedPatientProvider).
-      GoRoute(path: '/invite', builder: (_, __) => const InviteMemberScreen()),
+      // ?patient=<id> abre la invitacion ya con ese adulto mayor elegido.
+      GoRoute(
+          path: '/invite',
+          builder: (_, st) => InviteMemberScreen(
+              patientId: st.uri.queryParameters['patient'])),
       // Lado del invitado: ingresar el código de 6 dígitos (AGE-205 / DAC05-7).
       GoRoute(
           path: '/invite/accept',

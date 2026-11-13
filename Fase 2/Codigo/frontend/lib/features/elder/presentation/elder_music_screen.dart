@@ -10,6 +10,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/upload_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../application/elder_providers.dart';
+import 'elder_melodies_screen.dart';
 
 /// Director Musical (RF-65 a RF-67, RF-69).
 ///
@@ -29,7 +30,8 @@ import '../application/elder_providers.dart';
 /// DECISIÓN DE DISEÑO
 ///   El nombre se arma solo con la fecha y la hora (RNF-20: sin teclado). Un
 ///   dialogo con dos botones grandes pregunta si se guarda; "No guardar"
-///   descarta la grabacion.
+///   descarta la grabacion. Las melodias guardadas se escuchan en
+///   "Mis melodías" (ElderMelodiesScreen).
 class ElderMusicScreen extends ConsumerStatefulWidget {
   const ElderMusicScreen({super.key});
 
@@ -239,6 +241,21 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
       appBar: AppBar(
         title: const Text('Director musical'),
         toolbarHeight: 72,
+        actions: [
+          // Las melodias guardadas, para volver a escucharlas.
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: TextButton.icon(
+              style: TextButton.styleFrom(minimumSize: const Size(48, 52)),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => const ElderMelodiesScreen()),
+              ),
+              icon: const Icon(Icons.library_music_rounded, size: 28),
+              label: const Text('Mis melodías'),
+            ),
+          ),
+        ],
         titleTextStyle: AgeText.h1.copyWith(
           fontFamily: 'Nunito Sans',
           color: scheme.onSurface,

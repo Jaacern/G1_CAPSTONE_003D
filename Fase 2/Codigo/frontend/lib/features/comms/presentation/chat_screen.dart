@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/upload_service.dart';
+import '../../../core/speech/boton_dictado.dart';
 import '../../../core/speech/grabacion.dart';
 import '../../../core/speech/speech_service.dart';
 import '../../../core/theme/app_theme.dart';
@@ -642,10 +643,16 @@ class _Composer extends StatelessWidget {
                     maxLines: 4,
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => onSend(),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: 'Escribe un mensaje… (@asistente)',
+                      // Dictar escribe aqui (RF-64). El microfono de la
+                      // derecha, en cambio, graba una nota de voz.
+                      suffixIcon: BotonDictado(
+                        controller: controller,
+                        enabled: enabled && !recording,
+                      ),
                       contentPadding:
-                          EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     ),
                   ),
                 ),

@@ -278,55 +278,31 @@ class _ProductsTab extends ConsumerStatefulWidget {
 }
 
 class _ProductsTabState extends ConsumerState<_ProductsTab> {
-  /// Clave de la categoría elegida; null es "Todas" y no manda el parámetro.
-  String? _categoria;
+  // Sin filtro por categoria (decision del equipo): la tienda muestra el
+  // catalogo completo. productsProvider(null) no manda el parametro.
+  static const String? _todas = null;
 
   @override
   Widget build(BuildContext context) {
-    final products = ref.watch(productsProvider(_categoria));
+    final products = ref.watch(productsProvider(_todas));
     return Column(
       children: [
-        SizedBox(
-          height: 48,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-            children: [
-              ChoiceChip(
-                label: const Text('Todas'),
-                selected: _categoria == null,
-                onSelected: (_) => setState(() => _categoria = null),
-              ),
-              for (final (codigo, etiqueta) in categoriasProducto) ...[
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  label: Text(etiqueta),
-                  selected: _categoria == codigo,
-                  onSelected: (_) => setState(() => _categoria = codigo),
-                ),
-              ],
-            ],
-          ),
-        ),
         Expanded(
           child: products.when(
             loading: () => const LoadingView(),
             error: (e, _) => ErrorView(
               message: e.toString(),
-              onRetry: () => ref.invalidate(productsProvider(_categoria)),
+              onRetry: () => ref.invalidate(productsProvider(_todas)),
             ),
             data: (list) => list.isEmpty
-                ? EmptyView(
+                ? const EmptyView(
                     icon: Icons.shopping_bag_outlined,
                     title: 'Sin productos',
-                    subtitle: _categoria == null
-                        ? 'Aún no hay ayudas técnicas disponibles.'
-                        : 'No hay productos en '
-                            '${categoriaProducto(_categoria)}.',
+                    subtitle: 'Aún no hay ayudas técnicas disponibles.',
                   )
                 : RefreshIndicator(
                     onRefresh: () async =>
-                        ref.invalidate(productsProvider(_categoria)),
+                        ref.invalidate(productsProvider(_todas)),
                     child: ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                       itemCount: list.length,
@@ -394,7 +370,6 @@ class _ProductCard extends StatelessWidget {
                   alignment: WrapAlignment.end,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    _Pill(label: categoriaProducto(product.category)),
                     Text(
                       product.precioLabel,
                       style: const TextStyle(

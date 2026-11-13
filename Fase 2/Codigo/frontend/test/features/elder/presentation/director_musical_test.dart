@@ -85,6 +85,29 @@ void main() {
     expect(find.textContaining('No tocaste ninguna nota'), findsOneWidget);
     await esperarContador(tester);
   });
+
+  testWidgets('con notas pregunta si se guarda, sin pedir teclado (RNF-20)',
+      (tester) async {
+    await montar(tester);
+
+    await tester.tap(find.text('Grabar'));
+    await tester.pump();
+    await tester.tap(find.text('Do'));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.tap(find.text('Guardar'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+    expect(find.text('¿Guardamos tu melodía?'), findsOneWidget);
+    expect(find.textContaining('Melodía del'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+
+    // "No guardar" descarta: se cierra y no se sube nada.
+    await tester.tap(find.text('No guardar'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    expect(find.text('¿Guardamos tu melodía?'), findsNothing);
+    expect(find.text('Guardando…'), findsNothing);
+    await esperarContador(tester);
+  });
 }
 
 /// Tonos que no suenan: anota lo que se toco.

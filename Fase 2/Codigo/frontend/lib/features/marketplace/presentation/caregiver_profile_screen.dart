@@ -358,6 +358,7 @@ class _ReviewDialogState extends ConsumerState<_ReviewDialog> {
             children: [
               for (var i = 1; i <= 5; i++)
                 IconButton(
+                  tooltip: i == 1 ? '1 estrella' : '$i estrellas',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onPressed: () => setState(() => _rating = i),

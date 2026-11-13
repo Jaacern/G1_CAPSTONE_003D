@@ -92,6 +92,10 @@ class SpeechService {
   Future<void> playUrl(String url) => _player.play(UrlSource(url));
   Future<void> stopPlayback() => _player.stop();
 
+  /// Avisa cada vez que un audio termina de sonar solo (no al detenerlo).
+  /// Sirve para que un boton de "escuchar" vuelva a su estado.
+  Stream<void> get onPlaybackComplete => _player.onPlayerComplete;
+
   Future<void> dispose() async {
     await _recorder.dispose();
     await _player.dispose();

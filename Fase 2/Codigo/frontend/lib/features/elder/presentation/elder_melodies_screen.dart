@@ -43,6 +43,42 @@ class Melodia {
   }
 }
 
+/// Enlace para que alguien sin cuenta escuche una melodia (RF-67), por
+/// ejemplo la nieta que la recibe por WhatsApp.
+///
+/// La API (POST /patients/{id}/music/{id}/share) devuelve la ruta sin el
+/// servidor ("/api/v1/music/shared/<token>"); aqui se arma el enlace
+/// completo para poder pegarlo en un mensaje.
+class EnlaceDeEscucha {
+  const EnlaceDeEscucha({
+    required this.shareId,
+    required this.url,
+    required this.expiresAt,
+  });
+
+  final String shareId;
+
+  /// Enlace completo, listo para compartir.
+  final String url;
+
+  /// Despues de esta fecha el enlace deja de funcionar.
+  final DateTime expiresAt;
+
+  /// [servidor] es la direccion de la API (AppConfig.apiBaseUrl).
+  factory EnlaceDeEscucha.fromJson(Map<String, dynamic> json,
+      {required String servidor}) {
+    final ruta = (json['url'] ?? '') as String;
+    final base = servidor.endsWith('/')
+        ? servidor.substring(0, servidor.length - 1)
+        : servidor;
+    return EnlaceDeEscucha(
+      shareId: json['share_id'].toString(),
+      url: ruta.startsWith('http') ? ruta : '$base$ruta',
+      expiresAt: DateTime.parse(json['expires_at'] as String).toLocal(),
+    );
+  }
+}
+
 /// Melodias del adulto mayor, la mas reciente primero
 /// (GET /patients/{id}/music, RF-65).
 final melodiasProvider =

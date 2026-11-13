@@ -498,8 +498,12 @@ class _MessageBubble extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text('Nota de voz',
-                style: TextStyle(color: fg, fontWeight: FontWeight.w600)),
+            // Una nota de voz puede traer un titulo, por ejemplo la melodia
+            // que el adulto mayor le mando a su familia desde Mis melodias.
+            Flexible(
+              child: Text(message.text ?? 'Nota de voz',
+                  style: TextStyle(color: fg, fontWeight: FontWeight.w600)),
+            ),
           ],
         );
       case MessageType.text:

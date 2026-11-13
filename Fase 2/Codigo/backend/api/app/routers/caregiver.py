@@ -183,6 +183,11 @@ async def today(
 
     # Adherencia de los ultimos siete dias: dosis tomadas sobre dosis que
     # ya vencieron. Las que todavia no llegan no cuentan en contra.
+    #
+    # Una dosis cuelga de un medicamento suelto o de una indicacion de un
+    # tratamiento (scheduled_doses.treatment_item_id). Antes solo se miraban
+    # las de medications, y un paciente con su esquema en tratamientos
+    # aparecia sin adherencia. Se une igual que en las dosis del dia.
     adherencia = (
         await db.execute(
             text(
@@ -191,8 +196,10 @@ async def today(
                          100.0 * count(*) FILTER (WHERE d.status = 'taken')
                          / nullif(count(*), 0), 1)
                 FROM scheduled_doses d
-                JOIN medications m ON m.id = d.medication_id
-                WHERE m.patient_id = :pid
+                LEFT JOIN medications m ON m.id = d.medication_id
+                LEFT JOIN treatment_items ti ON ti.id = d.treatment_item_id
+                LEFT JOIN treatments tr ON tr.id = ti.treatment_id
+                WHERE COALESCE(m.patient_id, tr.patient_id) = :pid
                   AND d.scheduled_at >= now() - interval '7 days'
                   AND d.scheduled_at <= now()
                 """

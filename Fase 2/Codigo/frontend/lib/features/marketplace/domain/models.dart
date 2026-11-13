@@ -218,33 +218,3 @@ class JobOffer {
         description: (json['description'] ?? '') as String,
       );
 }
-
-// ---------------------------------------------------------------------------
-// Categorías del catálogo
-// ---------------------------------------------------------------------------
-
-/// Las siete categorías que acepta `GET /marketplace/products?category=`.
-///
-/// Son códigos en inglés y cualquier otro valor devuelve 422, así que la
-/// pantalla pinta la etiqueta en español pero manda siempre la clave.
-const Map<String, String> _categoriasProducto = {
-  'mobility': 'Movilidad',
-  'bathroom': 'Baño',
-  'bedroom': 'Dormitorio',
-  'hygiene': 'Higiene',
-  'monitoring': 'Monitoreo',
-  'nutrition': 'Nutrición',
-  'other': 'Otros',
-};
-
-/// Etiqueta en español de una categoría; si llega un valor desconocido se
-/// muestra el código, que es más honesto que un "Otros" inventado.
-String categoriaProducto(String? codigo) {
-  if (codigo == null || codigo.isEmpty) return 'Sin categoría';
-  return _categoriasProducto[codigo] ?? codigo;
-}
-
-/// Clave y etiqueta de cada categoría, en el orden en que se muestran los
-/// filtros.
-List<(String, String)> get categoriasProducto =>
-    List.unmodifiable(_categoriasProducto.entries.map((e) => (e.key, e.value)));

@@ -351,7 +351,13 @@ class _GrabacionBar extends StatelessWidget {
             onPressed: onGuardar,
             icon: const Icon(Icons.stop_rounded),
             label: const Text('Guardar'),
-            style: FilledButton.styleFrom(backgroundColor: AgeColors.teal600),
+            // El tema da a los botones ancho infinito (Size.fromHeight) para
+            // los formularios; dentro de una fila eso rompe el dibujo de la
+            // pantalla entera. Aqui el ancho es el del contenido.
+            style: FilledButton.styleFrom(
+              backgroundColor: AgeColors.teal600,
+              minimumSize: const Size(48, 52),
+            ),
           ),
         ],
       );
@@ -365,6 +371,8 @@ class _GrabacionBar extends StatelessWidget {
           onPressed: onGrabar,
           icon: const Icon(Icons.fiber_manual_record_rounded, color: Colors.red),
           label: const Text('Grabar'),
+          // Ver la nota del boton Guardar: sin esto la fila no se puede dibujar.
+          style: OutlinedButton.styleFrom(minimumSize: const Size(48, 52)),
         ),
       ],
     );

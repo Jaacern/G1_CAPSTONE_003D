@@ -1,14 +1,13 @@
-import 'package:cross_file/cross_file.dart';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:record/record.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/audio/tone_service.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/upload_service.dart';
-import '../../../core/speech/grabacion.dart';
 import '../../../core/theme/app_theme.dart';
 import '../application/elder_providers.dart';
 
@@ -55,10 +54,6 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
 
   /// Notas tocadas durante la grabacion: cuando (ms desde que empezo) y cual.
   final _notasGrabadas = <({int offsetMs, double frequency})>[];
-
-  final _recorder = AudioRecorder();
-  /// Formato con el que se esta grabando, para nombrar bien lo que se sube.
-  FormatoGrabacion? _formato;
   bool _grabando = false;
   bool _subiendo = false;
   int _duracionSeg = 0;
@@ -70,12 +65,6 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
     _stopwatch = Stopwatch();
   }
 
-  @override
-  void dispose() {
-    _recorder.dispose();
-    super.dispose();
-  }
-
   /// Se llama cada vez que suena una nota. Si se esta grabando, se anota.
   void _alTocar(double frecuencia) {
     if (!_grabando) return;
@@ -83,35 +72,11 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
         (offsetMs: _stopwatch.elapsedMilliseconds, frequency: frecuencia));
   }
 
-  Future<void> _iniciarGrabacion() async {
-    final tiene = await _recorder.hasPermission();
-    if (!tiene) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Necesito permiso para el micrófono.'),
-          ),
-        );
-      }
-      return;
-    }
-    // El formato no se fija de antemano: en el navegador depende de lo que
-    // soporte el MediaRecorder, y el servidor solo acepta algunos.
-    final FormatoGrabacion formato;
-    try {
-      formato = await formatoDeGrabacion(_recorder);
-    } on SinFormatoSoportado catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.toString())));
-      }
-      return;
-    }
-    _formato = formato;
-    await _recorder.start(
-      RecordConfig(encoder: formato.encoder),
-      path: await rutaDeGrabacion('musica', formato.extension),
-    );
+  /// Empieza a grabar. No usa el microfono: anota las notas que se tocan y
+  /// al guardar arma el audio con ellas. Asi no se cuela la voz ni el ruido
+  /// de la pieza, no hace falta pedir permiso y funciona en cualquier
+  /// navegador.
+  void _iniciarGrabacion() {
     _notasGrabadas.clear();
     _stopwatch
       ..reset()
@@ -132,41 +97,37 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
 
   Future<void> _detenerYGuardar() async {
     if (!_grabando) return;
-    final path = await _recorder.stop();
     _stopwatch.stop();
     setState(() => _grabando = false);
+    if (!mounted) return;
 
-    if (path == null || !mounted) return;
+    if (_notasGrabadas.isEmpty) return;
 
     // Confirmar antes de subir. El nombre se arma solo (RNF-20).
     final titulo = await _pedirTitulo();
-    if (titulo == null || !mounted) {
-      // Usuario canceló: borrar archivo temporal.
-      await borrarGrabacion(path);
-      return;
-    }
+    if (titulo == null || !mounted) return;
 
     setState(() => _subiendo = true);
     try {
       final patientId = ref.read(elderPatientIdProvider);
       if (patientId == null) throw Exception('Sin paciente asociado.');
 
-      final uploads = ref.read(uploadServiceProvider);
-      final api = ref.read(apiClientProvider);
+      final notas = List.of(_notasGrabadas);
+      final wav = ref
+          .read(toneServiceProvider)
+          .mezclar(notas, durationMs: _duracionNotaMs);
+      final ultimoMs = notas.map((n) => n.offsetMs).reduce(math.max);
+      final segundos =
+          ((ultimoMs + _duracionNotaMs) / 1000).ceil().clamp(1, 86400);
 
-      // 1. Subir el audio.
-      // Con nombre y tipo puestos a mano: en el navegador la ruta que
-      // devuelve el grabador es un blob sin extension, y el servidor decide
-      // si acepta el archivo por su tipo.
-      final uploaded = await uploads.uploadFile(
-        XFile(
-          path,
-          name: 'musica.${_formato?.extension ?? 'm4a'}',
-          mimeType: _formato?.mime,
-        ),
-        kind: 'audio',
-        patientId: patientId,
-      );
+      // 1. Subir el audio armado con las notas.
+      final uploaded = await ref.read(uploadServiceProvider).uploadBytes(
+            wav,
+            filename: 'melodia.wav',
+            kind: 'audio',
+            patientId: patientId,
+            contentType: 'audio/wav',
+          );
 
       // 2. Registrar la creación con client_uuid para idempotencia (RF-66).
       // El endpoint pide el id del archivo suelto, no la URL entera.
@@ -175,12 +136,12 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
         throw Exception('El audio se subió pero no se pudo identificar.');
       }
       final clientUuid = const Uuid().v4();
-      await api.post<void>(
+      await ref.read(apiClientProvider).post<void>(
         '/patients/$patientId/music',
         query: {
           'file_id': fileId,
           'title': titulo,
-          'duration_seconds': _stopwatch.elapsed.inSeconds.clamp(1, 86400),
+          'duration_seconds': segundos,
           'client_uuid': clientUuid,
         },
       );
@@ -213,7 +174,6 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
       }
     } finally {
       if (mounted) setState(() => _subiendo = false);
-      await borrarGrabacion(path);
     }
   }
 

@@ -137,6 +137,7 @@ class _ObservationScreenState extends ConsumerState<ObservationScreen> {
                     child: CircleAvatar(
                       backgroundColor: Colors.black54,
                       child: IconButton(
+                        tooltip: 'Quitar la foto',
                         icon: const Icon(Icons.close_rounded,
                             color: Colors.white),
                         onPressed: () => setState(() => _image = null),

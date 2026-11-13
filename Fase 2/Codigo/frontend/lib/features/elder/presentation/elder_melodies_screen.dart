@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -161,6 +162,33 @@ class _ElderMelodiesScreenState extends ConsumerState<ElderMelodiesScreen> {
     }
   }
 
+  /// Pide el enlace y lo muestra para copiarlo (RF-67).
+  Future<void> _compartir(Melodia m) async {
+    final patientId = ref.read(elderPatientIdProvider);
+    if (patientId == null) return;
+    final EnlaceDeEscucha enlace;
+    try {
+      enlace = await compartirMelodia(
+          ref.read(apiClientProvider), patientId, m.id);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo crear el enlace.')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    final resultado = await showDialog<String>(
+      context: context,
+      builder: (_) => DialogoEnlaceDeEscucha(titulo: m.title, enlace: enlace),
+    );
+    if (resultado == 'copiado' && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enlace copiado. Pégalo en un mensaje.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -199,6 +227,7 @@ class _ElderMelodiesScreenState extends ConsumerState<ElderMelodiesScreen> {
                       melodia: lista[i],
                       sonando: _sonando == lista[i].id,
                       onTap: () => _alternar(lista[i]),
+                      onCompartir: () => _compartir(lista[i]),
                     ),
                   ),
                 ),
@@ -208,16 +237,71 @@ class _ElderMelodiesScreenState extends ConsumerState<ElderMelodiesScreen> {
   }
 }
 
+/// Muestra el enlace de una melodia para copiarlo (RF-67).
+///
+/// Devuelve 'copiado' si se copio, para que la pantalla lo confirme.
+class DialogoEnlaceDeEscucha extends StatelessWidget {
+  const DialogoEnlaceDeEscucha({
+    super.key,
+    required this.titulo,
+    required this.enlace,
+  });
+
+  final String titulo;
+  final EnlaceDeEscucha enlace;
+
+  @override
+  Widget build(BuildContext context) {
+    final vence = DateFormat("d 'de' MMMM", 'es').format(enlace.expiresAt);
+    return AlertDialog(
+      title: const Text('Enlace para escuchar'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Quien abra este enlace puede escuchar "$titulo" sin crear una '
+            'cuenta. Funciona hasta el $vence.',
+            style: AgeText.bodyL,
+          ),
+          const SizedBox(height: 12),
+          SelectableText(enlace.url, style: const TextStyle(fontSize: 13)),
+        ],
+      ),
+      actions: [
+        TextButton(
+          style: TextButton.styleFrom(minimumSize: const Size(96, 56)),
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cerrar'),
+        ),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(minimumSize: const Size(120, 56)),
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: enlace.url));
+            if (context.mounted) Navigator.pop(context, 'copiado');
+          },
+          icon: const Icon(Icons.copy_rounded),
+          label: const Text('Copiar enlace'),
+        ),
+      ],
+    );
+  }
+}
+
 class _MelodiaCard extends StatelessWidget {
   const _MelodiaCard({
     required this.melodia,
     required this.sonando,
     required this.onTap,
+    required this.onCompartir,
   });
 
   final Melodia melodia;
   final bool sonando;
   final VoidCallback onTap;
+
+  /// Crea un enlace para que otra persona la escuche (RF-67).
+  final VoidCallback onCompartir;
 
   @override
   Widget build(BuildContext context) {
@@ -270,6 +354,15 @@ class _MelodiaCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                ),
+                IconButton(
+                  tooltip: 'Compartir melodía',
+                  iconSize: 32,
+                  constraints:
+                      const BoxConstraints(minWidth: 56, minHeight: 56),
+                  onPressed: onCompartir,
+                  icon: const Icon(Icons.share_rounded,
+                      color: AgeColors.teal600),
                 ),
               ],
             ),

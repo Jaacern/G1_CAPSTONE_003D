@@ -108,4 +108,35 @@ void main() {
     expect(find.text('Escribe el segundo nombre'), findsNothing);
     expect(find.text('Escribe el segundo apellido'), findsNothing);
   });
+
+  testWidgets('pide correo y contrasena para la cuenta del adulto mayor',
+      (tester) async {
+    final repo = await montar(tester);
+    await enviar(tester);
+
+    expect(find.text('Escribe el correo del adulto mayor'), findsOne);
+    expect(find.text('Escribe una contraseña'), findsOne);
+    expect(repo.altos, 0);
+  });
+
+  testWidgets('un correo mal escrito y una contrasena corta no pasan',
+      (tester) async {
+    await montar(tester);
+    await tester.enterText(campo('Correo del adulto mayor *'), 'elena.gmail.com');
+    await tester.enterText(campo('Contraseña *'), 'abc1');
+    await enviar(tester);
+
+    expect(find.text('Revisa el correo: falta algo (ejemplo: elena@gmail.com)'),
+        findsOne);
+    expect(find.text('Mínimo 8 caracteres'), findsOne);
+  });
+
+  testWidgets('la contrasena repetida tiene que coincidir', (tester) async {
+    await montar(tester);
+    await tester.enterText(campo('Contraseña *'), 'Abuela2026');
+    await tester.enterText(campo('Repite la contraseña *'), 'Abuela2025');
+    await enviar(tester);
+
+    expect(find.text('Las contraseñas no coinciden'), findsOne);
+  });
 }

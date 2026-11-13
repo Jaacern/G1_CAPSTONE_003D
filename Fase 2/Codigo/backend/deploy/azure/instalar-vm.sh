@@ -82,7 +82,9 @@ fi
 # --- 4. Respaldo diario (03:00 hora de la VM, que es UTC) ---------------
 mkdir -p "$HOME/respaldos"
 CRON_LINEA="0 3 * * * cd \"$BACKEND_DIR\" && ./deploy/azure/respaldo.sh diario >> \"$HOME/respaldos/cron.log\" 2>&1"
-( crontab -l 2>/dev/null | grep -v 'deploy/azure/respaldo.sh' ; echo "$CRON_LINEA" ) | crontab -
+# '|| true': sin crontab previo, 'crontab -l' y 'grep -v' devuelven 1 y con
+# 'set -e' el script moriria aqui en silencio, sin levantar nada.
+{ crontab -l 2>/dev/null | grep -v 'deploy/azure/respaldo.sh' || true; echo "$CRON_LINEA"; } | crontab -
 echo "[instalar] respaldo diario programado"
 
 # --- 5. Levantar --------------------------------------------------------

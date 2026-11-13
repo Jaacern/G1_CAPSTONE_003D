@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/upload_service.dart';
 import '../../../core/speech/speech_service.dart';
@@ -92,6 +93,15 @@ final melodiasProvider =
       .map((e) => Melodia.fromJson(e as Map<String, dynamic>))
       .toList();
 });
+
+/// Pide a la API un enlace de escucha para una melodia (RF-67). Cada vez
+/// que se comparte se crea un enlace nuevo; vale 72 horas.
+Future<EnlaceDeEscucha> compartirMelodia(
+    ApiClient api, String patientId, String melodiaId) async {
+  final res = await api.post<Map<String, dynamic>>(
+      '/patients/$patientId/music/$melodiaId/share');
+  return EnlaceDeEscucha.fromJson(res, servidor: AppConfig.apiBaseUrl);
+}
 
 /// "Mis melodías": las creaciones guardadas, para volver a escucharlas.
 ///

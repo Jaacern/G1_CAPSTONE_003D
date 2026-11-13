@@ -14,6 +14,19 @@ import 'package:flutter_test/flutter_test.dart';
 /// derecho se sale de la pantalla. Flutter convierte ese desborde en falla de
 /// prueba, así que montar la vista a 320 dp lo detecta sin necesitar un
 /// teléfono.
+
+/// Baja hasta que el objetivo este construido.
+///
+/// El tablero es una lista larga y ListView solo construye lo que entra en
+/// pantalla, asi que una tarjeta que esta mas abajo no existe en el arbol
+/// hasta que se llega a ella. Desde que el tablero tiene saludo y accesos
+/// arriba, estas tarjetas quedan fuera de la primera pantalla.
+Future<void> bajarHasta(WidgetTester tester, Finder objetivo) async {
+  await tester.scrollUntilVisible(objetivo, 240,
+      scrollable: find.byType(Scrollable).first);
+  await tester.pump();
+}
+
 void main() {
   testWidgets('las tarjetas de "Hoy" caben en 320 dp', (tester) async {
     await tester.binding.setSurfaceSize(const Size(320, 1400));
@@ -46,8 +59,11 @@ void main() {
     // Las tres tarjetas que antes se desbordaban: la de vitales ("Ver todo ›"),
     // la de medicamentos (pill de pendientes) y la de observación
     // ("Próximamente").
+    await bajarHasta(tester, find.text('Vitals del wearable'));
     expect(find.text('Vitals del wearable'), findsOneWidget);
+    await bajarHasta(tester, find.text('Medicamentos de hoy'));
     expect(find.text('Medicamentos de hoy'), findsOneWidget);
+    await bajarHasta(tester, find.text('Última observación'));
     expect(find.text('Última observación'), findsOneWidget);
   });
 }

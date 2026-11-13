@@ -102,10 +102,24 @@ Future<void> montar(WidgetTester tester,
   await tester.pump(const Duration(milliseconds: 400));
 }
 
+
+/// Baja hasta que el objetivo este construido.
+///
+/// El tablero es una lista larga y ListView solo construye lo que entra en
+/// pantalla, asi que una tarjeta que esta mas abajo no existe en el arbol
+/// hasta que se llega a ella. Desde que el tablero tiene saludo y accesos
+/// arriba, estas tarjetas quedan fuera de la primera pantalla.
+Future<void> bajarHasta(WidgetTester tester, Finder objetivo) async {
+  await tester.scrollUntilVisible(objetivo, 240,
+      scrollable: find.byType(Scrollable).first);
+  await tester.pump();
+}
+
 void main() {
   testWidgets('muestra la observación más nueva de la cuidadora',
       (tester) async {
     await montar(tester, repo: CaregiverRepositoryMock());
+    await bajarHasta(tester, find.text('Última observación'));
 
     // El mock siembra dos; la lista viene del más nuevo al más viejo, así que
     // la tarjeta muestra la de las 15:10.
@@ -131,6 +145,7 @@ void main() {
         repo: CaregiverRepositoryHttp(
             ApiClient(_FakeTokenStorage(), dio: dio),
             const CacheDeLectura.sinGuardar()));
+    await bajarHasta(tester, find.text('Merendó fruta y tomó la medicación.'));
 
     expect(find.text('Merendó fruta y tomó la medicación.'), findsOneWidget);
     // Solo la última: la bitácora completa vive en su propia pantalla.
@@ -145,6 +160,8 @@ void main() {
         repo: CaregiverRepositoryHttp(
             ApiClient(_FakeTokenStorage(), dio: dio),
             const CacheDeLectura.sinGuardar()));
+    await bajarHasta(
+        tester, find.textContaining('todavía no ha registrado una observación'));
 
     expect(find.textContaining('todavía no ha registrado una observación'),
         findsOneWidget);

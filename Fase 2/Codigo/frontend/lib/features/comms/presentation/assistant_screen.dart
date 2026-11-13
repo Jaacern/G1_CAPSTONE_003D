@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/speech/boton_dictado.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../../patients/application/patients_providers.dart';
@@ -225,10 +226,15 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                 maxLines: 4,
                 textInputAction: TextInputAction.send,
                 onSubmitted: _ask,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Escribe tu pregunta…',
+                  // Dictar la pregunta en vez de escribirla (RF-64).
+                  suffixIcon: BotonDictado(
+                    controller: _textController,
+                    enabled: !_sending,
+                  ),
                   contentPadding:
-                      EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 ),
               ),
             ),

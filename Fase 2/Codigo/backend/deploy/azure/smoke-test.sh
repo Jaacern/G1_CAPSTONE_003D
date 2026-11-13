@@ -5,12 +5,24 @@
 #   ./deploy/azure/smoke-test.sh                       # prueba local en la VM
 #   PUBLIC_URL=https://api.tu-dominio.cl ./deploy/azure/smoke-test.sh
 #                                                      # ademas, por el tunel
+#
+# Si el dominio esta protegido con Cloudflare Access, agrega el service token
+# (el mismo que usa la app):
+#   export CF_ACCESS_CLIENT_ID=...   CF_ACCESS_CLIENT_SECRET=...
 set -euo pipefail
 
 verificar() {
   local url="$1" intentos=30
+  # Si la URL esta detras de Cloudflare Access, sin el service token responde
+  # 403 antes de llegar a la API. Se pasan por variable de entorno para que
+  # no queden en el historial ni en pantalla.
+  local cabeceras=()
+  if [ -n "${CF_ACCESS_CLIENT_ID:-}" ] && [ -n "${CF_ACCESS_CLIENT_SECRET:-}" ]; then
+    cabeceras=(-H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}"
+               -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}")
+  fi
   for _ in $(seq 1 "$intentos"); do
-    if curl -fsS --max-time 5 "$url" 2>/dev/null | grep -q agecare-api; then
+    if curl -fsS --max-time 5 "${cabeceras[@]}" "$url" 2>/dev/null | grep -q agecare-api; then
       echo "[smoke] OK  $url"
       return 0
     fi

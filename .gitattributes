@@ -1,0 +1,5 @@
+# Los scripts de shell corren dentro de los contenedores (Linux) y tienen que
+# tener fin de linea LF. Con core.autocrlf=true, Windows los bajaba con CRLF,
+# el entrypoint de la API fallaba ("bad interpreter") y Docker la reiniciaba
+# sin parar. Asi quedan en LF en cualquier sistema.
+*.sh text eol=lf

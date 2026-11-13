@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -6,6 +7,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/config/comunas.dart';
 import '../../../core/config/idiomas.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/bloques.dart';
 import '../../../core/widgets/common.dart';
 import '../application/marketplace_providers.dart';
 import '../data/marketplace_repository.dart';
@@ -32,7 +34,16 @@ class CaregiverProfileScreen extends ConsumerWidget {
     }
     final detail = ref.watch(caregiverDetailProvider(profileId));
     return Scaffold(
-      appBar: AppBar(title: const Text('Perfil')),
+      // Sin barra de titulo: la cabecera de color ya dice de quien es el
+      // perfil y trae su propio boton de volver, y una barra encima le
+      // quitaria la mitad del alto a la cabecera.
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: Colors.white,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+      ),
       body: detail.when(
         loading: () => const LoadingView(),
         error: (e, _) => ErrorView(
@@ -43,52 +54,82 @@ class CaregiverProfileScreen extends ConsumerWidget {
           onRefresh: () async =>
               ref.invalidate(caregiverDetailProvider(profileId)),
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+            padding: const EdgeInsets.only(bottom: 32),
             children: [
-              _Header(caregiver: c),
-              const SizedBox(height: 16),
+              _Cabecera(caregiver: c),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
               if (c.bio.isNotEmpty) ...[
-                const _SectionTitle('Sobre mí'),
-                const SizedBox(height: 6),
+                const EncabezadoDeSeccion('Sobre mí'),
                 Text(c.bio,
                     style: const TextStyle(color: AppColors.textPrimary)),
-                const SizedBox(height: 16),
               ],
-              _InfoRow(
-                icon: Icons.workspace_premium_outlined,
-                label: '${c.yearsExperience} años de experiencia',
+              // Lo que antes eran tres filas de icono y texto. De un vistazo
+              // se compara mejor asi, que es para lo que se mira un perfil
+              // al lado de otro.
+              const EncabezadoDeSeccion('En números'),
+              Row(
+                children: [
+                  Expanded(
+                    child: TarjetaDeDato(
+                      etiqueta: 'Experiencia',
+                      valor: '${c.yearsExperience} años',
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TarjetaDeDato(
+                      etiqueta: 'Reseñas',
+                      valor: '${c.reviewsCount}',
+                    ),
+                  ),
+                  if (c.tarifaLabel != null) ...[
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TarjetaDeDato(
+                        etiqueta: 'Por hora',
+                        valor: c.tarifaLabel!,
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              if (c.zones.isNotEmpty)
-                _InfoRow(
-                  icon: Icons.location_on_outlined,
-                  label: 'Zonas: ${c.zones.map(nombreComuna).join(', ')}',
-                ),
-              if (c.languages.isNotEmpty)
-                _InfoRow(
-                  icon: Icons.translate_rounded,
-                  label: 'Idiomas: ${c.languages.map(nombreIdioma).join(', ')}',
-                ),
-              if (c.tarifaLabel != null)
-                _InfoRow(
-                  icon: Icons.payments_outlined,
-                  label: 'Tarifa: ${c.tarifaLabel} por hora',
-                ),
-              const SizedBox(height: 16),
               if (c.specialties.isNotEmpty) ...[
-                const _SectionTitle('Especialidades'),
-                const SizedBox(height: 8),
+                const EncabezadoDeSeccion('Especialidades'),
                 Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    for (final s in c.specialties) _Pill(label: s),
+                    for (final s in c.specialties)
+                      Chip2(s, color: AgeColors.teal100),
                   ],
                 ),
-                const SizedBox(height: 16),
+              ],
+              if (c.languages.isNotEmpty) ...[
+                const EncabezadoDeSeccion('Idiomas'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final i in c.languages) Chip2(nombreIdioma(i)),
+                  ],
+                ),
+              ],
+              if (c.zones.isNotEmpty) ...[
+                const EncabezadoDeSeccion('Dónde atiende'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final z in c.zones) Chip2(nombreComuna(z)),
+                  ],
+                ),
               ],
               if (c.certifications.isNotEmpty) ...[
-                const _SectionTitle('Certificaciones'),
-                const SizedBox(height: 8),
+                const EncabezadoDeSeccion('Certificaciones'),
                 for (final cert in c.certifications)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
@@ -103,8 +144,7 @@ class CaregiverProfileScreen extends ConsumerWidget {
                   ),
                 const SizedBox(height: 16),
               ],
-              _SectionTitle('Reseñas (${c.reviewsCount})'),
-              const SizedBox(height: 8),
+              EncabezadoDeSeccion('Reseñas (${c.reviewsCount})'),
               if (c.reviews.isEmpty)
                 const Text('Aún no hay reseñas.',
                     style: TextStyle(color: AppColors.textSecondary))
@@ -136,6 +176,9 @@ class CaregiverProfileScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -165,49 +208,71 @@ class CaregiverProfileScreen extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-class _Header extends StatelessWidget {
-  const _Header({required this.caregiver});
+/// Cabecera del perfil: bloque de color con la foto y, montada encima, la
+/// tarjeta con el nombre y la calificacion.
+///
+/// El bloque va detras y la tarjeta con un margen superior menor que su alto,
+/// asi que la tarjeta la tapa en parte. Sin desplazamientos negativos: el
+/// Stack toma el alto de la tarjeta, que siempre es el hijo mas alto.
+class _Cabecera extends StatelessWidget {
+  const _Cabecera({required this.caregiver});
   final CaregiverProfileDetail caregiver;
+
+  static const _altoDelBloque = 190.0;
+  static const _montaje = 150.0;
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      child: Row(
-        children: [
-          InitialsAvatar(
+    return Stack(
+      children: [
+        Container(
+          height: _altoDelBloque,
+          decoration: const BoxDecoration(
+            color: AgeColors.teal600,
+            borderRadius: BorderRadius.vertical(
+                bottom: Radius.circular(AgeRadius.xxl)),
+          ),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.only(top: 24),
+          child: InitialsAvatar(
             name: caregiver.name,
             photoUrl: caregiver.photoUrl,
-            radius: 34,
+            radius: 44,
           ),
-          const SizedBox(width: 14),
-          Expanded(
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, _montaje, 16, 0),
+          child: AppCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(caregiver.name,
                     style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w800)),
+                        fontSize: 20, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 4),
                 Text(caregiver.headline,
                     style: const TextStyle(
-                        color: AppColors.textSecondary, fontSize: 13)),
-                const SizedBox(height: 8),
+                        color: AppColors.textSecondary, fontSize: 14)),
+                const SizedBox(height: 10),
                 Row(
                   children: [
                     _RatingStars(rating: caregiver.rating),
                     const SizedBox(width: 6),
-                    Text(
-                      '${caregiver.rating.toStringAsFixed(1)} (${caregiver.reviewsCount})',
-                      style: const TextStyle(
-                          fontSize: 13, color: AppColors.textSecondary),
+                    Expanded(
+                      child: Text(
+                        '${caregiver.rating.toStringAsFixed(1)} · '
+                        '${caregiver.reviewsCount} reseñas',
+                        style: const TextStyle(
+                            fontSize: 13, color: AppColors.textSecondary),
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -402,36 +467,6 @@ class _ReviewDialogState extends ConsumerState<_ReviewDialog> {
 // ---------------------------------------------------------------------------
 // Auxiliares
 // ---------------------------------------------------------------------------
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) =>
-      Text(text, style: Theme.of(context).textTheme.titleMedium);
-}
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.icon, required this.label});
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: AppColors.primary),
-          const SizedBox(width: 8),
-          Expanded(child: Text(label)),
-        ],
-      ),
-    );
-  }
-}
-
 class _RatingStars extends StatelessWidget {
   const _RatingStars({required this.rating, this.size = 16});
   final double rating;
@@ -455,23 +490,3 @@ class _RatingStars extends StatelessWidget {
   }
 }
 
-class _Pill extends StatelessWidget {
-  const _Pill({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: .08),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(label,
-          style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.primaryDark,
-              fontWeight: FontWeight.w600)),
-    );
-  }
-}

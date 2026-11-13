@@ -137,6 +137,11 @@ class _PatientDocumentsViewState extends ConsumerState<PatientDocumentsView> {
                           onPressed: () => _subir(context),
                           icon: const Icon(Icons.upload_file_rounded),
                           label: const Text('Subir'),
+                          // El tema da a los botones ancho infinito
+                          // (Size.fromHeight); al lado del buscador, dentro
+                          // de una fila, eso dejaba la pantalla sin dibujar.
+                          style: FilledButton.styleFrom(
+                              minimumSize: const Size(48, 48)),
                         ),
                       ],
                     ],

@@ -342,6 +342,7 @@ class _DraftCard extends StatelessWidget {
                     style: TextStyle(fontWeight: FontWeight.w700)),
               ),
               IconButton(
+                tooltip: 'Quitar este medicamento',
                 icon: const Icon(Icons.delete_outline_rounded,
                     color: AppColors.textSecondary),
                 onPressed: onRemove,

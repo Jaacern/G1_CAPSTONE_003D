@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
@@ -273,6 +274,25 @@ class DialogoEnlaceDeEscucha extends StatelessWidget {
           style: TextButton.styleFrom(minimumSize: const Size(96, 56)),
           onPressed: () => Navigator.pop(context),
           child: const Text('Cerrar'),
+        ),
+        // Abre el menu de compartir del telefono (WhatsApp, correo...).
+        // En un navegador que no lo tiene, se copia el enlace.
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(minimumSize: const Size(120, 56)),
+          onPressed: () async {
+            try {
+              await Share.share(
+                'Escucha mi melodía "$titulo": ${enlace.url}',
+                subject: titulo,
+              );
+              if (context.mounted) Navigator.pop(context);
+            } catch (_) {
+              await Clipboard.setData(ClipboardData(text: enlace.url));
+              if (context.mounted) Navigator.pop(context, 'copiado');
+            }
+          },
+          icon: const Icon(Icons.share_rounded),
+          label: const Text('Compartir'),
         ),
         FilledButton.icon(
           style: FilledButton.styleFrom(minimumSize: const Size(120, 56)),

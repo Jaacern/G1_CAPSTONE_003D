@@ -49,6 +49,13 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
     _Note('Do²', 523.25, AgeColors.teal700),
   ];
 
+  /// Cuanto suena cada nota. El mismo valor para tocarla y para guardarla,
+  /// asi lo grabado suena igual a lo que se escucho.
+  static const _duracionNotaMs = 650;
+
+  /// Notas tocadas durante la grabacion: cuando (ms desde que empezo) y cual.
+  final _notasGrabadas = <({int offsetMs, double frequency})>[];
+
   final _recorder = AudioRecorder();
   /// Formato con el que se esta grabando, para nombrar bien lo que se sube.
   FormatoGrabacion? _formato;
@@ -67,6 +74,13 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
   void dispose() {
     _recorder.dispose();
     super.dispose();
+  }
+
+  /// Se llama cada vez que suena una nota. Si se esta grabando, se anota.
+  void _alTocar(double frecuencia) {
+    if (!_grabando) return;
+    _notasGrabadas.add(
+        (offsetMs: _stopwatch.elapsedMilliseconds, frequency: frecuencia));
   }
 
   Future<void> _iniciarGrabacion() async {
@@ -98,6 +112,7 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
       RecordConfig(encoder: formato.encoder),
       path: await rutaDeGrabacion('musica', formato.extension),
     );
+    _notasGrabadas.clear();
     _stopwatch
       ..reset()
       ..start();
@@ -286,7 +301,12 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
                   childAspectRatio: 1.15,
                   children: [
                     for (final note in _notes)
-                      _NoteButton(note: note, tone: tone),
+                      _NoteButton(
+                        note: note,
+                        tone: tone,
+                        duracionMs: _duracionNotaMs,
+                        onTocar: _alTocar,
+                      ),
                   ],
                 ),
               ),
@@ -394,9 +414,18 @@ class _Note {
 }
 
 class _NoteButton extends StatefulWidget {
-  const _NoteButton({required this.note, required this.tone});
+  const _NoteButton({
+    required this.note,
+    required this.tone,
+    required this.duracionMs,
+    required this.onTocar,
+  });
   final _Note note;
   final ToneService tone;
+  final int duracionMs;
+
+  /// Avisa a la pantalla que sono esta nota (para anotarla si se graba).
+  final ValueChanged<double> onTocar;
 
   @override
   State<_NoteButton> createState() => _NoteButtonState();
@@ -407,7 +436,8 @@ class _NoteButtonState extends State<_NoteButton> {
 
   void _hit() {
     setState(() => _pressed = true);
-    widget.tone.play(widget.note.frequency, durationMs: 650);
+    widget.tone.play(widget.note.frequency, durationMs: widget.duracionMs);
+    widget.onTocar(widget.note.frequency);
     Future.delayed(const Duration(milliseconds: 160), () {
       if (mounted) setState(() => _pressed = false);
     });

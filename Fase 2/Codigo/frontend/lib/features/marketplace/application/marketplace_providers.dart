@@ -19,13 +19,6 @@ final caregiversProvider = FutureProvider.autoDispose
       ),
 );
 
-/// Listado de productos/ayudas técnicas (categoría opcional).
-final productsProvider =
-    FutureProvider.autoDispose.family<List<MarketProduct>, String?>(
-  (ref, category) =>
-      ref.watch(marketplaceRepositoryProvider).listProducts(category: category),
-);
-
 /// Ofertas de trabajo para cuidadoras.
 final jobsProvider = FutureProvider.autoDispose<List<JobOffer>>(
   (ref) => ref.watch(marketplaceRepositoryProvider).listJobs(),

@@ -256,6 +256,31 @@ else:
         )
 
 
+# ── App principal en el navegador (familiar, cuidadora, medico, adulto mayor) ──
+# Es la app Flutter de frontend/, compilada para web con --base-href /app/ y
+# copiada a static/app_web. Va en el mismo origen que la API: asi el navegador
+# no hace peticiones entre dominios y una presentacion se hace abriendo un link.
+_APP_WEB_DIR = os.environ.get(
+    "AGECARE_APP_WEB_DIR", os.path.join(_FRONT_DIR, "app_web")
+)
+
+if os.path.isfile(os.path.join(_APP_WEB_DIR, "index.html")):
+    app.mount(
+        "/app",
+        StaticFiles(directory=_APP_WEB_DIR, html=True),
+        name="app_web",
+    )
+else:
+    @app.get("/app", include_in_schema=False)
+    async def app_web_no_compilada():
+        return HTMLResponse(
+            "<h1>App web no compilada</h1>"
+            "<p>Compila frontend con <code>flutter build web --base-href /app/</code> "
+            "y copia build/web a app/static/app_web.</p>",
+            status_code=404,
+        )
+
+
 # ── Cliente de prueba: sirve el HTML y los assets desde /front ───
 @app.get("/test", include_in_schema=False)
 async def test_client():

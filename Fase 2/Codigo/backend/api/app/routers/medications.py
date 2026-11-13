@@ -617,14 +617,15 @@ async def log_dose(
                 """
                 INSERT INTO alerts
                     (patient_id, type, severity, title, detail,
-                     payload, dedup_key, status)
+                     dose_id, payload, dedup_key, status)
                 VALUES
                     (:pid, 'incident', 'warning', :title, :detalle,
-                     CAST(:payload AS jsonb), NULL, 'active')
+                     :dose_id, CAST(:payload AS jsonb), NULL, 'active')
                 """
             ),
             {
                 "pid": str(dose["patient_id"]),
+                "dose_id": dose_id,
                 "title": f"Problema al administrar {dose['medication_name']}",
                 "detalle": detalle,
                 "payload": json.dumps({

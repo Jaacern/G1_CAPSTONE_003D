@@ -414,7 +414,7 @@ async def alertar_dosis_omitidas(*, verbose: bool = True) -> dict[str, int]:
                       AND NOT EXISTS (
                             SELECT 1 FROM alerts a
                              WHERE a.type = 'missed_dose'
-                               AND a.payload ->> 'dose_id' = CAST(sd.id AS text)
+                               AND a.dose_id = sd.id
                           )
                     ORDER BY sd.scheduled_at
                     """
@@ -450,15 +450,16 @@ async def alertar_dosis_omitidas(*, verbose: bool = True) -> dict[str, int]:
                     """
                     INSERT INTO alerts
                         (patient_id, type, severity, title, detail,
-                         payload, dedup_key, status)
+                         dose_id, payload, dedup_key, status)
                     VALUES
                         (:pid, 'missed_dose', 'warning',
                          'Dosis no administrada', :detalle,
-                         CAST(:payload AS jsonb), 'missed_dose', 'active')
+                         :dose_id, CAST(:payload AS jsonb), 'missed_dose', 'active')
                     """
                 ),
                 {
                     "pid": str(d["patient_id"]),
+                    "dose_id": str(d["id"]),
                     "detalle": detalle,
                     "payload": json.dumps({
                         "dose_id": str(d["id"]),
@@ -590,7 +591,7 @@ async def evaluar_vitales(ejecutor, *, patient_id: str | None = None) -> tuple[i
                     """
                     SELECT 1 FROM alerts
                      WHERE type = 'vital_out_of_range'
-                       AND payload ->> 'reading_id' = CAST(:rid AS text)
+                       AND reading_id = CAST(:rid AS uuid)
                      LIMIT 1
                     """
                 ),
@@ -616,15 +617,16 @@ async def evaluar_vitales(ejecutor, *, patient_id: str | None = None) -> tuple[i
                 """
                 INSERT INTO alerts
                     (patient_id, type, severity, title, detail,
-                     payload, dedup_key, status)
+                     reading_id, payload, dedup_key, status)
                 VALUES
                     (:pid, 'vital_out_of_range', 'warning',
                      :titulo, :detalle,
-                     CAST(:payload AS jsonb), :clave, 'active')
+                     :reading_id, CAST(:payload AS jsonb), :clave, 'active')
                 """
             ),
             {
                 "pid": str(m["patient_id"]),
+                "reading_id": str(m["id"]),
                 # title es varchar(120): una etiqueta larga del catalogo
                 # no puede reventar el INSERT.
                 "titulo": titulo[:120],

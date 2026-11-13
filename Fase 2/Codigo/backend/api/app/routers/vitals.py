@@ -659,10 +659,10 @@ async def _alertar_si_fuera_de_rango(db: AsyncSession, patient_id: str,
                f"({'mínimo' if bajo else 'máximo'} configurado {_n(float(limite))}{unidad}). "
                "Medición manual.")
     await db.execute(
-        text("INSERT INTO alerts (patient_id, type, severity, title, detail, payload, "
-             "dedup_key, status) VALUES (:pid, 'vital_out_of_range', 'warning', :ti, :de, "
-             "CAST(:pl AS jsonb), :c, 'active')"),
-        {"pid": patient_id, "ti": titulo[:120], "de": detalle, "c": clave,
+        text("INSERT INTO alerts (patient_id, type, severity, title, detail, reading_id, "
+             "payload, dedup_key, status) VALUES (:pid, 'vital_out_of_range', 'warning', :ti, "
+             ":de, :rid, CAST(:pl AS jsonb), :c, 'active')"),
+        {"pid": patient_id, "ti": titulo[:120], "de": detalle, "c": clave, "rid": reading_id,
          "pl": json.dumps({
              "reading_id": reading_id, "type": tipo, "value": valor,
              "min_value": float(th["min_value"]) if th["min_value"] is not None else None,

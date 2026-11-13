@@ -14,11 +14,8 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Tarjeta estilo wireframe v2: superficie, borde sutil, radio 18 y una
-    // sombra suave azulada para dar profundidad. Respeta claro/oscuro.
-    // Tarjeta AgeCare: superficie blanca sobre crema, borde sutil de 1 px y
-    // radio xl. La guía casi no usa sombras —las tarjetas se distinguen por
-    // contraste de superficie y borde— así que la sombra es muy tenue.
+    // Tarjeta AgeCare: superficie blanca sobre crema, borde sutil de 1 px,
+    // radio xl y la sombra suave del tema. Respeta claro/oscuro.
     final dark = Theme.of(context).brightness == Brightness.dark;
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -26,15 +23,7 @@ class AppCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(AgeRadius.xl),
         border: Border.all(
             color: dark ? AgeColors.darkBorder : AgeColors.border),
-        boxShadow: dark
-            ? null
-            : const [
-                BoxShadow(
-                  color: Color(0x0F12283F),
-                  blurRadius: 18,
-                  offset: Offset(0, 6),
-                ),
-              ],
+        boxShadow: dark ? null : AgeSombra.suave,
       ),
       child: Material(
         type: MaterialType.transparency,

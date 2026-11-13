@@ -616,6 +616,7 @@ código dice que hace.
 | 🗄️ Modelo de Datos | Esquema ER completo de PostgreSQL + diccionario de datos | ✅ Fase 2 |
 | 🧪 Guía de Pruebas | Ver [Instalación y Ejecución](#️-instalación-y-ejecución) → *Backend en local sin Docker* | ✅ Fase 2 |
 | 📊 Diagramas UML | Casos de uso, clases y secuencia | 🔄 En progreso |
+| 🚀 Despliegue en Azure | [Guía paso a paso](backend/deploy/azure/README.md): VM, túnel, actualización y respaldos | 🔄 En progreso |
 | 📖 Manual Técnico | Guía de despliegue y operación | ⏳ Pendiente |
 | 🎤 Presentación Final | Presentación para comisión evaluadora | ⏳ Pendiente |
 

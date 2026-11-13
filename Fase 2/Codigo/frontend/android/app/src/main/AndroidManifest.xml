@@ -10,6 +10,10 @@
     <!-- Acceso a red para hablar con el backend (también en builds release). -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- Microfono: notas de voz del chat y dictado por voz (RF-64). Sin esto
+         el telefono niega el microfono sin siquiera preguntar. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+
     <application
         android:label="AgeCare"
         android:name="${applicationName}"

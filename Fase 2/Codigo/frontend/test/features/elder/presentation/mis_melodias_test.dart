@@ -60,7 +60,8 @@ void main() {
     expect(find.byIcon(Icons.play_arrow_rounded), findsNWidgets(2));
   });
 
-  testWidgets('cada melodia se puede compartir (RF-67)', (tester) async {
+  testWidgets('cada melodia se puede mandar a la familia (RF-67)',
+      (tester) async {
     await montar(tester, [
       Melodia(
         id: 'm-1',
@@ -71,7 +72,7 @@ void main() {
       ),
     ]);
 
-    expect(find.byTooltip('Compartir melodía'), findsOneWidget);
+    expect(find.byTooltip('Mandar a mi familia'), findsOneWidget);
   });
 
   testWidgets('sin melodias explica donde se graban', (tester) async {

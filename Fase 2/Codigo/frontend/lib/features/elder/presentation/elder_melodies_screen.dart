@@ -12,6 +12,8 @@ import '../../../core/network/upload_service.dart';
 import '../../../core/speech/speech_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../comms/data/chat_repository.dart';
+import '../../comms/domain/models.dart';
 import '../application/elder_providers.dart';
 
 /// Una melodia guardada con el Director Musical.
@@ -105,14 +107,29 @@ Future<EnlaceDeEscucha> compartirMelodia(
   return EnlaceDeEscucha.fromJson(res, servidor: AppConfig.apiBaseUrl);
 }
 
+/// Manda una melodia al chat de la familia del adulto mayor (RF-67).
+///
+/// Va como nota de voz con el titulo de la melodia: la familia la escucha
+/// en el chat como cualquier otra, sin enlaces ni cuentas nuevas. El
+/// archivo ya es del paciente, asi que no se vuelve a subir.
+Future<void> enviarMelodiaALaFamilia(
+    ChatRepository chat, String patientId, Melodia m) {
+  return chat.sendMessage(
+    patientId,
+    type: MessageType.voice,
+    text: '🎵 ${m.title}',
+    mediaUrl: m.audioUrl,
+  );
+}
+
 /// "Mis melodías": las creaciones guardadas, para volver a escucharlas.
 ///
 /// Pensada como el resto de la vista del adulto mayor: botones grandes y sin
 /// teclado (RNF-19, RNF-20). Cada melodia tiene dos acciones:
 ///   - el boton redondo la hace sonar; tocarlo de nuevo, o tocar otra, la
 ///     detiene;
-///   - el boton de compartir crea un enlace para que alguien sin cuenta la
-///     escuche (RF-67), y lo muestra para copiarlo o mandarlo.
+///   - el boton de mandar la envia al chat de su familia (RF-67), despues
+///     de preguntar con dos botones grandes.
 class ElderMelodiesScreen extends ConsumerStatefulWidget {
   const ElderMelodiesScreen({super.key});
 
@@ -166,29 +183,47 @@ class _ElderMelodiesScreenState extends ConsumerState<ElderMelodiesScreen> {
     }
   }
 
-  /// Pide el enlace y lo muestra para copiarlo (RF-67).
-  Future<void> _compartir(Melodia m) async {
+  /// Pregunta y manda la melodia al chat de la familia (RF-67).
+  Future<void> _mandarALaFamilia(Melodia m) async {
     final patientId = ref.read(elderPatientIdProvider);
     if (patientId == null) return;
-    final EnlaceDeEscucha enlace;
+    final mandar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Se la mandamos a tu familia?'),
+        content: Text(
+          'Les llega "${m.title}" al chat de la familia, para que la '
+          'escuchen.',
+          style: AgeText.bodyL,
+        ),
+        actionsAlignment: MainAxisAlignment.spaceBetween,
+        actions: [
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(minimumSize: const Size(120, 56)),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(minimumSize: const Size(120, 56)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Mandar'),
+          ),
+        ],
+      ),
+    );
+    if (mandar != true || !mounted) return;
     try {
-      enlace = await compartirMelodia(
-          ref.read(apiClientProvider), patientId, m.id);
+      await enviarMelodiaALaFamilia(
+          ref.read(chatRepositoryProvider), patientId, m);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Le mandaste "${m.title}" a tu familia.')),
+      );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo crear el enlace.')),
-      );
-      return;
-    }
-    if (!mounted) return;
-    final resultado = await showDialog<String>(
-      context: context,
-      builder: (_) => DialogoEnlaceDeEscucha(titulo: m.title, enlace: enlace),
-    );
-    if (resultado == 'copiado' && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enlace copiado. Pégalo en un mensaje.')),
+        const SnackBar(
+            content: Text('No se pudo mandar la melodía. Intenta de nuevo.')),
       );
     }
   }
@@ -231,7 +266,7 @@ class _ElderMelodiesScreenState extends ConsumerState<ElderMelodiesScreen> {
                       melodia: lista[i],
                       sonando: _sonando == lista[i].id,
                       onTap: () => _alternar(lista[i]),
-                      onCompartir: () => _compartir(lista[i]),
+                      onCompartir: () => _mandarALaFamilia(lista[i]),
                     ),
                   ),
                 ),
@@ -323,7 +358,7 @@ class _MelodiaCard extends StatelessWidget {
   final bool sonando;
   final VoidCallback onTap;
 
-  /// Crea un enlace para que otra persona la escuche (RF-67).
+  /// La manda al chat de la familia (RF-67).
   final VoidCallback onCompartir;
 
   @override
@@ -379,12 +414,12 @@ class _MelodiaCard extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Compartir melodía',
+                  tooltip: 'Mandar a mi familia',
                   iconSize: 32,
                   constraints:
                       const BoxConstraints(minWidth: 56, minHeight: 56),
                   onPressed: onCompartir,
-                  icon: const Icon(Icons.share_rounded,
+                  icon: const Icon(Icons.send_rounded,
                       color: AgeColors.teal600),
                 ),
               ],

@@ -479,6 +479,7 @@ Future<void> _editarEnfermedades(
                     ),
                   ),
                   IconButton(
+                    tooltip: 'Agregar enfermedad',
                     icon:
                         const Icon(Icons.add_rounded, color: AppColors.primary),
                     onPressed: () {

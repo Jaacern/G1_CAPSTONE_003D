@@ -1,6 +1,7 @@
 import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:record/record.dart';
 import 'package:uuid/uuid.dart';
 
@@ -122,7 +123,7 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
 
     if (path == null || !mounted) return;
 
-    // Pedir título antes de subir.
+    // Confirmar antes de subir. El nombre se arma solo (RNF-20).
     final titulo = await _pedirTitulo();
     if (titulo == null || !mounted) {
       // Usuario canceló: borrar archivo temporal.
@@ -201,38 +202,40 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
     }
   }
 
+  /// Pregunta si se guarda la melodia y devuelve su nombre, o null si no.
+  ///
+  /// RNF-20: las acciones principales del adulto mayor no piden teclado.
+  /// Antes este dialogo pedia escribir el nombre; ahora el nombre se arma
+  /// solo con la fecha y la hora ("Melodia del 12 de noviembre, 19:30") y
+  /// solo queda elegir entre dos botones grandes. Se mantiene la pregunta
+  /// porque tambien es la forma de descartar una grabacion que no gusto.
   Future<String?> _pedirTitulo() async {
-    final ctrl = TextEditingController(
-      text: 'Mi melodía ${DateTime.now().day}/${DateTime.now().month}',
-    );
-    return showDialog<String>(
+    final titulo =
+        'Melodía del ${DateFormat("d 'de' MMMM, HH:mm", 'es').format(DateTime.now())}';
+    final guardar = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('¿Cómo la llamas?'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          maxLength: 150,
-          decoration: const InputDecoration(
-            labelText: 'Nombre de la creación',
-            border: OutlineInputBorder(),
-          ),
+        title: const Text('¿Guardamos tu melodía?'),
+        content: Text(
+          'Se va a guardar como "$titulo".',
+          style: AgeText.bodyL,
         ),
+        actionsAlignment: MainAxisAlignment.spaceBetween,
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Descartar'),
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(minimumSize: const Size(120, 56)),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No guardar'),
           ),
           FilledButton(
-            onPressed: () {
-              final t = ctrl.text.trim();
-              Navigator.pop(ctx, t.isEmpty ? null : t);
-            },
+            style: FilledButton.styleFrom(minimumSize: const Size(120, 56)),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Guardar'),
           ),
         ],
       ),
     );
+    return guardar == true ? titulo : null;
   }
 
   @override

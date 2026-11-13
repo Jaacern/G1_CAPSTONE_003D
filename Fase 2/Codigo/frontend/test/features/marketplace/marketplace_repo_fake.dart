@@ -9,10 +9,9 @@ import 'package:agecare_app/features/marketplace/domain/models.dart';
 import 'package:agecare_app/features/marketplace/presentation/marketplace_screen.dart';
 
 /// Repositorio del marketplace para pruebas de pantalla: no llama a la API y
-/// anota con qué argumentos lo invitaron a filtrar.
+/// anota con qué comuna lo invitaron a filtrar.
 class MarketplaceRepoFake implements MarketplaceRepository {
   String? zonaEnviada;
-  String? categoriaEnviada;
 
   /// Las ofertas que la pantalla de trabajos va a ver. Se pueden reemplazar
   /// antes de montar la vista.
@@ -30,29 +29,6 @@ class MarketplaceRepoFake implements MarketplaceRepository {
   /// nombres y especialidades largas.
   List<CaregiverProfileSummary> cuidadoras = const [];
 
-  /// El catálogo que devuelve la tira de productos, filtrado por categoría
-  /// igual que hace la API.
-  List<MarketProduct> productos = const [
-    MarketProduct(
-      id: 'p-silla-ruedas',
-      name: 'Silla de ruedas estándar',
-      price: 139990,
-      category: 'mobility',
-      description:
-          'Silla plegable de acero con apoyapiés desmontables y frenos en '
-          'ambas ruedas. Para uso domiciliario y traslados cortos.',
-    ),
-    MarketProduct(
-      id: 'p-pastillero',
-      name: 'Pastillero semanal con alarma',
-      price: 24990,
-      category: 'monitoring',
-      description:
-          'Organizador de 7 días con 4 tomas diarias y alarma sonora '
-          'programable, para no saltarse ni repetir una dosis.',
-    ),
-  ];
-
   @override
   Future<List<CaregiverProfileSummary>> listCaregivers({
     String? zone,
@@ -62,12 +38,11 @@ class MarketplaceRepoFake implements MarketplaceRepository {
     return cuidadoras;
   }
 
+  // La app ya no muestra productos (el marketplace es solo de cuidadoras),
+  // pero el repositorio los sigue ofreciendo porque la API los tiene.
   @override
-  Future<List<MarketProduct>> listProducts({String? category}) async {
-    categoriaEnviada = category;
-    if (category == null) return productos;
-    return productos.where((p) => p.category == category).toList();
-  }
+  Future<List<MarketProduct>> listProducts({String? category}) async =>
+      const [];
 
   @override
   Future<List<JobOffer>> listJobs() async => ofertas;

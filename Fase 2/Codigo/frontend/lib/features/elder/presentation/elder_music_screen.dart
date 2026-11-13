@@ -365,8 +365,8 @@ class _GrabacionBar extends StatelessWidget {
 
     return Row(
       children: [
-        const Text('¿Quieres guardar tu melodía?'),
-        const Spacer(),
+        const Expanded(child: Text('¿Quieres guardar tu melodía?')),
+        const SizedBox(width: 8),
         OutlinedButton.icon(
           onPressed: onGrabar,
           icon: const Icon(Icons.fiber_manual_record_rounded, color: Colors.red),

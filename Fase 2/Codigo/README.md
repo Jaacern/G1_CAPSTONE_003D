@@ -374,6 +374,22 @@ docker compose up -d db api      # o: podman compose up -d db api
 #   - PostgreSQL:  localhost:5432
 ```
 
+**Con los servicios de fondo** (lo que se usa para probar la app completa):
+
+```bash
+docker compose up -d --build db api mantenimiento avisos
+```
+
+| Servicio | Qué hace |
+|----------|----------|
+| `db` | PostgreSQL 16 con los datos de la app |
+| `api` | La API FastAPI; al partir aplica las migraciones de `sql/` |
+| `mantenimiento` | Cada hora marca las dosis vencidas, avisa mediciones fuera de rango y limpia subidas abandonadas |
+| `avisos` | Cada 30 segundos manda al teléfono las alertas pendientes y reavisa las críticas sin atender (RF-52) |
+
+`--build` hace falta después de un `git pull` que cambió el backend: sin él
+Docker sigue usando la imagen anterior.
+
 #### Instalar las dependencias de Python (local, sin Docker)
 
 > 💡 Si al correr un script de Python sale `ModuleNotFoundError` (por ejemplo

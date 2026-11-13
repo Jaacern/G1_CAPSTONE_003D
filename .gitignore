@@ -45,3 +45,11 @@ security-audit-skill/
 
 # Empaquetados temporales de trabajo.
 .tmp-*.tgz
+
+# Landing page local (no se versiona) y sus copias.
+site/
+site copy/
+site*/
+
+# Logs locales del IDE.
+.kiro_*.log

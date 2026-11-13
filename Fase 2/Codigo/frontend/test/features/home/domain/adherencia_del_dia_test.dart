@@ -30,4 +30,12 @@ void main() {
     expect(hoy.pending, 2);
     expect(hoy.nextDose, isNotNull);
   });
+
+  test('si la API no manda conteos, el dia queda en cero', () {
+    final hoy = MedicationsToday.fromJson(const {});
+
+    expect(hoy.total, 0);
+    expect(hoy.nextDose, isNull);
+    expect(hoy.adherencePct, 100);
+  });
 }

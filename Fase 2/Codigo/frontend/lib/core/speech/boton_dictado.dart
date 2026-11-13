@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
@@ -53,8 +54,20 @@ class _BotonDictadoState extends State<BotonDictado> {
           setState(() => _escuchando = false);
         }
       },
-      onError: (_) {
-        if (mounted) setState(() => _escuchando = false);
+      onError: (SpeechRecognitionError e) {
+        if (!mounted) return;
+        setState(() => _escuchando = false);
+        // Silencio o "no te entendi" no son fallas: se deja de escuchar y ya.
+        if (e.errorMsg == 'error_no_match' ||
+            e.errorMsg == 'error_speech_timeout' ||
+            e.errorMsg == 'no-speech') {
+          return;
+        }
+        showAppSnackBar(
+          context,
+          'No se pudo dictar. Revisa el permiso del micrófono.',
+          error: true,
+        );
       },
     );
     return _listo;

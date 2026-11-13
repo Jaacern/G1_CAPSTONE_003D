@@ -109,7 +109,15 @@ class _ElderMusicScreenState extends ConsumerState<ElderMusicScreen> {
     setState(() => _grabando = false);
     if (!mounted) return;
 
-    if (_notasGrabadas.isEmpty) return;
+    if (_notasGrabadas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No tocaste ninguna nota. Toca algunas y vuelve a '
+              'grabar.'),
+        ),
+      );
+      return;
+    }
 
     // Confirmar antes de subir. El nombre se arma solo (RNF-20).
     final titulo = await _pedirTitulo();

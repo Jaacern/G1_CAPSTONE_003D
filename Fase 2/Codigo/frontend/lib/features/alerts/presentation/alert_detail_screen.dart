@@ -12,6 +12,7 @@ import '../../health/domain/models.dart' show VitalType;
 import '../application/alerts_providers.dart';
 import '../data/alerts_repository.dart';
 import '../domain/models.dart';
+import '../../../core/widgets/bloques.dart';
 
 class AlertDetailScreen extends ConsumerStatefulWidget {
   const AlertDetailScreen({super.key, required this.alertId});
@@ -194,7 +195,7 @@ class _AlertDetailBody extends StatelessWidget {
         ],
 
         // Mensaje / contexto
-        const _SectionTitle('¿Qué ocurrió?'),
+        const EncabezadoDeSeccion('¿Qué ocurrió?'),
         const SizedBox(height: 6),
         AppCard(
           child: Text(alert.message,
@@ -203,7 +204,7 @@ class _AlertDetailBody extends StatelessWidget {
         const SizedBox(height: 16),
 
         // Detalles
-        const _SectionTitle('Detalles'),
+        const EncabezadoDeSeccion('Detalles'),
         const SizedBox(height: 6),
         AppCard(
           child: Column(
@@ -369,20 +370,6 @@ String _prettyKey(String key) {
     'lng': 'Longitud',
   };
   return map[key] ?? key.replaceAll('_', ' ');
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Text(
-        text,
-        style: const TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 15,
-            color: AppColors.textPrimary),
-      );
 }
 
 class _DetailRow extends StatelessWidget {

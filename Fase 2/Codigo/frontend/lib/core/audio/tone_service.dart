@@ -73,6 +73,51 @@ class ToneService {
     return _wrapWav(data);
   }
 
+  /// Une una secuencia de notas en un solo WAV, con la misma forma de onda
+  /// que [play], para que lo guardado suene igual a lo que se toco.
+  ///
+  /// Cada nota empieza en su `offsetMs` y dura [durationMs]. Si se tocaron
+  /// rapido y se superponen, se suman, y al final se escala todo para que no
+  /// sature. Lo usa el Director musical para guardar una melodia sin pasar
+  /// por el microfono: asi solo quedan las notas, sin voces ni ruido.
+  Uint8List mezclar(List<({int offsetMs, double frequency})> notas,
+      {int durationMs = 600}) {
+    if (notas.isEmpty) return _wrapWav(Int16List(0));
+    final largoNota = (_sampleRate * durationMs / 1000).round();
+    final ultimo = notas.map((n) => n.offsetMs).reduce(math.max);
+    final total = (_sampleRate * ultimo / 1000).round() + largoNota;
+    final mezcla = Float64List(total);
+    final attack = (_sampleRate * 0.02).round();
+    final release = (_sampleRate * 0.12).round();
+    const twoPi = 2 * math.pi;
+    for (final n in notas) {
+      final inicio = (_sampleRate * n.offsetMs / 1000).round();
+      for (var i = 0; i < largoNota; i++) {
+        final t = i / _sampleRate;
+        final s = (math.sin(twoPi * n.frequency * t) +
+                0.18 * math.sin(twoPi * n.frequency * 2 * t)) /
+            1.18;
+        var env = 1.0;
+        if (i < attack) {
+          env = i / attack;
+        } else if (i > largoNota - release) {
+          env = (largoNota - i) / release;
+        }
+        mezcla[inicio + i] += s * env;
+      }
+    }
+    var pico = 0.0;
+    for (final v in mezcla) {
+      if (v.abs() > pico) pico = v.abs();
+    }
+    final escala = pico > 1 ? 1 / pico : 1.0;
+    final data = Int16List(total);
+    for (var i = 0; i < total; i++) {
+      data[i] = (mezcla[i] * escala * 32767 * 0.9).round().clamp(-32768, 32767);
+    }
+    return _wrapWav(data);
+  }
+
   /// Envuelve las muestras PCM en una cabecera WAV (RIFF) estándar.
   Uint8List _wrapWav(Int16List samples) {
     const channels = 1;

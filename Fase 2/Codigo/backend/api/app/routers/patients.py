@@ -30,7 +30,7 @@ from app.deps import (
 from app.errors import ApiError
 from app.routers.checkins import MOTIVO_MAL_HOY
 from app.ratelimit import LIMIT_INVITE_CODE, limiter
-from app.security import hash_token
+from app.security import hash_password, hash_token
 from app.validators import (
     clean_person_name,
     normalize_phone,
@@ -83,6 +83,22 @@ class EmergencyContactNewIn(BaseModel):
         return normalize_phone(v)
 
 
+# La misma regla que /auth/register: al menos 8 caracteres, con letras y
+# numeros. La cuenta del adulto mayor no tiene por que ser mas debil.
+_CLAVE_VALIDA = re.compile(r"^(?=.*[A-Za-z])(?=.*\d).{8,}$")
+
+
+class ElderAccountIn(BaseModel):
+    """Cuenta con la que el adulto mayor entra a la app.
+
+    La crea su familia al crear el perfil: el registro publico no ofrece
+    cuentas de adulto mayor. Queda en el circulo del paciente con el rol
+    'elder', asi que entra directo a su pantalla.
+    """
+    email:    EmailStr
+    password: str
+
+
 class PatientCreateIn(BaseModel):
     """Alta de paciente.
 
@@ -110,6 +126,9 @@ class PatientCreateIn(BaseModel):
     insurance:        Literal["fonasa", "isapre", "particular", "otra"] | None = None
     marital_status:   Literal["soltero", "casado", "viudo", "divorciado",
                               "conviviente", "separado"] | None = None
+    # Si viene, se crea tambien la cuenta del adulto mayor con este correo y
+    # contrasena, ya unida a su perfil.
+    elder_account:    ElderAccountIn | None = None
 
     @field_validator("first_name", "last_name")
     @classmethod
@@ -212,6 +231,8 @@ class PatientCreateOut(BaseModel):
     patient_id: str
     full_name:  str
     created_at: datetime
+    # La cuenta del adulto mayor, si se pidio crearla.
+    elder_user_id: str | None = None
 
 
 class PatientPatchIn(BaseModel):
@@ -1249,6 +1270,36 @@ async def create_patient(
     if ya_existe:
         raise rut_repetido
 
+    # La cuenta del adulto mayor se revisa antes de crear nada: si el correo
+    # ya existe o la contrasena es debil, no tiene que quedar un perfil a
+    # medias sin su cuenta.
+    cuenta_am = payload.elder_account
+    correo_repetido = ApiError(
+        status_code=409,
+        code="EMAIL_ALREADY_EXISTS",
+        message="Ya existe una cuenta con ese correo. Usa otro para el adulto mayor.",
+        details=[{"field": "elder_account.email",
+                  "message": "Ese correo ya tiene una cuenta."}],
+    )
+    if cuenta_am is not None:
+        if not _CLAVE_VALIDA.match(cuenta_am.password):
+            raise ApiError(
+                status_code=400,
+                code="WEAK_PASSWORD",
+                message="La contraseña del adulto mayor no cumple los requisitos "
+                        "mínimos: al menos 8 caracteres, con letras y números.",
+                details=[{"field": "elder_account.password",
+                          "message": "Al menos 8 caracteres, con letras y números."}],
+            )
+        correo_usado = (
+            await db.execute(
+                text("SELECT 1 FROM users WHERE lower(email) = lower(:e)"),
+                {"e": cuenta_am.email},
+            )
+        ).first()
+        if correo_usado:
+            raise correo_repetido
+
     try:
         patient = (
             await db.execute(
@@ -1318,12 +1369,53 @@ async def create_patient(
         ),
         {"pid": pid, "uid": user.user_id},
     )
+
+    # Cuenta del adulto mayor, en la misma transaccion que su perfil: o
+    # quedan las dos cosas o ninguna. Lleva el nombre del perfil y entra al
+    # circulo con el rol 'elder', que le abre su pantalla al iniciar sesion.
+    elder_user_id = None
+    if cuenta_am is not None:
+        try:
+            elder_user_id = str((
+                await db.execute(
+                    text(
+                        """
+                        INSERT INTO users (email, password_hash, first_name,
+                                           second_name, last_name,
+                                           second_last_name, account_type)
+                        VALUES (:email, :ph, :fn, :sn, :ln, :sln, 'elder')
+                        RETURNING id
+                        """
+                    ),
+                    {
+                        "email": cuenta_am.email,
+                        "ph":    hash_password(cuenta_am.password),
+                        "fn":    payload.first_name,
+                        "sn":    payload.second_name,
+                        "ln":    payload.last_name,
+                        "sln":   payload.second_last_name,
+                    },
+                )
+            ).scalar())
+        except IntegrityError:
+            # El mismo correo registrado entre la revision y este insert.
+            await db.rollback()
+            raise correo_repetido
+        await db.execute(
+            text(
+                "INSERT INTO patient_members (patient_id, user_id, role, is_owner) "
+                "VALUES (:pid, :uid, 'elder', false)"
+            ),
+            {"pid": pid, "uid": elder_user_id},
+        )
+
     await db.commit()
 
     return PatientCreateOut(
         patient_id=pid,
         full_name=patient["full_name"],
         created_at=patient["created_at"],
+        elder_user_id=elder_user_id,
     )
 
 

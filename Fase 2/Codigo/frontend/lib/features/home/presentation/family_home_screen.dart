@@ -461,19 +461,21 @@ class _MedsTodayCard extends ConsumerWidget {
                         style: TextStyle(
                             fontSize: 14, fontWeight: FontWeight.w700)),
                   ),
+                  // Los tonos 700 y no los 500 y 600 de antes: el texto se
+                  // dibuja del mismo color que su fondo tintado, y ahi un
+                  // tono claro no llega al contraste que pide la guia.
                   if (m.pending > 0)
-                    _Pill(
-                      text:
-                          '${m.pending} pendiente${m.pending == 1 ? '' : 's'}',
-                      color: AppColors.statusWarning,
+                    Etiqueta(
+                      '${m.pending} pendiente${m.pending == 1 ? '' : 's'}',
+                      tono: AgeColors.warn700,
                     )
                   else if (m.missed > 0)
-                    _Pill(
-                      text: '${m.missed} omitida${m.missed == 1 ? '' : 's'}',
-                      color: AppColors.statusAttention,
+                    Etiqueta(
+                      '${m.missed} omitida${m.missed == 1 ? '' : 's'}',
+                      tono: AgeColors.attention700,
                     )
                   else
-                    const _Pill(text: 'Al día', color: AppColors.statusOk),
+                    const Etiqueta('Al día', tono: AgeColors.ok700),
                 ],
               ),
               const SizedBox(height: 12),
@@ -502,26 +504,6 @@ class _MedsTodayCard extends ConsumerWidget {
         );
       },
       orElse: () => const SizedBox.shrink(),
-    );
-  }
-}
-
-class _Pill extends StatelessWidget {
-  const _Pill({required this.text, required this.color});
-  final String text;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(text,
-          style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w700, color: color)),
     );
   }
 }
@@ -610,7 +592,8 @@ class _LastObservationCard extends ConsumerWidget {
                 Row(
                   children: [
                     Flexible(
-                        child: _Pill(text: etiqueta, color: AppColors.primary)),
+                        child: Etiqueta(etiqueta,
+                            tono: AgeColors.teal700)),
                   ],
                 ),
               ],

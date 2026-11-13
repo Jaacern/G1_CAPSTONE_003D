@@ -14,5 +14,6 @@ __pycache__/
 
 # Build del panel de administración (se genera con flutter build web en admin_web)
 backend/api/app/static/admin_web/
+backend/api/app/static/app_web/
 admin_web/build/
 admin_web/.dart_tool/

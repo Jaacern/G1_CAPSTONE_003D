@@ -18,17 +18,18 @@ import '../application/elder_providers.dart';
 ///
 /// FLUJO
 ///   1. Al pulsar una nota suena (ToneService, igual que antes).
-///   2. Si la grabación está activa, el micrófono capta el sonido ambiente,
-///      que incluye los tonos que salen por el altavoz. Es el enfoque más
-///      simple: no requiere mezcla de audio en código.
-///   3. Al pulsar ● Grabar, el micrófono empieza a escuchar.
-///   4. Al pulsar ■ Guardar, se detiene la grabación, sube el archivo y
-///      se registra en POST /patients/{id}/music con un client_uuid local
-///      (RF-66: idempotente ante reintentos).
+///   2. Al pulsar ● Grabar se empieza a anotar que nota se toca y cuando.
+///      No se usa el microfono: antes se grababa el sonido de la pieza y se
+///      colaban la voz y el ruido.
+///   3. Al pulsar ■ Guardar se arma un WAV con esas notas
+///      (ToneService.mezclar), con la misma forma de onda que se escucho, se
+///      sube y se registra en POST /patients/{id}/music con un client_uuid
+///      local (RF-66: idempotente ante reintentos).
 ///
 /// DECISIÓN DE DISEÑO
-///   El título lo pone el adulto mayor en un diálogo antes de guardar. Si
-///   cancela el diálogo, el audio se descarta sin subir nada.
+///   El nombre se arma solo con la fecha y la hora (RNF-20: sin teclado). Un
+///   dialogo con dos botones grandes pregunta si se guarda; "No guardar"
+///   descarta la grabacion.
 class ElderMusicScreen extends ConsumerStatefulWidget {
   const ElderMusicScreen({super.key});
 

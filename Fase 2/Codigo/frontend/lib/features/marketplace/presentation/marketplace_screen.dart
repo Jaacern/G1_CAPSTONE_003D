@@ -6,14 +6,13 @@ import '../../../core/config/app_config.dart';
 import '../../../core/config/comunas.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
-import '../../../core/widgets/remote_file_image.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/models.dart';
 import '../application/marketplace_providers.dart';
 import '../domain/models.dart';
 
-/// Marketplace de AgeCare: cuidadoras, productos/ayudas técnicas y, para la
-/// cuidadora, ofertas de trabajo.
+/// Marketplace de AgeCare: búsqueda de cuidadoras y, para la cuidadora,
+/// ofertas de trabajo. La venta de productos se sacó por decisión del equipo.
 class MarketplaceScreen extends ConsumerWidget {
   const MarketplaceScreen({super.key});
 
@@ -27,7 +26,7 @@ class MarketplaceScreen extends ConsumerWidget {
         body: const ComingSoonView(
           icon: Icons.storefront_rounded,
           title: 'Marketplace de cuidado',
-          subtitle: 'Aquí podrás encontrar cuidadoras y productos de apoyo. '
+          subtitle: 'Aquí podrás encontrar cuidadoras para tu familiar. '
               'Esta función estará disponible en una próxima versión.',
         ),
       );
@@ -36,30 +35,35 @@ class MarketplaceScreen extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final isCaregiver = user?.primaryRole == RoleType.caregiver;
 
-    final tabs = <Tab>[
-      const Tab(text: 'Cuidadoras'),
-      const Tab(text: 'Productos'),
-      if (isCaregiver) const Tab(text: 'Trabajos'),
-    ];
+    // Sin pestañas cuando hay una sola sección: el familiar ve directamente
+    // la búsqueda de cuidadoras.
+    if (!isCaregiver) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Marketplace')),
+        body: const _CaregiversTab(),
+      );
+    }
 
     return DefaultTabController(
-      length: tabs.length,
+      length: 2,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Marketplace'),
-          bottom: TabBar(
+          bottom: const TabBar(
             isScrollable: false,
             labelColor: AppColors.primary,
             unselectedLabelColor: AppColors.textSecondary,
             indicatorColor: AppColors.primary,
-            tabs: tabs,
+            tabs: [
+              Tab(text: 'Cuidadoras'),
+              Tab(text: 'Trabajos'),
+            ],
           ),
         ),
-        body: TabBarView(
+        body: const TabBarView(
           children: [
-            const _CaregiversTab(),
-            const _ProductsTab(),
-            if (isCaregiver) const _JobsTab(),
+            _CaregiversTab(),
+            _JobsTab(),
           ],
         ),
       ),
@@ -261,127 +265,6 @@ class _CaregiverCard extends StatelessWidget {
               ],
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Productos
-// ---------------------------------------------------------------------------
-class _ProductsTab extends ConsumerStatefulWidget {
-  const _ProductsTab();
-
-  @override
-  ConsumerState<_ProductsTab> createState() => _ProductsTabState();
-}
-
-class _ProductsTabState extends ConsumerState<_ProductsTab> {
-  // Sin filtro por categoria (decision del equipo): la tienda muestra el
-  // catalogo completo. productsProvider(null) no manda el parametro.
-  static const String? _todas = null;
-
-  @override
-  Widget build(BuildContext context) {
-    final products = ref.watch(productsProvider(_todas));
-    return Column(
-      children: [
-        Expanded(
-          child: products.when(
-            loading: () => const LoadingView(),
-            error: (e, _) => ErrorView(
-              message: e.toString(),
-              onRetry: () => ref.invalidate(productsProvider(_todas)),
-            ),
-            data: (list) => list.isEmpty
-                ? const EmptyView(
-                    icon: Icons.shopping_bag_outlined,
-                    title: 'Sin productos',
-                    subtitle: 'Aún no hay ayudas técnicas disponibles.',
-                  )
-                : RefreshIndicator(
-                    onRefresh: () async =>
-                        ref.invalidate(productsProvider(_todas)),
-                    child: ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                      itemCount: list.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (_, i) => _ProductCard(product: list[i]),
-                    ),
-                  ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ProductCard extends StatelessWidget {
-  const _ProductCard({required this.product});
-
-  final MarketProduct product;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          product.imageUrl != null
-              ? RemoteFileImage(
-                  product.imageUrl!,
-                  width: 64,
-                  height: 64,
-                  borderRadius: BorderRadius.circular(12),
-                )
-              : Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: .08),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.medical_services_outlined,
-                      color: AppColors.primary),
-                ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(product.name,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 4),
-                Text(product.description,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: AppColors.textSecondary, fontSize: 13)),
-                const SizedBox(height: 8),
-                // Etiqueta y precio comparten línea; si el teléfono es chico
-                // o el texto está grande, el precio baja a la línea de abajo
-                // en vez de desbordar la tarjeta.
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  alignment: WrapAlignment.end,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      product.precioLabel,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          color: AppColors.primary),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );

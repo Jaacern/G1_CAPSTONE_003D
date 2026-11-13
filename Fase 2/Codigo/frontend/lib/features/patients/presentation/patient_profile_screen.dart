@@ -586,6 +586,20 @@ class _EquipoCard extends ConsumerWidget {
                           : null,
                 ),
               ],
+              // Invitar desde la ficha deja el codigo para ESTE adulto
+              // mayor, sin tener que elegirlo de nuevo.
+              if (soyAdmin) ...[
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.group_add_outlined,
+                      color: AppColors.primary),
+                  title: const Text('Invitar a alguien',
+                      style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600)),
+                  onTap: () => context.push('/invite?patient=$patientId'),
+                ),
+              ],
             ],
           ),
         );

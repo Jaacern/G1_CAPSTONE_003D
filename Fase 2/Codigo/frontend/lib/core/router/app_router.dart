@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/application/auth_controller.dart';
 import '../../features/auth/presentation/login_screen.dart';
+import '../../features/auth/presentation/welcome_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/alerts/presentation/alerts_screen.dart';
 import '../../features/alerts/presentation/alert_detail_screen.dart';
@@ -47,7 +48,13 @@ import '../../features/wearable/presentation/watch_pairing_screen.dart';
 import '../../features/dev/presentation/theme_gallery_screen.dart';
 
 /// Rutas públicas (accesibles sin sesión).
-const _publicRoutes = {'/login', '/register', '/recover', '/splash'};
+const _publicRoutes = {
+  '/welcome',
+  '/login',
+  '/register',
+  '/recover',
+  '/splash'
+};
 
 /// Router principal. Escucha el estado de autenticación para redirigir.
 final goRouterProvider = Provider<GoRouter>((ref) {
@@ -66,12 +73,17 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       final loggedIn = auth is Authenticated;
       final onPublic = _publicRoutes.contains(loc);
 
-      if (!loggedIn) return onPublic && loc != '/splash' ? null : '/login';
+      if (!loggedIn) {
+        // Tras el arranque, quien no tiene sesión ve primero la bienvenida.
+        if (loc == '/splash') return '/welcome';
+        return onPublic ? null : '/login';
+      }
       if (loggedIn && (onPublic)) return '/home';
       return null;
     },
     routes: [
       GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
+      GoRoute(path: '/welcome', builder: (_, __) => const WelcomeScreen()),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(
           path: '/register',

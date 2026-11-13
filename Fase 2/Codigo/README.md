@@ -448,6 +448,14 @@ flutter run \
 | Adulto mayor | `adultomayor@agecare.cl` | `agecare123` |
 | Administrador (panel) | `administrador@agecare.cl` | `agecare123` |
 
+**Revisar la app antes de subir cambios** (lo mismo que corre el CI):
+
+```bash
+cd frontend
+flutter analyze   # tiene que decir "No issues found!": el CI falla hasta por un aviso (info)
+flutter test      # todas las pruebas
+```
+
 ---
 
 ## 🔐 Seguridad

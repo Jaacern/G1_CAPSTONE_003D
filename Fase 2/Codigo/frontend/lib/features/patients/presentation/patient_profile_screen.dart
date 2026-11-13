@@ -523,7 +523,10 @@ Future<void> _editarEnfermedades(
 
 /// Fila de riesgo cardiovascular con color según el nivel (bajo/moderado/alto).
 /// Equipo de cuidado: lista los miembros con su rol clínico (médico general,
-/// kinesiólogo, enfermera, cuidadora, familiar...). Botón para gestionar.
+/// kinesiólogo, enfermera, cuidadora, familiar...).
+///
+/// El familiar administrador ve ademas un boton para quitar a cada miembro
+/// (RF-14). Nunca en su propia fila: al administrador no se le puede quitar.
 class _EquipoCard extends ConsumerWidget {
   const _EquipoCard({required this.patientId});
   final String patientId;
@@ -531,6 +534,7 @@ class _EquipoCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final equipo = ref.watch(careTeamProvider);
+    final yo = ref.watch(currentUserProvider)?.userId;
     return equipo.when(
       loading: () =>
           const AppCard(child: SizedBox(height: 50, child: LoadingView())),
@@ -545,6 +549,9 @@ class _EquipoCard extends ConsumerWidget {
                 style: TextStyle(color: AppColors.textSecondary)),
           );
         }
+        // Solo el administrador gestiona el circulo.
+        final soyAdmin =
+            miembros.any((m) => m.isOwner && m.userId == yo);
         return AppCard(
           padding: EdgeInsets.zero,
           child: Column(
@@ -566,7 +573,15 @@ class _EquipoCard extends ConsumerWidget {
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
                               color: AppColors.primary))
-                      : null,
+                      : soyAdmin
+                          ? IconButton(
+                              tooltip: 'Quitar del círculo',
+                              icon: const Icon(Icons.person_remove_outlined,
+                                  color: AppColors.critical),
+                              onPressed: () =>
+                                  _quitar(context, ref, miembros[i]),
+                            )
+                          : null,
                 ),
               ],
             ],
@@ -574,6 +589,46 @@ class _EquipoCard extends ConsumerWidget {
         );
       },
     );
+  }
+
+  /// Pide confirmacion y quita al miembro. Quitar a alguien le corta el
+  /// acceso a la ficha clinica de inmediato, por eso se pregunta antes.
+  Future<void> _quitar(
+      BuildContext context, WidgetRef ref, CareMember m) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Quitar del círculo de cuidado?'),
+        content: Text(
+            '${m.fullName} (${m.label}) dejará de ver la información del '
+            'adulto mayor. Si después lo necesitas, puedes volver a '
+            'invitarlo con un código.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.critical,
+              minimumSize: const Size(48, 48),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Quitar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(patientsRepositoryProvider).removeMember(patientId, m.userId);
+      ref.invalidate(careTeamProvider);
+      if (context.mounted) {
+        showAppSnackBar(context, '${m.fullName} ya no está en el círculo.');
+      }
+    } on ApiException catch (e) {
+      if (context.mounted) showAppSnackBar(context, e.message, error: true);
+    }
   }
 
   IconData _icono(CareMember m) {

@@ -202,6 +202,9 @@ async def today(
                 WHERE COALESCE(m.patient_id, tr.patient_id) = :pid
                   AND d.scheduled_at >= now() - interval '7 days'
                   AND d.scheduled_at <= now()
+                  -- Una toma cancelada (cambio o se descontinuo la
+                  -- indicacion) no es una toma omitida: no cuenta.
+                  AND d.status <> 'cancelled'
                 """
             ),
             {"pid": patient_id},

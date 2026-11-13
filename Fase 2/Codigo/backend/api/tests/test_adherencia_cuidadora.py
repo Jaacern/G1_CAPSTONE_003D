@@ -3,7 +3,8 @@
 Una dosis puede colgar de un medicamento suelto o de una indicacion de un
 tratamiento. El resumen solo miraba las primeras, asi que un paciente con
 su esquema en tratamientos aparecia sin adherencia. Esta prueba agrega una
-dosis de tratamiento vencida y comprueba que el resumen la cuenta.
+dosis de tratamiento vencida y comprueba que el resumen la cuenta, y que
+una toma cancelada no cuenta ni a favor ni en contra.
 """
 import os
 os.environ.setdefault("POSTGRES_HOST", "127.0.0.1")
@@ -38,7 +39,8 @@ PACIENTE = "33333333-3333-4333-8333-333333333333"
 n = ok = 0
 
 # Lo que deberia dar, calculado aparte: todas las dosis vencidas de los
-# ultimos siete dias, vengan de un medicamento o de un tratamiento.
+# ultimos siete dias, vengan de un medicamento o de un tratamiento, menos
+# las canceladas, que no son tomas omitidas.
 ESPERADA = """
     SELECT round(100.0 * count(*) FILTER (WHERE d.status = 'taken')
                  / nullif(count(*), 0), 1)
@@ -49,6 +51,7 @@ ESPERADA = """
     WHERE COALESCE(m.patient_id, tr.patient_id) = CAST(:pid AS uuid)
       AND d.scheduled_at >= now() - interval '7 days'
       AND d.scheduled_at <= now()
+      AND d.status <> 'cancelled'
 """
 
 
@@ -118,6 +121,18 @@ async def main(client, uid):
                   f"dio {dada}")
         comprobar("coincide con el calculo con medicamentos y tratamientos",
                   dada == debe, f"dio {dada} y debia {debe}")
+
+        async with _eng.begin() as c:
+            # Una toma cancelada (se cambio la indicacion) no cuenta.
+            creadas.append(str((await c.execute(_t(
+                "INSERT INTO scheduled_doses (treatment_item_id, scheduled_at, status) "
+                "VALUES (:item, now() - interval '3 hours 5 minutes 11 seconds', 'cancelled') "
+                "RETURNING id"), {"item": item})).scalar()))
+
+        r = await client.get("/api/v1/caregiver/today", headers=token(uid))
+        antes, dada = dada, r.json().get("adherence_pct")
+        comprobar("una toma cancelada no cambia la adherencia", dada == antes,
+                  f"antes {antes}, ahora {dada}")
     finally:
         async with _eng.begin() as c:
             for d in creadas:

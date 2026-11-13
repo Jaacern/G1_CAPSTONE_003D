@@ -48,6 +48,12 @@ class _CreatePatientScreenState extends ConsumerState<CreatePatientScreen> {
   final _ecRelationship = TextEditingController();
   final _ecPhone = TextEditingController();
 
+  // Cuenta del adulto mayor: con ella entra a la app desde el primer dia.
+  final _elderEmail = TextEditingController();
+  final _elderPassword = TextEditingController();
+  final _elderPasswordRepeat = TextEditingController();
+  bool _verClave = false;
+
   // Salud (opcional)
   String? _insurance;
   final Set<String> _conditions = {};
@@ -70,6 +76,9 @@ class _CreatePatientScreenState extends ConsumerState<CreatePatientScreen> {
       _ecLastName,
       _ecRelationship,
       _ecPhone,
+      _elderEmail,
+      _elderPassword,
+      _elderPasswordRepeat,
     ]) {
       c.dispose();
     }
@@ -125,13 +134,19 @@ class _CreatePatientScreenState extends ConsumerState<CreatePatientScreen> {
               conditions: _conditions.toList(),
               allergies: _allergies.values.toList(),
               insurance: _insurance,
+              elderAccount: NewElderAccount(
+                email: _elderEmail.text,
+                password: _elderPassword.text,
+              ),
             ),
           );
       ref.invalidate(myPatientsProvider);
       await ref.read(authControllerProvider.notifier).refreshProfile();
       if (mounted) {
-        showAppSnackBar(context,
-            '${patient.fullName} fue agregado. Ahora invita a su círculo de cuidado.');
+        showAppSnackBar(
+            context,
+            '${patient.fullName} fue agregado y ya puede entrar con '
+            '${_elderEmail.text.trim()}. Ahora invita a su círculo de cuidado.');
         context.go('/home');
       }
     } on ApiException catch (e) {
@@ -293,6 +308,63 @@ class _CreatePatientScreenState extends ConsumerState<CreatePatientScreen> {
                         ),
                         validator: validatePhone,
                       ),
+                    ),
+
+                    // ── Cuenta del adulto mayor ───────────────────────
+                    const _Seccion('Cuenta del adulto mayor',
+                        detalle:
+                            'Con este correo y esta contraseña entra a la app y ve su pantalla: sus remedios, sus fotos y el chat con la familia.'),
+                    TextFormField(
+                      controller: _elderEmail,
+                      enabled: !_loading,
+                      keyboardType: TextInputType.emailAddress,
+                      autocorrect: false,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'Correo del adulto mayor *',
+                        prefixIcon: Icon(Icons.mail_outline),
+                      ),
+                      validator: validarCorreo,
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: _elderPassword,
+                      enabled: !_loading,
+                      obscureText: !_verClave,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      textInputAction: TextInputAction.next,
+                      decoration: InputDecoration(
+                        labelText: 'Contraseña *',
+                        helperText: 'Al menos 8 caracteres, con letras y números',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          tooltip: _verClave
+                              ? 'Ocultar contraseña'
+                              : 'Mostrar contraseña',
+                          icon: Icon(_verClave
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined),
+                          onPressed: () =>
+                              setState(() => _verClave = !_verClave),
+                        ),
+                      ),
+                      validator: validarClave,
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: _elderPasswordRepeat,
+                      enabled: !_loading,
+                      obscureText: !_verClave,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      decoration: const InputDecoration(
+                        labelText: 'Repite la contraseña *',
+                        prefixIcon: Icon(Icons.lock_outline),
+                      ),
+                      validator: (v) => v == _elderPassword.text
+                          ? null
+                          : 'Las contraseñas no coinciden',
                     ),
 
                     // ── Salud (opcional) ──────────────────────────────
@@ -702,4 +774,27 @@ class _Alergias extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// Correo de la cuenta del adulto mayor. Revisa la forma; si ya existe una
+/// cuenta con ese correo lo dice el servidor.
+String? validarCorreo(String? v) {
+  final t = (v ?? '').trim();
+  if (t.isEmpty) return 'Escribe el correo del adulto mayor';
+  if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(t)) {
+    return 'Revisa el correo: falta algo (ejemplo: elena@gmail.com)';
+  }
+  return null;
+}
+
+/// La misma regla que pide el servidor (y el registro): al menos 8
+/// caracteres, con letras y números.
+String? validarClave(String? v) {
+  final t = v ?? '';
+  if (t.isEmpty) return 'Escribe una contraseña';
+  if (t.length < 8) return 'Mínimo 8 caracteres';
+  if (!RegExp('[A-Za-z]').hasMatch(t) || !RegExp(r'\d').hasMatch(t)) {
+    return 'Usa letras y números';
+  }
+  return null;
 }

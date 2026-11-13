@@ -1,12 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 
-import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/upload_service.dart';
 import '../../../core/speech/speech_service.dart';
@@ -48,42 +45,6 @@ class Melodia {
   }
 }
 
-/// Enlace para que alguien sin cuenta escuche una melodia (RF-67), por
-/// ejemplo la nieta que la recibe por WhatsApp.
-///
-/// La API (POST /patients/{id}/music/{id}/share) devuelve la ruta sin el
-/// servidor ("/api/v1/music/shared/<token>"); aqui se arma el enlace
-/// completo para poder pegarlo en un mensaje.
-class EnlaceDeEscucha {
-  const EnlaceDeEscucha({
-    required this.shareId,
-    required this.url,
-    required this.expiresAt,
-  });
-
-  final String shareId;
-
-  /// Enlace completo, listo para compartir.
-  final String url;
-
-  /// Despues de esta fecha el enlace deja de funcionar.
-  final DateTime expiresAt;
-
-  /// [servidor] es la direccion de la API (AppConfig.apiBaseUrl).
-  factory EnlaceDeEscucha.fromJson(Map<String, dynamic> json,
-      {required String servidor}) {
-    final ruta = (json['url'] ?? '') as String;
-    final base = servidor.endsWith('/')
-        ? servidor.substring(0, servidor.length - 1)
-        : servidor;
-    return EnlaceDeEscucha(
-      shareId: json['share_id'].toString(),
-      url: ruta.startsWith('http') ? ruta : '$base$ruta',
-      expiresAt: DateTime.parse(json['expires_at'] as String).toLocal(),
-    );
-  }
-}
-
 /// Melodias del adulto mayor, la mas reciente primero
 /// (GET /patients/{id}/music, RF-65).
 final melodiasProvider =
@@ -97,15 +58,6 @@ final melodiasProvider =
       .map((e) => Melodia.fromJson(e as Map<String, dynamic>))
       .toList();
 });
-
-/// Pide a la API un enlace de escucha para una melodia (RF-67). Cada vez
-/// que se comparte se crea un enlace nuevo; vale 72 horas.
-Future<EnlaceDeEscucha> compartirMelodia(
-    ApiClient api, String patientId, String melodiaId) async {
-  final res = await api.post<Map<String, dynamic>>(
-      '/patients/$patientId/music/$melodiaId/share');
-  return EnlaceDeEscucha.fromJson(res, servidor: AppConfig.apiBaseUrl);
-}
 
 /// Manda una melodia al chat de la familia del adulto mayor (RF-67).
 ///
@@ -272,76 +224,6 @@ class _ElderMelodiesScreenState extends ConsumerState<ElderMelodiesScreen> {
                 ),
         ),
       ),
-    );
-  }
-}
-
-/// Muestra el enlace de una melodia para copiarlo (RF-67).
-///
-/// Devuelve 'copiado' si se copio, para que la pantalla lo confirme.
-class DialogoEnlaceDeEscucha extends StatelessWidget {
-  const DialogoEnlaceDeEscucha({
-    super.key,
-    required this.titulo,
-    required this.enlace,
-  });
-
-  final String titulo;
-  final EnlaceDeEscucha enlace;
-
-  @override
-  Widget build(BuildContext context) {
-    final vence = DateFormat("d 'de' MMMM", 'es').format(enlace.expiresAt);
-    return AlertDialog(
-      title: const Text('Enlace para escuchar'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Quien abra este enlace puede escuchar "$titulo" sin crear una '
-            'cuenta. Funciona hasta el $vence.',
-            style: AgeText.bodyL,
-          ),
-          const SizedBox(height: 12),
-          SelectableText(enlace.url, style: const TextStyle(fontSize: 13)),
-        ],
-      ),
-      actions: [
-        TextButton(
-          style: TextButton.styleFrom(minimumSize: const Size(96, 56)),
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cerrar'),
-        ),
-        // Abre el menu de compartir del telefono (WhatsApp, correo...).
-        // En un navegador que no lo tiene, se copia el enlace.
-        OutlinedButton.icon(
-          style: OutlinedButton.styleFrom(minimumSize: const Size(120, 56)),
-          onPressed: () async {
-            try {
-              await Share.share(
-                'Escucha mi melodía "$titulo": ${enlace.url}',
-                subject: titulo,
-              );
-              if (context.mounted) Navigator.pop(context);
-            } catch (_) {
-              await Clipboard.setData(ClipboardData(text: enlace.url));
-              if (context.mounted) Navigator.pop(context, 'copiado');
-            }
-          },
-          icon: const Icon(Icons.share_rounded),
-          label: const Text('Compartir'),
-        ),
-        FilledButton.icon(
-          style: FilledButton.styleFrom(minimumSize: const Size(120, 56)),
-          onPressed: () async {
-            await Clipboard.setData(ClipboardData(text: enlace.url));
-            if (context.mounted) Navigator.pop(context, 'copiado');
-          },
-          icon: const Icon(Icons.copy_rounded),
-          label: const Text('Copiar enlace'),
-        ),
-      ],
     );
   }
 }

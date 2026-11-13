@@ -456,6 +456,13 @@ flutter analyze   # tiene que decir "No issues found!": el CI falla hasta por un
 flutter test      # todas las pruebas
 ```
 
+**Micrófono y dictado por voz:** las notas de voz del chat y el botón de dictar
+(chat y asistente, RF-64) usan el micrófono. En Chrome hay que permitirlo la
+primera vez (ícono del candado en la barra de direcciones). El dictado usa el
+reconocimiento de voz del navegador o del teléfono, así que funciona en Chrome,
+Android e iOS, pero no en Firefox. El Director Musical del adulto mayor no usa
+el micrófono: guarda solo las notas tocadas.
+
 ---
 
 ## 🔐 Seguridad

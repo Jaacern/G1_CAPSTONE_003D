@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'package:agecare_app/core/theme/app_theme.dart';
 import 'package:agecare_app/features/auth/application/auth_controller.dart';
 import 'package:agecare_app/features/auth/domain/models.dart';
 import 'package:agecare_app/features/documents/data/documents_repository.dart';
@@ -52,8 +53,9 @@ void main() {
     });
   });
 
-  Future<void> montar(WidgetTester tester, RoleType rol) async {
-    await tester.binding.setSurfaceSize(const Size(400, 1400));
+  Future<void> montar(WidgetTester tester, RoleType rol,
+      {ThemeData? tema, double ancho = 400}) async {
+    await tester.binding.setSurfaceSize(Size(ancho, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(ProviderScope(
       overrides: [
@@ -70,8 +72,9 @@ void main() {
               ],
             )),
       ],
-      child: const MaterialApp(
-          home: Scaffold(body: PatientDocumentsView(patientId: 'p1'))),
+      child: MaterialApp(
+          theme: tema,
+          home: const Scaffold(body: PatientDocumentsView(patientId: 'p1'))),
     ));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
@@ -115,5 +118,14 @@ void main() {
   testWidgets('el familiar puede quitar documentos', (tester) async {
     await montar(tester, RoleType.family);
     expect(find.byTooltip('Quitar del expediente'), findsWidgets);
+  });
+
+  testWidgets('con el tema de la app el boton Subir cabe junto al buscador',
+      (tester) async {
+    // El tema real da a los botones ancho infinito; sin un ancho propio el
+    // boton dentro de la fila del buscador rompia el dibujo de la vista.
+    await montar(tester, RoleType.family, tema: AppTheme.light(), ancho: 320);
+    expect(find.text('Subir'), findsOne);
+    expect(find.text('Recetas · 2'), findsOne);
   });
 }

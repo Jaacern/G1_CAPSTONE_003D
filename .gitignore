@@ -53,3 +53,10 @@ site*/
 
 # Logs locales del IDE.
 .kiro_*.log
+
+# Firebase / notificaciones push: credenciales que NO se versionan.
+# El JSON de la cuenta de servicio va en el .env del backend (ya ignorado).
+**/google-services.json
+**/GoogleService-Info.plist
+**/firebase-adminsdk*.json
+**/serviceAccount*.json

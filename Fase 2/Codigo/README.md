@@ -418,9 +418,25 @@ pip install -r requirements.txt
 
 > 🚧 **Pendiente (más adelante):** el **OCR de recetas** está en desarrollo; cuando
 > se use, necesita el binario `tesseract` en el sistema
-> (`sudo apt-get install -y tesseract-ocr tesseract-ocr-spa`). La **guía de
-> pruebas** (`python tests/correr.py` con una base Postgres levantada) se
-> documentará aquí cuando esté lista.
+> (`sudo apt-get install -y tesseract-ocr tesseract-ocr-spa`).
+
+#### Pruebas del backend
+
+Son pruebas de integración: cada archivo de `tests/` habla con la base real,
+así que necesitan la base levantada y el esquema aplicado (basta con haber
+levantado `db` y `api` una vez).
+
+```bash
+cd backend/api
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+
+python tests/correr.py                       # todas
+python tests/correr.py adherencia musica     # solo las que contienen esas palabras
+```
+
+La conexión sale de las mismas variables que usa la API (`POSTGRES_HOST`,
+`POSTGRES_PORT`, `POSTGRES_USER`...). Cada archivo corre en su propio proceso:
+si uno falla, los demás siguen, y el resultado final dice cuántos pasaron.
 
 ### Frontend (Flutter)
 

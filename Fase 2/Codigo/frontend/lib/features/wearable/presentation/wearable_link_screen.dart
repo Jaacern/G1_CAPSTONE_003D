@@ -283,6 +283,7 @@ class _SourcesPanel extends ConsumerWidget {
                         TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               ),
               IconButton(
+                tooltip: 'Actualizar',
                 visualDensity: VisualDensity.compact,
                 icon: const Icon(Icons.refresh_rounded, size: 20),
                 onPressed: () {

@@ -23,4 +23,12 @@ void main() {
     expect(item.type, ContentType.news);
     expect(item.spokenText, 'Llega la primavera. Esta semana sube la temperatura');
   });
+
+  test('una tarjeta sin tipo ni textos no rompe la pantalla', () {
+    final item = ContentItem.fromJson(const {'id': 'c-2'});
+
+    expect(item.type, ContentType.tip);
+    expect(item.title, '');
+    expect(item.imageUrl, isNull);
+  });
 }

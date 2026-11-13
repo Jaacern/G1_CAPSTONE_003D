@@ -9,6 +9,16 @@ import 'package:flutter_test/flutter_test.dart';
 int _u32(Uint8List wav, int offset) =>
     ByteData.sublistView(wav).getUint32(offset, Endian.little);
 
+/// Las muestras de audio (16 bits con signo) que vienen despues de la
+/// cabecera de 44 bytes.
+List<int> _muestras(Uint8List wav) {
+  final datos = ByteData.sublistView(wav, 44);
+  return [
+    for (var i = 0; i + 1 < datos.lengthInBytes; i += 2)
+      datos.getInt16(i, Endian.little),
+  ];
+}
+
 void main() {
   // No toca ninguna nota: los reproductores ni se llegan a crear.
   final tono = ToneService();
@@ -33,5 +43,19 @@ void main() {
     const bytes = 66150 * 2;
     expect(_u32(wav, 40), bytes);
     expect(wav.length, 44 + bytes);
+  });
+
+  test('notas superpuestas no saturan el audio', () {
+    // Dos notas iguales al mismo tiempo suman el doble: hay que bajar el
+    // volumen del total para que no se recorte.
+    final wav = tono.mezclar(const [
+      (offsetMs: 0, frequency: 440.0),
+      (offsetMs: 0, frequency: 440.0),
+    ], durationMs: 300);
+
+    final pico =
+        _muestras(wav).map((m) => m.abs()).reduce((a, b) => a > b ? a : b);
+    expect(pico, lessThanOrEqualTo(29491)); // 90 % del maximo, sin recorte
+    expect(pico, greaterThan(20000)); // se escucha, no quedo en silencio
   });
 }

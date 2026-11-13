@@ -66,5 +66,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>AgeCare usa el micrófono para grabar notas de voz y para dictar mensajes.</string>
 </dict>
 </plist>

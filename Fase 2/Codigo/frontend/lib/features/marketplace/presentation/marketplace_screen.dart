@@ -223,30 +223,40 @@ class _CaregiverCard extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
+              // La nota va al lado del nombre y no abajo: es con lo que se
+              // compara una cuidadora con otra al recorrer la lista, y ahi
+              // arriba se lee de un vistazo en todas las filas a la vez.
+              _NotaDestacada(
+                  rating: caregiver.rating, resenas: caregiver.reviewsCount),
             ],
           ),
           const SizedBox(height: 10),
-          // Valoración a la izquierda y tarifa a la derecha; si el teléfono es
-          // chico o el texto está grande, la tarifa baja de línea en vez de
-          // desbordar la tarjeta.
+          // La tarifa baja de línea en vez de desbordar la tarjeta si el
+          // teléfono es chico o el texto está grande.
           Wrap(
             spacing: 6,
             runSpacing: 6,
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _RatingStars(rating: caregiver.rating),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${caregiver.rating.toStringAsFixed(1)} (${caregiver.reviewsCount})',
-                    style: const TextStyle(
-                        fontSize: 13, color: AppColors.textSecondary),
-                  ),
-                ],
-              ),
+              if (caregiver.zones.isNotEmpty)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.location_on_rounded,
+                        size: 15, color: AppColors.textSecondary),
+                    const SizedBox(width: 4),
+                    Text(
+                      nombreComuna(caregiver.zones.first) +
+                          (caregiver.zones.length > 1
+                              ? ' +${caregiver.zones.length - 1}'
+                              : ''),
+                      style: const TextStyle(
+                          fontSize: 13, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
               if (caregiver.tarifaLabel != null)
                 Text(
                   '${caregiver.tarifaLabel!}/h',
@@ -355,27 +365,43 @@ class _JobCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Widgets auxiliares
 // ---------------------------------------------------------------------------
-class _RatingStars extends StatelessWidget {
-  const _RatingStars({required this.rating});
+/// La nota, con su estrella, como etiqueta compacta.
+class _NotaDestacada extends StatelessWidget {
+  const _NotaDestacada({required this.rating, required this.resenas});
+
   final double rating;
+  final int resenas;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (var i = 1; i <= 5; i++)
-          Icon(
-            i <= rating.round()
-                ? Icons.star_rounded
-                : Icons.star_border_rounded,
-            size: 16,
-            color: AppColors.statusWarning,
-          ),
-      ],
+    // Sin resenas no hay nota que mostrar, y un 0,0 se lee como una mala
+    // calificacion en vez de como "todavia nadie la califico".
+    if (resenas == 0) {
+      return const Text('Sin resenas',
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary));
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AgeColors.gold100,
+        borderRadius: BorderRadius.circular(AgeRadius.full),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.star_rounded, size: 16, color: AgeColors.gold700),
+          const SizedBox(width: 4),
+          Text(rating.toStringAsFixed(1),
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AgeColors.gold700)),
+        ],
+      ),
     );
   }
 }
+
 
 class _Pill extends StatelessWidget {
   const _Pill({required this.label});

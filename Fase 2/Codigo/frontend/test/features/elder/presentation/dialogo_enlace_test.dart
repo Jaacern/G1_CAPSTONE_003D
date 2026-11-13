@@ -79,4 +79,12 @@ void main() {
 
     expect(resultados, [null]);
   });
+
+  testWidgets('se puede mandar por WhatsApp o correo, no solo copiar',
+      (tester) async {
+    await abrir(tester);
+
+    expect(find.text('Compartir'), findsOneWidget);
+    expect(find.text('Copiar enlace'), findsOneWidget);
+  });
 }

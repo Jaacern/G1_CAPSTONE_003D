@@ -107,9 +107,12 @@ Future<EnlaceDeEscucha> compartirMelodia(
 
 /// "Mis melodías": las creaciones guardadas, para volver a escucharlas.
 ///
-/// Pensada como el resto de la vista del adulto mayor: botones grandes y una
-/// sola accion por melodia, sin teclado (RNF-19, RNF-20). Tocar el boton de
-/// una melodia la hace sonar; tocarlo de nuevo, o tocar otra, la detiene.
+/// Pensada como el resto de la vista del adulto mayor: botones grandes y sin
+/// teclado (RNF-19, RNF-20). Cada melodia tiene dos acciones:
+///   - el boton redondo la hace sonar; tocarlo de nuevo, o tocar otra, la
+///     detiene;
+///   - el boton de compartir crea un enlace para que alguien sin cuenta la
+///     escuche (RF-67), y lo muestra para copiarlo o mandarlo.
 class ElderMelodiesScreen extends ConsumerStatefulWidget {
   const ElderMelodiesScreen({super.key});
 

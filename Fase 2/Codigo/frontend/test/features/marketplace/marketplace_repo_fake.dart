@@ -89,8 +89,8 @@ class MarketplaceRepoFake implements MarketplaceRepository {
       throw UnimplementedError();
 }
 
-/// Monta el marketplace como familiar (dos pestañas) o como cuidadora (tres)
-/// y deja la primera visible. El listado de cuidadoras hay que darlo acá y no
+/// Monta el marketplace como familiar (solo cuidadoras, sin pestañas) o como
+/// cuidadora (Cuidadoras y Trabajos) y deja la primera visible. El listado de cuidadoras hay que darlo acá y no
 /// después: la pantalla ya pide la lista en el primer frame.
 Future<MarketplaceRepoFake> montarMarketplace(
   WidgetTester tester, {

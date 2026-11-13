@@ -544,6 +544,16 @@ _PIDE_CRITERIO = re.compile(
         r"(?:le\s+)?(?:doy|damos|debo|puedo|recomiend\w*|sirve|tomar)\b",
         r"\b(?:subir|bajar|duplicar|aumentar|reducir|suspender|cambiar)\s+"
         r"(?:la\s+|su\s+)?(?:dosis|medicaci\w*|tratamiento)\b",
+        # Primera persona sin verbo modal: "le subo la dosis?", "le doy otra
+        # pastilla?". Son la misma pregunta que "debo subir la dosis" y son
+        # las mas frecuentes de un familiar, pero el patron de arriba pide un
+        # modal o el infinitivo y se le escapaban.
+        r"\b(?:le\s+|les\s+)?(?:subo|bajo|doy|aumento|reduzco|disminuyo|"
+        r"duplico|suspendo|cambio|quito|retiro|omito|salto)\s+"
+        r"(?:la\s+|el\s+|su\s+|las\s+|los\s+|un\s+|una\s+|otra\s+|"
+        r"otro\s+|mas\s+|menos\s+)?(?:dosis|medicaci\w*|medicament\w*|"
+        r"pastilla\w*|remedio\w*|pildora\w*|comprimido\w*|tratamiento|"
+        r"insulina)\b",
         r"\bse\s+puede\s+(?:tomar|dar|mezclar)\b",
         r"\brecet\w*\b",
     ]),

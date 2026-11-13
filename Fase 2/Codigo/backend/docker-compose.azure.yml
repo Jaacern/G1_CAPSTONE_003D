@@ -1,0 +1,25 @@
+# Override de PRODUCCION para la VM de Azure.
+#
+# No se usa solo: se apila sobre el compose base.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.azure.yml up -d
+#
+# (deploy/azure/actualizar.sh ya lo hace por ti.)
+#
+# Que cambia respecto al desarrollo:
+#   - La base no publica ningun puerto: solo la API la alcanza por la red
+#     interna de Docker.
+#   - La API escucha solo en 127.0.0.1. Hacia afuera sale unicamente por el
+#     tunel de Cloudflare; la VM no necesita abrir el 8000.
+#   - pgadmin queda detras de un perfil: no arranca salvo que se pida
+#     a proposito (--profile dev).
+services:
+  db:
+    ports: !override []
+
+  api:
+    ports: !override
+      - "127.0.0.1:8000:8000"
+
+  pgadmin:
+    profiles: ["dev"]

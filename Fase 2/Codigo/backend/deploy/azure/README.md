@@ -187,6 +187,48 @@ había antes de actualizar.
 cambian si la URL pública de la API cambia (ver `lib/core/config.dart` en
 `admin_web` y la configuración equivalente en `frontend`).
 
+## 3b. Versión web (demostración desde un computador)
+
+La API sirve también las dos apps Flutter compiladas para web, en el mismo
+dominio, así que la demostración se hace abriendo un link:
+
+| Ruta | Qué es | Carpeta en la imagen |
+|------|--------|----------------------|
+| `/app/` | App principal (familiar, cuidadora, médico, adulto mayor) | `api/app/static/app_web` |
+| `/admin/` | Panel de administración | `api/app/static/admin_web` |
+
+Los builds no se versionan (pesan decenas de MB). Para publicar un cambio de
+interfaz, compila en tu equipo:
+
+```bash
+cd "Fase 2/Codigo/frontend"
+flutter build web --release --base-href /app/ \
+  --dart-define=USE_MOCKS=false \
+  --dart-define=API_BASE_URL=https://<tu-dominio>
+tar -C build/web -czf /tmp/app_web.tgz .
+
+cd ../admin_web
+flutter build web --release --base-href /admin/
+tar -C build/web -czf /tmp/admin_web.tgz .
+```
+
+Cópialos a la VM y extráelos en su carpeta:
+
+```bash
+scp -i <tu-clave.pem> /tmp/app_web.tgz /tmp/admin_web.tgz azureuser@<IP-de-la-VM>:/tmp/
+ssh -i <tu-clave.pem> azureuser@<IP-de-la-VM>
+S=~/agecare/"Fase 2"/Codigo/backend/api/app/static
+for n in app_web admin_web; do rm -rf "$S/$n"; mkdir -p "$S/$n"; tar -xzf /tmp/$n.tgz -C "$S/$n"; done
+cd ~/agecare/"Fase 2"/Codigo/backend && ./deploy/azure/actualizar.sh --sin-pull
+```
+
+La imagen copia `app/` al construirse, por eso hace falta `actualizar.sh` después
+de extraer. El `--base-href` tiene que coincidir con la ruta (`/app/`, `/admin/`):
+con otro valor la página queda en blanco.
+
+En la versión web no funcionan las notificaciones push, el reloj ni la
+grabación de voz; el resto del flujo sí.
+
 ## 4. Volver atrás
 
 Si una actualización sale mal, vuelve al commit anterior que el script imprimió:

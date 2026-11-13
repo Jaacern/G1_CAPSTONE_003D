@@ -1916,6 +1916,7 @@ Future<void> _editarContactos(
                               onChanged: (_) => toggle(c),
                             ),
                             IconButton(
+                              tooltip: 'Quitar contacto',
                               icon: const Icon(Icons.delete_outline_rounded,
                                   color: AppColors.critical, size: 20),
                               onPressed: () => quitar(c),

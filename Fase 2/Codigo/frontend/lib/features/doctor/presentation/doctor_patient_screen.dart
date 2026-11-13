@@ -14,6 +14,7 @@ import '../../patients/application/patients_providers.dart';
 import '../../patients/domain/models.dart';
 import '../../documents/presentation/patient_documents_view.dart';
 import '../../patients/presentation/patient_timeline.dart';
+import '../../../core/widgets/bloques.dart';
 
 /// Ficha clínica del paciente para el rol médico (solo lectura del historial +
 /// recetar). Toda la información viene de endpoints existentes:
@@ -127,14 +128,14 @@ class _ResumenTab extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
       children: [
-        const _SectionLabel('Alergias'),
+        const EncabezadoDeSeccion('Alergias'),
         _AlergiasResumen(
           detalle: detalle?.allergies ?? const [],
           mini: patient?.allergies ?? const [],
         ),
-        const _SectionLabel('Signos vitales actuales'),
+        const EncabezadoDeSeccion('Signos vitales actuales'),
         _SignosVitalesResumen(latestVitals: latestVitals),
-        const _SectionLabel('Antecedentes'),
+        const EncabezadoDeSeccion('Antecedentes'),
         AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,7 +180,7 @@ class _ResumenTab extends ConsumerWidget {
         ),
         Row(
           children: [
-            const Expanded(child: _SectionLabel('Tratamiento vigente')),
+            const Expanded(child: EncabezadoDeSeccion('Tratamiento vigente')),
             TextButton(
               onPressed: () => DefaultTabController.of(context).animateTo(1),
               child: const Text('Ver detalle'),
@@ -187,7 +188,7 @@ class _ResumenTab extends ConsumerWidget {
           ],
         ),
         const _TratamientoResumen(),
-        const _SectionLabel('Adherencia (últimos 7 días)'),
+        const EncabezadoDeSeccion('Adherencia (últimos 7 días)'),
         adherence.when(
           loading: () =>
               const AppCard(child: SizedBox(height: 70, child: LoadingView())),
@@ -218,10 +219,10 @@ class _ResumenTab extends ConsumerWidget {
             );
           },
         ),
-        const _SectionLabel('Contacto de emergencia'),
+        const EncabezadoDeSeccion('Contacto de emergencia'),
         _ContactoEmergenciaResumen(patientId: patientId),
         if (detalle != null) ...[
-          const _SectionLabel('Datos del paciente'),
+          const EncabezadoDeSeccion('Datos del paciente'),
           _DatosPaciente(detalle: detalle!),
         ],
       ],
@@ -681,7 +682,7 @@ class _TratamientosTab extends ConsumerWidget {
         Row(
           children: [
             const Expanded(
-                child: _SectionLabel('Tratamientos por especialidad')),
+                child: EncabezadoDeSeccion('Tratamientos por especialidad')),
             TextButton.icon(
               onPressed: () =>
                   context.push('/treatment/history?patient=$patientId'),
@@ -760,25 +761,6 @@ class _DocumentosTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
       PatientDocumentsView(patientId: patientId);
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 22, 4, 10),
-        child: Text(
-          text.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textSecondary,
-            letterSpacing: .5,
-          ),
-        ),
-      );
 }
 
 class _VitalTile extends StatelessWidget {

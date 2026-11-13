@@ -132,8 +132,12 @@ async def main(client):
         "WHERE ti.treatment_id = CAST(:t AS uuid) AND sd.scheduled_at < now() "
         "ORDER BY sd.scheduled_at DESC LIMIT 1", t=str(viejo))).scalar()
     if administrada:
+        # logged_at va junto con logged_by: ck_scheduled_doses_logged_pair
+        # exige que esten los dos o ninguno. Sin el, esto pasaba o fallaba
+        # segun que toma eligiera la consulta.
         await sql("UPDATE scheduled_doses SET status = 'taken', "
-                  "  administered_at = scheduled_at, logged_by = :u "
+                  "  administered_at = scheduled_at, "
+                  "  logged_at = scheduled_at, logged_by = :u "
                   "WHERE id = :i", i=administrada, u=medico)
 
     items = (await sql(

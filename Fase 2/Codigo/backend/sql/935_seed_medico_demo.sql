@@ -1,6 +1,10 @@
 -- AgeCare — Datos de demostracion (SOLO DESARROLLO)
 -- 935_seed_medico_demo.sql — Una cuenta de medico habilitada para probar
 -- MIGRACION IDEMPOTENTE
+-- SEMILLA
+-- Datos de ejemplo, no un cambio de esquema. Por eso no lleva revert
+-- en sql/revertir/: deshacerla seria borrar datos de demostracion, que
+-- es otra cosa que deshacer una migracion (RNF-24).
 --
 -- El seed principal no traia ningun medico, asi que la vista del medico no se
 -- podia probar. Desde 934 un medico solo opera si esta habilitado, por lo que

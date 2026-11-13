@@ -359,11 +359,18 @@ class _GrabacionBar extends StatelessWidget {
         children: [
           const Icon(Icons.circle, color: Colors.red, size: 14),
           const SizedBox(width: 6),
-          Text(
-            'Grabando ${_fmt(duracionSeg)}',
-            style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+          // Flexible y no un texto suelto con Spacer: el contador crece al
+          // pasar de 09:59 a 10:00 y, con la letra grande de esta pantalla,
+          // empujaba el boton fuera de la fila.
+          Expanded(
+            child: Text(
+              'Grabando ${_fmt(duracionSeg)}',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  color: Colors.red, fontWeight: FontWeight.w600),
+            ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           FilledButton.icon(
             onPressed: onGuardar,
             icon: const Icon(Icons.stop_rounded),

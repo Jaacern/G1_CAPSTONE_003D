@@ -6,9 +6,11 @@ import 'package:agecare_app/features/alerts/presentation/sos_button.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/bloques.dart';
 import '../../../core/widgets/common.dart';
 import '../../../core/widgets/remote_file_image.dart';
 import '../../alerts/application/alerts_providers.dart';
+import '../../auth/application/auth_controller.dart';
 import '../../caregiver/application/caregiver_providers.dart';
 import '../../caregiver/domain/models.dart';
 import '../../patients/application/patients_providers.dart';
@@ -60,12 +62,15 @@ class FamilyHomeScreen extends ConsumerWidget {
                 ref.invalidate(selectedPatientDetailProvider);
               },
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 96),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
                 children: [
+                  const _Saludo(),
                   const _AlertBand(),
-                  const _SectionLabel('Tus adultos mayores'),
+                  const _AccesosRapidos(),
+                  const EncabezadoDeSeccion('Tus adultos mayores'),
                   for (final p in patients) _PatientSemCard(patient: p),
-                  _SectionLabel('Resumen de ${_firstName(selected?.fullName)}'),
+                  EncabezadoDeSeccion(
+                      'Resumen de ${_firstName(selected?.fullName)}'),
                   const _VitalsSummaryCard(),
                   const SizedBox(height: 12),
                   const _MedsTodayCard(),
@@ -96,23 +101,116 @@ class FamilyHomeScreen extends ConsumerWidget {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-  final String text;
+/// Saludo con el nombre de quien entro y su foto.
+///
+/// Es lo primero de la pantalla porque le dice a la persona que esta en su
+/// cuenta y no en la de otro, que en un telefono compartido entre familiares
+/// no es obvio.
+class _Saludo extends ConsumerWidget {
+  const _Saludo();
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(2, 22, 2, 10),
-        child: Text(
-          text.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textSecondary,
-            letterSpacing: .5,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final usuario = ref.watch(currentUserProvider);
+    final nombre = (usuario?.firstName.trim().isNotEmpty ?? false)
+        ? usuario!.firstName.trim()
+        : _primerNombre(usuario?.fullName);
+    final esquema = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Hola,',
+                    style: AgeText.small
+                        .copyWith(color: esquema.onSurfaceVariant)),
+                Text(nombre,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AgeText.h2.copyWith(color: esquema.onSurface)),
+              ],
+            ),
           ),
-        ),
-      );
+          InkWell(
+            onTap: () => context.push('/profile'),
+            borderRadius: BorderRadius.circular(AgeRadius.full),
+            child: InitialsAvatar(
+                name: usuario?.fullName ?? '', 
+                photoUrl: usuario?.avatarUrl,
+                radius: 22),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _primerNombre(String? completo) {
+    if (completo == null || completo.trim().isEmpty) return 'hola';
+    return completo.trim().split(RegExp(r'\s+')).first;
+  }
+}
+
+/// Accesos a las cuatro pantallas a las que mas se entra desde aqui.
+///
+/// Son atajos a lo que ya existe, no pantallas nuevas: entrar a la salud del
+/// paciente desde el tablero son hoy dos toques, uno para cambiar de pestaña
+/// y otro para encontrar lo que se buscaba.
+class _AccesosRapidos extends ConsumerWidget {
+  const _AccesosRapidos();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    void aPestana(String etiqueta) =>
+        ref.read(shellTabIndexProvider.notifier).state =
+            ShellTabs.familia(etiqueta);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 18),
+      // Cada mosaico se reparte el ancho por igual, para que entren los
+      // cuatro tambien en una pantalla angosta.
+      child: Row(
+        children: [
+          Expanded(
+            child: MosaicoDeAcceso(
+              icono: Icons.favorite_rounded,
+              etiqueta: 'Salud',
+              color: AgeColors.teal600,
+              alPresionar: () => aPestana('Salud'),
+            ),
+          ),
+          Expanded(
+            child: MosaicoDeAcceso(
+              icono: Icons.assignment_ind_rounded,
+              etiqueta: 'Ficha',
+              color: AgeColors.coral500,
+              alPresionar: () => aPestana('Ficha'),
+            ),
+          ),
+          Expanded(
+            child: MosaicoDeAcceso(
+              icono: Icons.folder_rounded,
+              etiqueta: 'Documentos',
+              color: AgeColors.gold500,
+              alPresionar: () => context.push('/documents'),
+            ),
+          ),
+          if (AppConfig.hasComms)
+            Expanded(
+              child: MosaicoDeAcceso(
+                icono: Icons.forum_rounded,
+                etiqueta: 'Mensajes',
+                color: AgeColors.navy500,
+                alPresionar: () => aPestana('Mensajes'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Banda de alerta del paciente seleccionado (si tiene alertas activas).
@@ -363,19 +461,21 @@ class _MedsTodayCard extends ConsumerWidget {
                         style: TextStyle(
                             fontSize: 14, fontWeight: FontWeight.w700)),
                   ),
+                  // Los tonos 700 y no los 500 y 600 de antes: el texto se
+                  // dibuja del mismo color que su fondo tintado, y ahi un
+                  // tono claro no llega al contraste que pide la guia.
                   if (m.pending > 0)
-                    _Pill(
-                      text:
-                          '${m.pending} pendiente${m.pending == 1 ? '' : 's'}',
-                      color: AppColors.statusWarning,
+                    Etiqueta(
+                      '${m.pending} pendiente${m.pending == 1 ? '' : 's'}',
+                      tono: AgeColors.warn700,
                     )
                   else if (m.missed > 0)
-                    _Pill(
-                      text: '${m.missed} omitida${m.missed == 1 ? '' : 's'}',
-                      color: AppColors.statusAttention,
+                    Etiqueta(
+                      '${m.missed} omitida${m.missed == 1 ? '' : 's'}',
+                      tono: AgeColors.attention700,
                     )
                   else
-                    const _Pill(text: 'Al día', color: AppColors.statusOk),
+                    const Etiqueta('Al día', tono: AgeColors.ok700),
                 ],
               ),
               const SizedBox(height: 12),
@@ -404,26 +504,6 @@ class _MedsTodayCard extends ConsumerWidget {
         );
       },
       orElse: () => const SizedBox.shrink(),
-    );
-  }
-}
-
-class _Pill extends StatelessWidget {
-  const _Pill({required this.text, required this.color});
-  final String text;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(text,
-          style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w700, color: color)),
     );
   }
 }
@@ -512,7 +592,8 @@ class _LastObservationCard extends ConsumerWidget {
                 Row(
                   children: [
                     Flexible(
-                        child: _Pill(text: etiqueta, color: AppColors.primary)),
+                        child: Etiqueta(etiqueta,
+                            tono: AgeColors.teal700)),
                   ],
                 ),
               ],

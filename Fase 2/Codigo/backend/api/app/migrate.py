@@ -27,6 +27,13 @@ COMO SE USA
     decida nada:
         python -m app.migrate --auto
 
+    Para deshacer una migracion (RNF-24), con su archivo de sql/revertir/:
+        python -m app.migrate --revertir 969_claves_de_reenvio.sql
+        python -m app.migrate --revertir-ultima
+        python -m app.migrate --revertir-ultima --dry-run
+    Siempre en orden inverso al de aplicacion: una migracion puede apoyarse
+    en la anterior.
+
 Se guarda el sha256 de cada archivo. Si uno que ya corrio cambia despues,
 se avisa: editar un archivo ya aplicado significa que la base de quien lo
 corrio antes y la de quien lo corre ahora no quedan iguales, y eso es de
@@ -240,17 +247,143 @@ async def auto() -> int:
     return r or await _aplicar_idempotentes()
 
 
+# ---------------------------------------------------------------------------
+# Revertir (RNF-24)
+# ---------------------------------------------------------------------------
+#
+# Cada migracion que cambia el esquema tiene en sql/revertir/ un archivo con
+# el mismo nombre que deshace lo que hizo. Las semillas de datos de ejemplo no
+# llevan revert y lo declaran con esta marca en su cabecera: revertir una
+# semilla seria borrar datos de demostracion, que es otra cosa que deshacer un
+# cambio de esquema.
+MARCA_SEMILLA = "-- SEMILLA"
+
+CARPETA_REVERTIR = CARPETA / "revertir"
+
+
+def archivo_revert(nombre: str) -> Path:
+    """Donde vive el revert de una migracion, exista o no."""
+    return CARPETA_REVERTIR / nombre
+
+
+def es_semilla(p: Path) -> bool:
+    return MARCA_SEMILLA in p.read_text(encoding="utf-8")
+
+
+def migraciones_de_esquema() -> list[Path]:
+    """Las que cambian el esquema y por lo tanto deben traer su revert.
+
+    Son las que llevan la marca de migracion y no son semillas. Los archivos
+    anteriores al registro arman el esquema base: deshacerlos no es revertir
+    una migracion, es volver a crear la base.
+    """
+    return [p for p in _archivos()
+            if MARCA_IDEMPOTENTE in p.read_text(encoding="utf-8")
+            and not es_semilla(p)]
+
+
+async def revertir(nombre: str, *, dry_run: bool = False) -> int:
+    """Deshace una migracion y la saca del registro.
+
+    Sale del registro a proposito: una migracion revertida tiene que poder
+    volver a aplicarse, y mientras su fila este ahi el aplicador la da por
+    hecha.
+
+    Va todo en una transaccion. Si el revert se detiene a mitad, por ejemplo
+    porque encontro datos que no puede decidir que hacer con ellos, no queda
+    media migracion deshecha ni el registro mintiendo.
+    """
+    destino = archivo_revert(nombre)
+    if not destino.is_file():
+        print(f"No hay revert para {nombre}.")
+        print(f"Deberia estar en {destino}")
+        return 1
+
+    async with engine.begin() as conn:
+        await conn.execute(text(_TABLA))
+        aplicada = await conn.scalar(
+            text("SELECT 1 FROM schema_migrations WHERE filename = :f"),
+            {"f": nombre})
+
+    if not aplicada:
+        print(f"{nombre} no figura como aplicada. No hay nada que revertir.")
+        return 1
+
+    if dry_run:
+        print(f"[dry-run] correria {destino}")
+        print(f"[dry-run] y sacaria {nombre} del registro")
+        return 0
+
+    try:
+        async with engine.begin() as conn:
+            cruda = await conn.get_raw_connection()
+            await cruda.driver_connection.execute(
+                destino.read_text(encoding="utf-8"))
+            await conn.execute(
+                text("DELETE FROM schema_migrations WHERE filename = :f"),
+                {"f": nombre})
+    except Exception as e:  # noqa: BLE001
+        print(f"FALLO al revertir {nombre}")
+        print(f"   {str(e).splitlines()[0]}")
+        print("\nNo se toco nada: la migracion sigue aplicada.")
+        return 1
+
+    print(f"Revertida {nombre}. Se puede volver a aplicar con --auto.")
+    return 0
+
+
+async def ultima_aplicada() -> str | None:
+    async with engine.begin() as conn:
+        await conn.execute(text(_TABLA))
+        return await conn.scalar(text(
+            "SELECT filename FROM schema_migrations "
+            " ORDER BY applied_at DESC, filename DESC LIMIT 1"))
+
+
+async def revertir_ultima(*, dry_run: bool = False) -> int:
+    """La ultima que se aplico.
+
+    Es la unica que se puede revertir sin pensar: una migracion se puede
+    apoyar en la anterior, asi que el orden importa y el inverso es el unico
+    seguro.
+    """
+    nombre = await ultima_aplicada()
+    if nombre is None:
+        print("El registro esta vacio. No hay nada que revertir.")
+        return 1
+    print(f"Ultima aplicada: {nombre}")
+    return await revertir(nombre, dry_run=dry_run)
+
+
+
 async def _main(argv: list[str]) -> int:
-    validas = ("--baseline", "--dry-run", "--auto")
-    desconocidas = [a for a in argv if a not in validas]
+    validas = ("--baseline", "--dry-run", "--auto", "--revertir-ultima")
+    dry = "--dry-run" in argv
+    resto = [a for a in argv if a != "--dry-run"]
+
+    # --revertir lleva el nombre del archivo pegado detras.
+    nombre = None
+    if "--revertir" in resto:
+        i = resto.index("--revertir")
+        if i + 1 >= len(resto):
+            print("Falta el nombre del archivo: --revertir 969_lo_que_sea.sql")
+            return 2
+        nombre = resto[i + 1]
+        del resto[i:i + 2]
+
+    desconocidas = [a for a in resto if a not in validas]
     if desconocidas:
         print(__doc__)
         return 2
+
     try:
-        if "--auto" in argv:
+        if nombre is not None:
+            return await revertir(nombre, dry_run=dry)
+        if "--revertir-ultima" in resto:
+            return await revertir_ultima(dry_run=dry)
+        if "--auto" in resto:
             return await auto()
-        return await correr(baseline="--baseline" in argv,
-                            dry_run="--dry-run" in argv)
+        return await correr(baseline="--baseline" in resto, dry_run=dry)
     finally:
         await engine.dispose()
 

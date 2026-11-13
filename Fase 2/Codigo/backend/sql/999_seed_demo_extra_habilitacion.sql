@@ -1,6 +1,10 @@
 -- AgeCare — Datos de demostracion (SOLO DESARROLLO)
 -- 999_seed_demo_extra_habilitacion.sql — Retirado
 -- MIGRACION IDEMPOTENTE
+-- SEMILLA
+-- Datos de ejemplo, no un cambio de esquema. Por eso no lleva revert
+-- en sql/revertir/: deshacerla seria borrar datos de demostracion, que
+-- es otra cosa que deshacer una migracion (RNF-24).
 --
 -- Habilitaba al medico del circulo de 999_seed_demo_extra, que ya no existe.
 -- Se deja vacio por la misma razon que ese archivo.

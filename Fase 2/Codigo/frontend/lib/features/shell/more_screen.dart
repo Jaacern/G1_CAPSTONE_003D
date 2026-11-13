@@ -11,6 +11,7 @@ import '../auth/application/auth_controller.dart';
 import '../auth/domain/models.dart';
 import '../patients/application/patients_providers.dart';
 import 'shell_providers.dart';
+import '../../core/widgets/bloques.dart';
 
 /// Pestaña "Más" (fiel al wireframe Familiar v1): perfil, lista de pacientes,
 /// roles e invitaciones, y notificaciones/ajustes. Los accesos a módulos sin
@@ -65,7 +66,7 @@ class MoreScreen extends ConsumerWidget {
           ),
 
           // ---- Pacientes ----
-          const _SectionLabel('Adultos mayores'),
+          const EncabezadoDeSeccion('Adultos mayores'),
           patientsAsync.when(
             loading: () => const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
@@ -106,7 +107,7 @@ class MoreScreen extends ConsumerWidget {
           ),
 
           // ---- Roles e invitaciones ----
-          const _SectionLabel('Roles e invitaciones'),
+          const EncabezadoDeSeccion('Roles e invitaciones'),
           _ListGroup(
             children: [
               if (role == RoleType.family)
@@ -131,7 +132,7 @@ class MoreScreen extends ConsumerWidget {
 
           // ---- Descubrir (solo módulos con soporte/demo) ----
           if (AppConfig.hasMarketplace || AppConfig.hasDocuments) ...[
-            const _SectionLabel('Descubrir'),
+            const EncabezadoDeSeccion('Descubrir'),
             _ListGroup(
               children: [
                 if (AppConfig.hasDocuments)
@@ -151,7 +152,7 @@ class MoreScreen extends ConsumerWidget {
           ],
 
           // ---- Apariencia ----
-          const _SectionLabel('Apariencia'),
+          const EncabezadoDeSeccion('Apariencia'),
           _ListGroup(
             children: [
               Consumer(
@@ -177,7 +178,7 @@ class MoreScreen extends ConsumerWidget {
           ),
 
           // ---- Notificaciones y ajustes ----
-          const _SectionLabel('Notificaciones y ajustes'),
+          const EncabezadoDeSeccion('Notificaciones y ajustes'),
           _ListGroup(
             children: [
               _MoreTile(
@@ -217,25 +218,6 @@ class MoreScreen extends ConsumerWidget {
       ),
     );
   }
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 22, 4, 10),
-        child: Text(
-          text.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textSecondary,
-            letterSpacing: .5,
-          ),
-        ),
-      );
 }
 
 class _ListGroup extends StatelessWidget {

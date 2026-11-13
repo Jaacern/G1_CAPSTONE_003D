@@ -14,6 +14,7 @@ import '../application/patients_providers.dart';
 import '../data/patients_repository.dart';
 import '../data/reports_repository.dart';
 import '../domain/models.dart';
+import '../../../core/widgets/bloques.dart';
 
 /// Ficha completa del adulto mayor: identidad, ficha social, enfermedades,
 /// alergias, contactos y la hoja de emergencia en PDF.
@@ -66,11 +67,11 @@ class PatientProfileScreen extends ConsumerWidget {
               _Cabecera(patient: p),
               // Arriba y no al final: en una urgencia es lo primero que se
               // busca, y lo usan todos los que cuidan al adulto mayor.
-              const _SectionLabel('Hoja de emergencia'),
+              const EncabezadoDeSeccion('Hoja de emergencia'),
               _HojaEmergenciaCard(patientId: patientId, nombre: p.fullName),
               Row(
                 children: [
-                  const Expanded(child: _SectionLabel('Identidad')),
+                  const Expanded(child: EncabezadoDeSeccion('Identidad')),
                   if (editaFicha)
                   TextButton.icon(
                     onPressed: () => _editarNombre(context, ref, p),
@@ -129,7 +130,7 @@ class PatientProfileScreen extends ConsumerWidget {
               ),
               Row(
                 children: [
-                  const Expanded(child: _SectionLabel('Ficha social y riesgo')),
+                  const Expanded(child: EncabezadoDeSeccion('Ficha social y riesgo')),
                   if (editaFicha)
                   TextButton.icon(
                     onPressed: () => _editarPerfil(context, ref, p),
@@ -179,7 +180,7 @@ class PatientProfileScreen extends ConsumerWidget {
               ),
               Row(
                 children: [
-                  const Expanded(child: _SectionLabel('Antropometría')),
+                  const Expanded(child: EncabezadoDeSeccion('Antropometría')),
                   if (registraClinico)
                   TextButton.icon(
                     onPressed: () => _agregarMedicion(context, ref, p),
@@ -196,7 +197,7 @@ class PatientProfileScreen extends ConsumerWidget {
               ),
               Row(
                 children: [
-                  const Expanded(child: _SectionLabel('Enfermedades')),
+                  const Expanded(child: EncabezadoDeSeccion('Enfermedades')),
                   if (editaFicha)
                   TextButton.icon(
                     onPressed: () => _editarEnfermedades(context, ref, p),
@@ -246,7 +247,7 @@ class PatientProfileScreen extends ConsumerWidget {
                 ),
               Row(
                 children: [
-                  const Expanded(child: _SectionLabel('Alergias')),
+                  const Expanded(child: EncabezadoDeSeccion('Alergias')),
                   if (registraClinico)
                   TextButton.icon(
                     onPressed: () => _editarAlergias(context, ref, p),
@@ -258,7 +259,7 @@ class PatientProfileScreen extends ConsumerWidget {
               _AlergiasCard(allergies: p.allergies),
               Row(
                 children: [
-                  const Expanded(child: _SectionLabel('Vacunas')),
+                  const Expanded(child: EncabezadoDeSeccion('Vacunas')),
                   if (registraClinico)
                   TextButton.icon(
                     onPressed: () => _editarVacunas(context, ref, p),
@@ -268,7 +269,7 @@ class PatientProfileScreen extends ConsumerWidget {
                 ],
               ),
               _VacunasCard(immunizations: p.immunizations),
-              const _SectionLabel('Monitoreo'),
+              const EncabezadoDeSeccion('Monitoreo'),
               AppCard(
                 child: Row(
                   children: [
@@ -293,12 +294,12 @@ class PatientProfileScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-              const _SectionLabel('Equipo de cuidado'),
+              const EncabezadoDeSeccion('Equipo de cuidado'),
               _EquipoCard(patientId: patientId),
               Row(
                 children: [
                   const Expanded(
-                      child: _SectionLabel('Contactos de emergencia')),
+                      child: EncabezadoDeSeccion('Contactos de emergencia')),
                   if (editaFicha)
                   TextButton.icon(
                     onPressed: () => _editarContactos(context, ref, p),
@@ -308,9 +309,9 @@ class PatientProfileScreen extends ConsumerWidget {
                 ],
               ),
               _ContactosEmergenciaCard(patientId: patientId),
-              const _SectionLabel('Teléfonos de emergencia'),
+              const EncabezadoDeSeccion('Teléfonos de emergencia'),
               const _TelefonosEmergencia(),
-              const _SectionLabel('Expediente'),
+              const EncabezadoDeSeccion('Expediente'),
               AppCard(
                 padding: EdgeInsets.zero,
                 child: Column(
@@ -2049,21 +2050,6 @@ class _HojaEmergenciaCardState extends ConsumerState<_HojaEmergenciaCard> {
       ),
     );
   }
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-  final String text;
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 22, 4, 10),
-        child: Text(text.toUpperCase(),
-            style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textSecondary,
-                letterSpacing: .5)),
-      );
 }
 
 class _DataRow extends StatelessWidget {

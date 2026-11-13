@@ -43,8 +43,13 @@ void main() {
       ),
     ));
     await tester.pump();
+    await tester.scrollUntilVisible(find.text('Dónde atiende'), 240,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pump();
 
-    expect(find.text('Zonas: Concepción, Talcahuano'), findsOne);
+    // Una etiqueta por comuna, con su nombre y no su codigo.
+    expect(find.text('Concepción'), findsOne);
+    expect(find.text('Talcahuano'), findsOne);
     expect(find.textContaining('08101'), findsNothing);
   });
 
@@ -70,7 +75,12 @@ void main() {
       ),
     ));
     await tester.pump();
+    await tester.scrollUntilVisible(find.text('Dónde atiende'), 240,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pump();
 
-    expect(find.text('Zonas: 04101'), findsOne);
+    // Sin nombre conocido se muestra el codigo, que es poco, pero menos
+    // confuso que una etiqueta vacia.
+    expect(find.text('04101'), findsOne);
   });
 }

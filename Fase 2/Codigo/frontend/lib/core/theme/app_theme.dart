@@ -163,10 +163,34 @@ class AgeRadius {
   AgeRadius._();
   static const double s = 8;
   static const double m = 12;
-  static const double l = 14; // botones y campos
-  static const double xl = 16; // tarjetas, banners
-  static const double xxl = 24; // mosaicos, semáforo, diálogos
+  static const double l = 16; // botones y campos
+  static const double xl = 20; // tarjetas, banners
+  static const double xxl = 28; // mosaicos, semáforo, diálogos
   static const double full = 999;
+}
+
+/// Sombras.
+///
+/// Las tarjetas se distinguen por superficie y borde, y la sombra solo
+/// despega la tarjeta del fondo. Son dos capas, una ancha y muy tenue que da
+/// la profundidad y una corta que apoya el borde inferior; una sola capa
+/// ancha se ve como una mancha gris y una sola corta no despega nada.
+///
+/// En oscuro no van: sobre un fondo oscuro una sombra no se ve, y lo que
+/// separa las superficies ahi es el contraste entre ellas.
+class AgeSombra {
+  AgeSombra._();
+
+  static const suave = [
+    BoxShadow(color: Color(0x0F12283F), blurRadius: 24, offset: Offset(0, 8)),
+    BoxShadow(color: Color(0x0A12283F), blurRadius: 4, offset: Offset(0, 1)),
+  ];
+
+  /// Para lo que flota sobre el contenido: barras, hojas, menus.
+  static const elevada = [
+    BoxShadow(color: Color(0x1A12283F), blurRadius: 32, offset: Offset(0, 12)),
+    BoxShadow(color: Color(0x0D12283F), blurRadius: 6, offset: Offset(0, 2)),
+  ];
 }
 
 /// Espaciado sobre base 4 dp (sección 6.1).

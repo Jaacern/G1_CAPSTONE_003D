@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/bloques.dart';
 import '../../../core/widgets/common.dart';
 import '../application/treatments_providers.dart';
 import '../domain/treatment.dart';
@@ -185,7 +186,7 @@ class _VersionRow extends StatelessWidget {
                               fontWeight: FontWeight.w700, fontSize: 15)),
                       const SizedBox(width: 8),
                       if (version.vigente)
-                        const _Pill(texto: 'Vigente', color: AppColors.statusOk),
+                        const Etiqueta('Vigente', tono: AgeColors.ok700),
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -216,20 +217,3 @@ class _VersionRow extends StatelessWidget {
       '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
 }
 
-class _Pill extends StatelessWidget {
-  const _Pill({required this.texto, required this.color});
-  final String texto;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: .15),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(texto,
-            style: TextStyle(
-                color: color, fontSize: 11, fontWeight: FontWeight.w700)),
-      );
-}

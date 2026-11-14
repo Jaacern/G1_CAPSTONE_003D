@@ -238,13 +238,15 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// Paleta de marca AgeCare.
+// Paleta de marca AgeCare, tema claro. Los tonos de estado son algo más
+// oscuros que los de la app del celular para que el texto se lea sobre blanco.
 private val AgeBlue = Color(0xFF2E6BE6)
-private val AgeGreen = Color(0xFF34C759)
-private val AgeRed = Color(0xFFE04B43)
-private val AgeAmber = Color(0xFFF2A341)
-private val AgeDim = Color(0xFF8A97A6)
-private val AgeBg = Color(0xFF0B0F14)
+private val AgeGreen = Color(0xFF1E9E48)
+private val AgeRed = Color(0xFFD13A32)
+private val AgeAmber = Color(0xFFB86E00)
+private val AgeDim = Color(0xFF5B6878)
+private val AgeBg = Color(0xFFF5F8FC)
+private val AgeText = Color(0xFF16202B)
 
 // --------------------------------------------------------------------------
 // Pantalla de emparejamiento (teclado numérico)
@@ -281,7 +283,7 @@ private fun PairingScreen(
             shown,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
-            color = if (code.length == 6) AgeGreen else Color.White,
+            color = if (code.length == 6) AgeGreen else AgeText,
         )
         Spacer(Modifier.height(6.dp))
 
@@ -407,7 +409,7 @@ private fun MonitorScreen(
                 patientName ?: "AgeCare",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = AgeText,
             )
         }
         Spacer(Modifier.height(6.dp))

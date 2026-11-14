@@ -50,11 +50,11 @@ CREATE INDEX IF NOT EXISTS ix_users_staff
     ON users (email)
     WHERE is_staff AND deleted_at IS NULL;
 
--- Cuenta de administracion para la demostracion. Usa el mismo hash que las
--- otras cuentas de prueba del seed, asi que entra con la misma clave.
--- En produccion esta fila se borra o se le cambia la clave antes de salir.
-INSERT INTO users (email, password_hash, first_name, last_name, phone, locale, is_staff)
-VALUES ('administrador@agecare.cl',
-        '$2b$12$sOwnF0GBHVfW/6AuaTTIoez598bSRvAjjd.MhockXbT6sCX1.v4Xe',
-        'Tomás', 'Bravo', '+56933334444', 'es', true)
-ON CONFLICT DO NOTHING;
+-- La cuenta de administracion de la demostracion (administrador@agecare.cl)
+-- ya NO se siembra aqui. Plantar una credencial de clave conocida dentro de
+-- una migracion de ESQUEMA -que corre en TODOS los entornos, produccion
+-- incluida- era el hallazgo de la auditoria. Ahora nace en la capa de datos
+-- de ejemplo, junto al resto de las cuentas demo, en 947_cuentas_demo.sql
+-- (es un seed de datos de ejemplo, que se quita antes de salir a produccion).
+-- Esta migracion
+-- queda solo con el esquema (la columna is_staff y su indice).

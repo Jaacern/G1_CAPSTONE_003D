@@ -25,6 +25,16 @@
 --   nuevo ya lo usa otra cuenta, esa fila no se toca.
 --   En produccion estas cuentas se borran antes de salir.
 
+-- El administrador de la demostracion nace AQUI, en la capa de datos de
+-- ejemplo, no en la migracion de esquema 929 (de donde se saco para que una
+-- credencial de clave conocida no corra en produccion). Misma clave demo que
+-- el resto: agecare123. Guardado por correo para no duplicar si ya existe.
+INSERT INTO users (email, password_hash, first_name, last_name, phone, locale, is_staff)
+SELECT 'administrador@agecare.cl',
+       '$2b$12$sOwnF0GBHVfW/6AuaTTIoez598bSRvAjjd.MhockXbT6sCX1.v4Xe',
+       'Tomás', 'Bravo', '+56933334444', 'es', true
+ WHERE NOT EXISTS (SELECT 1 FROM users WHERE lower(email) = 'administrador@agecare.cl');
+
 -- La clave es el hash bcrypt de 'agecare123' (app.security.hash_password).
 UPDATE users u
    SET email = c.new_email,

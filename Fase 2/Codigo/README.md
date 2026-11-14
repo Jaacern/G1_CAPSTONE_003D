@@ -44,7 +44,8 @@
 10. [📂 Estructura del Código](#-estructura-del-código)
 11. [⚙️ Instalación y Ejecución](#️-instalación-y-ejecución)
 12. [🔐 Seguridad](#-seguridad)
-13. [📖 Documentación Adicional](#-documentación-adicional)
+13. [🧭 Limitaciones conocidas y trabajo futuro](#-limitaciones-conocidas-y-trabajo-futuro)
+14. [📖 Documentación Adicional](#-documentación-adicional)
 
 ---
 
@@ -125,7 +126,7 @@ La descoordinación en el ecosistema de cuidado retarda la toma de decisiones cr
 | 👤 Integrante | 🛠️ Rol en el Proyecto | 💼 Perfil Técnico |
 |--------------|----------------------|------------------|
 | **Javier Cerna** | Tech Lead · Full Stack · IA · DevSecOps | Backend avanzado, hardware embebido, LLMs locales, CI/CD |
-| **Benjamín Camus** | Arquitecto de Datos · Data Engineering · Azure | DBA, modelado de datos, arquitectura híbrida PostgreSQL + NoSQL, optimización Cloud |
+| **Benjamín Camus** | Arquitecto de Datos · Data Engineering · Azure | DBA, modelado de datos, arquitectura de datos PostgreSQL, optimización Cloud |
 | **Juan Mora** | DBA · Modelado Relacional | Administración de bases de datos, diseño ER, normalización |
 
 </div>
@@ -137,47 +138,59 @@ La descoordinación en el ecosistema de cuidado retarda la toma de decisiones cr
 
 ## 🏗️ Arquitectura del Sistema
 
-```
-┌─────────────────────────────────────────┐
-│         MICROSOFT AZURE CLOUD            │
-│                                          │
-📱 Flutter App ───► │ ┌─────────────────────────────────┐ │
-(Adulto Mayor)      │ │     Azure Container Apps        │ │
-│                   │ │                                 │ │
-📱 Flutter App ───► │ │ ┌──────────┐   ┌─────────────┐  │ │
-(Cuidador/a)        │ │ │ FastAPI  │   │ AI Service  │  │ │
-│                   │ │ │ Backend  │◄─►│(Azure OpenAI│  │ │
-📱 Flutter App ───► │ │ │ (Python) │   │  / LLMs)    │  │ │
-(Familiar)          │ │ └────┬─────┘   └─────────────┘  │ │
-│                   │ │      │                          │ │
-🖥️ Web Panel  ───► │ │ ┌────▼────────────────────────┐ │ │
-(Admin)             │ │ │        Data Layer           │ │ │
-│                   │ │ │ ┌────────────┐ ┌────────┐   │ │ │
-⌚ Wearable   ───► │ │ │ │ PostgreSQL │ │ NoSQL  │   │ │ │
-(Telemetría)        │ │ │ │(Históricos)│ │(Teleme-│   │ │ │
-│                   │ │ │ │/Transacc.) │ │ tría)  │   │ │ │
-│                   │ │ │ └────────────┘ └────────┘   │ │ │
-│                   │ │ └─────────────────────────────┘ │ │
-│                   │ └─────────────────────────────────┘ │
-│       🔐 JWT · Cifrado E2E · DevSecOps   │
-└─────────────────────────────────────────┘
+Arquitectura **implementada** (despliegue actual):
 
-Containerización: Docker + docker-compose
-Pruebas: Postman · PyTest
-OCR: Reconocimiento óptico de recetas médicas
 ```
+ 📱 App Flutter (web y Android)          ⌚ Reloj Wear OS (Kotlin)
+    familiar · cuidadora · médico           pulso, SpO₂, caídas
+    adulto mayor                            (HTTP directo, token de dispositivo)
+ 🖥️ Panel admin (Flutter Web)                       │
+        │ HTTPS                                      │ HTTPS
+        └──────────────┬─────────────────────────────┘
+                       ▼
+              Cloudflare Tunnel  (única entrada pública)
+                       │
+┌──────────────────────▼──────── VM Microsoft Azure (Ubuntu, docker compose) ─┐
+│                                                                              │
+│   ┌──────────────────────────────────────┐     Proveedores intercambiables   │
+│   │ FastAPI (monolito modular, Python)   │───► IA: NVIDIA Nemotron (API      │
+│   │  · REST + WebSocket de chat          │     compatible OpenAI) | Azure    │
+│   │  · sirve /app y /admin (Flutter Web) │───► OCR: Tesseract | NVIDIA Parse │
+│   │  · migraciones al arrancar           │───► Push: FCM · Correo: SMTP      │
+│   └───────────────┬──────────────────────┘───► Archivos: disco local | Blob  │
+│                   │                                                          │
+│   mantenimiento (cada hora) · avisos (cada 30 s)  ← mismos módulos, otro     │
+│                   │                                 contenedor               │
+│                   ▼                                                          │
+│   ┌──────────────────────────────────────┐                                   │
+│   │ PostgreSQL 16 (única base)           │                                   │
+│   │  datos clínicos + telemetría         │                                   │
+│   │  (vital_readings particionada)       │                                   │
+│   └──────────────────────────────────────┘                                   │
+└──────────────────────────────────────────────────────────────────────────────┘
+   🔐 HTTPS en tránsito · JWT con refresh rotatorio · autorización por
+      membresía en cada consulta · rate limiting · registro de accesos (RNF-14)
+```
+
+> **Diseño objetivo vs. implementado.** La propuesta inicial contemplaba Azure
+> Container Apps y una base NoSQL para la telemetría. Para la entrega se optó
+> por una sola base PostgreSQL (la telemetría vive en una tabla particionada por
+> tiempo) y una VM con docker compose, que es lo que se pudo operar y probar con
+> el equipo y el plazo disponibles. Ambos puntos quedan como trabajo futuro;
+> ver [Limitaciones conocidas y trabajo futuro](#-limitaciones-conocidas-y-trabajo-futuro).
 
 ### Capas del sistema
 
 | Capa | Tecnología | Descripción |
 |------|-----------|-------------|
-| 📱 Presentación | Flutter (Dart) | Apps móviles multi-rol + panel web |
-| ⌚ Captura | Kotlin (Wear OS) | App de reloj que envía telemetría de pulso al backend |
-| ⚙️ Lógica de Negocio | FastAPI (Python) | API REST, autenticación JWT, orquestación |
-| 🤖 Inteligencia Artificial | Azure OpenAI / LLMs | Asistente clínico contextual, OCR recetas |
-| 🗄️ Persistencia | PostgreSQL + NoSQL | Datos clínicos estructurados + telemetría |
-| ☁️ Infraestructura | Microsoft Azure | Container Apps, escalabilidad, alta disponibilidad |
-| 🔐 Seguridad | JWT + cifrado E2E | Autenticación, autorización, DevSecOps |
+| 📱 Presentación | Flutter (Dart) | App multi-rol (Android y web) + panel de administración web |
+| ⌚ Captura | Kotlin (Wear OS) | App de reloj: pulso, SpO₂ y detección de caídas por acelerómetro |
+| ⚙️ Lógica de Negocio | FastAPI (Python) | Monolito modular: API REST, WebSocket de chat, tareas programadas |
+| 🤖 Inteligencia Artificial | NVIDIA Nemotron (API compatible con OpenAI) | Asistente sobre el expediente con guardas clínicas; proveedor intercambiable (Azure OpenAI también soportado) |
+| 📄 OCR | Tesseract / NVIDIA Nemotron Parse | Lectura de recetas y documentos; Tesseract corre dentro del servidor, Nemotron Parse recibe la imagen ya saneada |
+| 🗄️ Persistencia | PostgreSQL 16 | Datos clínicos, transaccionales y telemetría en una sola base |
+| ☁️ Infraestructura | Microsoft Azure (VM) | Docker compose en una VM; entrada por Cloudflare Tunnel |
+| 🔐 Seguridad | HTTPS + JWT | Cifrado en tránsito, autorización por recurso, DevSecOps |
 
 ---
 
@@ -197,7 +210,6 @@ OCR: Reconocimiento óptico de recetas médicas
 
 ### Base de Datos
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?style=flat-square&logo=postgresql&logoColor=white)
-![NoSQL](https://img.shields.io/badge/NoSQL-E34F26?style=flat-square&logo=mongodb&logoColor=white)
 
 ### Cloud e Infraestructura
 ![Azure](https://img.shields.io/badge/Microsoft_Azure-0078D4?style=flat-square&logo=microsoftazure&logoColor=white)
@@ -208,7 +220,7 @@ OCR: Reconocimiento óptico de recetas médicas
 
 ### Testing
 ![Postman](https://img.shields.io/badge/Postman-FF6C37?style=flat-square&logo=postman&logoColor=white)
-![PyTest](https://img.shields.io/badge/PyTest-0A9EDC?style=flat-square&logo=pytest&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)
 
 </div>
 
@@ -216,20 +228,20 @@ OCR: Reconocimiento óptico de recetas médicas
 
 | Categoría | Tecnología | Versión / Detalles |
 |-----------|-----------|-------------------|
-| 🐍 Lenguaje Backend | Python | 3.11+ |
-| ⚡ Framework API | FastAPI | REST API, async, OpenAPI docs |
-| 📱 Framework Mobile | Flutter | Dart, multiplataforma iOS/Android/Web |
-| ⌚ App de reloj | Kotlin + Wear OS | Captura de pulso y envío al backend |
-| 🗄️ BD Relacional | PostgreSQL | Historiales clínicos, transacciones |
-| 📡 BD No Relacional | NoSQL | Telemetría wearable en tiempo real |
-| ☁️ Cloud | Microsoft Azure | Azure Container Apps |
-| 🐳 Contenedores | Docker + docker-compose | Orquestación de servicios |
-| 🔐 Autenticación | JWT | JSON Web Tokens, cifrado E2E |
-| 🤖 IA Generativa | Azure OpenAI / LLMs | Asistente clínico contextual |
-| 📄 OCR | Azure OCR / Custom | Digitalización de recetas médicas |
-| 🧪 Testing Backend | PyTest | Pruebas unitarias e integración |
-| 🧪 Testing API | Postman | Pruebas funcionales y de carga |
-| 🔒 Seguridad | DevSecOps | Análisis en pipeline CI/CD |
+| 🐍 Lenguaje Backend | Python | 3.12 (imagen `python:3.12-slim`) |
+| ⚡ Framework API | FastAPI | REST + WebSocket, async, OpenAPI docs |
+| 📱 Framework Mobile | Flutter | Dart; se compila para Android y web |
+| ⌚ App de reloj | Kotlin + Wear OS | Pulso, SpO₂ y detección de caídas; envío directo al backend |
+| 🗄️ Base de datos | PostgreSQL 16 | Datos clínicos, transacciones y telemetría (tabla particionada) |
+| ☁️ Cloud | Microsoft Azure | VM Ubuntu con docker compose |
+| 🌐 Entrada pública | Cloudflare Tunnel | HTTPS sin abrir puertos de la VM |
+| 🐳 Contenedores | Docker + docker-compose | API, tareas programadas, avisos y base |
+| 🔐 Autenticación | JWT | Access token corto + refresh rotatorio con detección de reuso |
+| 🤖 IA Generativa | NVIDIA Nemotron vía API compatible con OpenAI | Asistente sobre el expediente; también soporta Azure OpenAI |
+| 📄 OCR | Tesseract / NVIDIA Nemotron Parse | Configurable con `OCR_PROVIDER`: `tesseract` (local) o `nvidia_parse` |
+| 🧪 Testing Backend | Scripts de integración propios | Corren contra PostgreSQL real (`tests/correr.py`) |
+| 🧪 Testing API | Postman | Pruebas funcionales |
+| 🔒 Seguridad | DevSecOps | CI en GitHub Actions, auditoría de seguridad y Dependabot |
 
 ---
 
@@ -254,8 +266,8 @@ El proyecto sigue el **modelo de desarrollo en Cascada (Waterfall)**, elegido po
 | 📐 **Diseño del Sistema** | S4 – S6 | Arquitectura Azure, modelo ER en PostgreSQL, diagramas UML (clases, secuencia, casos de uso) |
 | ⚙️ **Implementación Backend e IA** | S7 – S11 | FastAPI, integración LLMs, OCR, simulador Wearable, API REST completa |
 | 📱 **Implementación Frontend** | S12 – S14 | Flutter apps (3 roles), módulo "Director Musical", integración con API |
-| 🧪 **Pruebas** | S15 – S16 | Unitarias, integración, rendimiento (p95 <500ms), seguridad (PyTest + Postman) |
-| 🚀 **Despliegue** | S17 – S18 | Docker, Azure Container Apps, Manual Técnico, presentación a comisión evaluadora |
+| 🧪 **Pruebas** | S15 – S16 | Unitarias, integración, rendimiento (p95 <500ms), seguridad (pruebas de integración contra PostgreSQL + Postman) |
+| 🚀 **Despliegue** | S17 – S18 | Docker, Microsoft Azure (VM + Cloudflare Tunnel), Manual Técnico, presentación a comisión evaluadora |
 
 ---
 
@@ -305,7 +317,7 @@ Arquitectura definitiva del sistema en Azure, modelo Entidad-Relación completo 
 
 > **Estado:** Pendiente
 
-Pruebas unitarias/integración (PyTest + Postman), rendimiento (p95 <500ms), seguridad (DevSecOps), containerización con Docker, despliegue en Azure Container Apps, Manual Técnico y presentación final.
+Pruebas de integración contra PostgreSQL real y Postman, rendimiento (p95 <500ms), seguridad (DevSecOps), containerización con Docker, despliegue en Microsoft Azure (VM con docker compose, ver [guía](backend/deploy/azure/README.md)), Manual Técnico y presentación final.
 
 ---
 
@@ -416,9 +428,10 @@ pip install -r requirements.txt
 | `flutter` no se reconoce como comando | Flutter no está en el PATH | `setx PATH "%PATH%;%USERPROFILE%\flutter\bin"` y abrir una terminal nueva |
 | La API no puede entrar a la base (`password authentication failed`) | El volumen `pgdata` se creó con otra contraseña que la del `.env` | `docker exec agecare-db psql -U agecare -c "ALTER USER agecare WITH PASSWORD '<la del .env>';"` o borrar el volumen con `docker compose down -v` (pierde los datos) |
 
-> 🚧 **Pendiente (más adelante):** el **OCR de recetas** está en desarrollo; cuando
-> se use, necesita el binario `tesseract` en el sistema
-> (`sudo apt-get install -y tesseract-ocr tesseract-ocr-spa`).
+> 🧾 **OCR de recetas:** se elige con `OCR_PROVIDER`. Con `tesseract` la imagen de
+> Docker ya trae el binario; sin Docker hay que instalarlo
+> (`sudo apt-get install -y tesseract-ocr tesseract-ocr-spa`). Con `nvidia_parse`
+> se usa NVIDIA Nemotron Parse y hace falta `OCR_API_KEY` (o `ASSISTANT_API_KEY`).
 
 #### Pruebas del backend
 
@@ -604,6 +617,26 @@ auditarlo, y verificar el comportamiento contra el sistema real, no contra lo qu
 código dice que hace.
 
 *Auditoría y remediación: **Javier Cerna (jaacern)** — rol Tech Lead · DevSecOps · Red Team.*
+
+---
+
+## 🧭 Limitaciones conocidas y trabajo futuro
+
+Lo que el sistema todavía no hace, o hace de forma más simple que el diseño
+objetivo. Se declara a propósito: es la lista de deuda técnica conocida.
+
+| Área | Estado actual | Trabajo futuro |
+|------|---------------|----------------|
+| Infraestructura | Una VM con docker compose; un único punto de falla | Azure Container Apps con réplicas e infraestructura como código (Bicep o Terraform) |
+| Telemetría | En PostgreSQL, tabla particionada por tiempo | Evaluar una base de series de tiempo o NoSQL si el volumen lo exige |
+| Archivos y respaldos | Disco local de la VM; respaldo diario en la misma VM | Azure Blob Storage (el adaptador ya existe) y respaldos fuera de la VM |
+| Arquitectura de software | Monolito modular; SQL y reglas de negocio dentro de los routers | Separar capa de dominio y de persistencia; dividir los routers más grandes |
+| Modelo de medicación | Conviven `medications` (modelo viejo) y `treatments` (oficial) | Retirar el modelo viejo cuando no queden dosis históricas que lo usen |
+| Datos de demostración | Las semillas viven junto a las migraciones de esquema | Separarlas para que no corran en producción |
+| Escalabilidad | Rate limiting en memoria; el chat abre una conexión a la base por cliente | Redis para el rate limiting y un broker para el chat |
+| Observabilidad | Logs de contenedor | Logs estructurados, métricas y alertas de operación |
+| Pruebas | Integración contra PostgreSQL real con un runner propio | Pytest con fixtures aisladas y pruebas de frontend y extremo a extremo |
+| Notificaciones en web | Sin push en la versión web | Configurar Firebase para web |
 
 ---
 

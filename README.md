@@ -97,7 +97,7 @@ El proyecto se organiza en **fases**, con revisión documental entre cada una. C
 
 ## 6. Aseguramiento de calidad
 
-Como práctica del equipo se aplican lineamientos de ingeniería de software: control de versiones, revisión entre pares, gestión formal de cambios y documentación versionada por entrega. Las pruebas automatizadas están en `Fase 2/Codigo/backend/api/tests` y `Fase 2/Codigo/frontend/test`, y se ejecutan con cada cambio mediante GitHub Actions (`.github/workflows`).
+Como práctica del equipo se aplican lineamientos de ingeniería de software: control de versiones, revisión entre pares, gestión formal de cambios y documentación versionada por entrega. Las pruebas automatizadas están en `Fase 2/Evidencias Proyecto/Codigo/backend/api/tests` y `Fase 2/Evidencias Proyecto/Codigo/frontend/test`, y se ejecutan con cada cambio mediante GitHub Actions (`.github/workflows`).
 
 ---
 
@@ -110,7 +110,7 @@ La seguridad se aborda desde el inicio del proyecto (*security by design*), bajo
 - **Cumplimiento normativo:** el tratamiento de datos personales se ajusta a la normativa chilena vigente en la materia.
 - **Trazabilidad:** control de versiones y registro de cambios sobre la documentación.
 
-El detalle de las medidas aplicadas está en `SECURITY.md` y en el README de `Fase 2/Codigo`. Las credenciales y los secretos **no forman parte de este repositorio**.
+El detalle de las medidas aplicadas está en `SECURITY.md` y en el README de `Fase 2/Evidencias Proyecto/Codigo`. Las credenciales y los secretos **no forman parte de este repositorio**.
 
 ---
 
@@ -126,9 +126,9 @@ El detalle de las medidas aplicadas está en `SECURITY.md` y en el README de `Fa
 La Fase 2 tiene dos entregas, y la carpeta `Fase 2/Evidencias Proyecto` conserva las dos.
 
 - **Avance (4 de octubre).** Documenta el diseño de la base de datos tal como estaba en esa fecha: 24 tablas, normalizadas hasta 2FN.
-- **Cierre.** Corresponde al sistema completo: 90 tablas normalizadas hasta 3FN, construidas con 131 migraciones versionadas, más el código fuente en `Fase 2/Codigo`.
+- **Cierre.** Corresponde al sistema completo: 90 tablas normalizadas hasta 3FN, construidas con 131 migraciones versionadas, más el código fuente en `Fase 2/Evidencias Proyecto/Codigo`.
 
-Los documentos del avance no se reescribieron, para que sigan mostrando lo que se entregó en esa fecha. Por eso el modelo relacional, el diccionario de datos y los diagramas describen las 24 tablas del avance. El modelo final se consulta en `11_schema_al_cierre.sql` y en las migraciones de `Fase 2/Codigo/backend/sql`.
+Los documentos del avance no se reescribieron, para que sigan mostrando lo que se entregó en esa fecha. Por eso el modelo relacional, el diccionario de datos y los diagramas describen las 24 tablas del avance. El modelo final se consulta en `11_schema_al_cierre.sql` y en las migraciones de `Fase 2/Evidencias Proyecto/Codigo/backend/sql`.
 
 ### Evidencias de Proyecto
 
@@ -149,7 +149,7 @@ Los documentos del avance no se reescribieron, para que sigan mostrando lo que s
 
 ### Código fuente
 
-El código del proyecto está en `Fase 2/Codigo`, con su propio README de instalación y ejecución.
+El código del proyecto está en `Fase 2/Evidencias Proyecto/Codigo`, con su propio README de instalación y ejecución.
 
 | Carpeta | Contenido |
 |---------|-----------|

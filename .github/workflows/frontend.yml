@@ -12,18 +12,18 @@ on:
   push:
     branches: [main]
     paths:
-      - 'Fase 2/Codigo/frontend/**'
+      - 'Fase 2/Evidencias Proyecto/Codigo/frontend/**'
       - '.github/workflows/frontend.yml'
   pull_request:
     paths:
-      - 'Fase 2/Codigo/frontend/**'
+      - 'Fase 2/Evidencias Proyecto/Codigo/frontend/**'
       - '.github/workflows/frontend.yml'
   # Para poder lanzarlo a mano desde la pestana Actions.
   workflow_dispatch:
 
 defaults:
   run:
-    working-directory: 'Fase 2/Codigo/frontend'
+    working-directory: 'Fase 2/Evidencias Proyecto/Codigo/frontend'
 
 jobs:
   revisar:

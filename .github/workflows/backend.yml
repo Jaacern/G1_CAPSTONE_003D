@@ -14,11 +14,11 @@ on:
   push:
     branches: [main]
     paths:
-      - 'Fase 2/Codigo/backend/**'
+      - 'Fase 2/Evidencias Proyecto/Codigo/backend/**'
       - '.github/workflows/backend.yml'
   pull_request:
     paths:
-      - 'Fase 2/Codigo/backend/**'
+      - 'Fase 2/Evidencias Proyecto/Codigo/backend/**'
       - '.github/workflows/backend.yml'
   workflow_dispatch:
 
@@ -85,16 +85,16 @@ jobs:
           # La misma que la imagen del Dockerfile.
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: 'Fase 2/Codigo/backend/api/requirements.txt'
+          cache-dependency-path: 'Fase 2/Evidencias Proyecto/Codigo/backend/api/requirements.txt'
 
       - name: Instalar dependencias
-        working-directory: 'Fase 2/Codigo/backend/api'
+        working-directory: 'Fase 2/Evidencias Proyecto/Codigo/backend/api'
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Aplicar el esquema
-        working-directory: 'Fase 2/Codigo/backend'
+        working-directory: 'Fase 2/Evidencias Proyecto/Codigo/backend'
         # En el orden del nombre, que es el mismo que usa
         # docker-entrypoint-initdb.d al crear el volumen. ON_ERROR_STOP para
         # que un .sql roto frene aqui y no se note doce pruebas despues.
@@ -106,16 +106,16 @@ jobs:
           done
 
       - name: Comprobar el aplicador de migraciones
-        working-directory: 'Fase 2/Codigo/backend/api'
+        working-directory: 'Fase 2/Evidencias Proyecto/Codigo/backend/api'
         # Prueba de humo del modo que usa el contenedor al arrancar. Sobre una
         # base recien creada tiene que anotar los archivos sin reejecutarlos.
         # Si esto se rompe, el despliegue no levanta.
         run: |
-          export AGECARE_SQL_DIR="$GITHUB_WORKSPACE/Fase 2/Codigo/backend/sql"
+          export AGECARE_SQL_DIR="$GITHUB_WORKSPACE/Fase 2/Evidencias Proyecto/Codigo/backend/sql"
           python -m app.migrate --auto
 
       - name: Correr las pruebas
-        working-directory: 'Fase 2/Codigo/backend/api'
+        working-directory: 'Fase 2/Evidencias Proyecto/Codigo/backend/api'
         run: |
           mkdir -p "$STORAGE_LOCAL_DIR"
           python tests/correr.py

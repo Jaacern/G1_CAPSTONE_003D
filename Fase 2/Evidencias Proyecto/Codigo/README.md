@@ -23,7 +23,7 @@
 
 ---
 
-> 📍 **Ubicación:** esta carpeta (`Fase 2/Codigo/`) contiene el **código fuente fullstack**
+> 📍 **Ubicación:** esta carpeta (`Fase 2/Evidencias Proyecto/Codigo/`) contiene el **código fuente fullstack**
 > de AgeCare (backend, frontend y app de reloj). La documentación académica del proyecto
 > (ERS, UML, modelo de datos, autoevaluaciones y evidencias) vive en las carpetas
 > `Fase 1/` y `Fase 2/` de este mismo repositorio.
@@ -311,10 +311,10 @@ Pruebas automatizadas del backend y de la aplicación con integración continua 
 
 ## 📂 Estructura del Código
 
-Esta carpeta (`Fase 2/Codigo/`) contiene el código fuente fullstack de AgeCare:
+Esta carpeta (`Fase 2/Evidencias Proyecto/Codigo/`) contiene el código fuente fullstack de AgeCare:
 
 ```
-Fase 2/Codigo/
+Fase 2/Evidencias Proyecto/Codigo/
 │
 ├── 📁 backend/                 # API FastAPI + PostgreSQL
 │   ├── api/

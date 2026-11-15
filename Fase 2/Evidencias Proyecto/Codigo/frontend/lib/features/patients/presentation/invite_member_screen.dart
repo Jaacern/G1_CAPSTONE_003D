@@ -229,7 +229,7 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
                     onPressed: () async {
                       await Clipboard.setData(
                           ClipboardData(text: _created!.token));
-                      if (context.mounted) {
+                      if (mounted) {
                         showAppSnackBar(context, 'Código copiado');
                       }
                     },

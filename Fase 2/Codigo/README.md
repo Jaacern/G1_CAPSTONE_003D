@@ -286,26 +286,26 @@ El proyecto sigue el **modelo de desarrollo en Cascada (Waterfall)**, elegido po
 
 Definición completa de la idea de proyecto, equipo, roles, objetivos, metodología y plan de trabajo.
 
-### Fase 2 — Diseño y Desarrollo 🔄
+### Fase 2 — Diseño y Desarrollo ✅
 
-> **Estado:** En progreso
+> **Estado:** Completada
 
-Arquitectura definitiva del sistema en Azure, modelo Entidad-Relación completo en PostgreSQL, diagramas UML, normalización 2FN, diccionario de datos y desarrollo del backend/frontend.
+Arquitectura definitiva del sistema en Azure, modelo Entidad-Relación completo en PostgreSQL, diagramas UML, normalización hasta 3FN, diccionario de datos y desarrollo del backend/frontend.
 
 **Entregables (avance):**
 
 - ✅ ERS simplificado (base Fase 1)
 - ✅ Documento de requerimientos funcionales
 - ✅ Modelo relacional definitivo + diccionario de datos
-- ✅ Normalización 2FN y análisis de decisiones de diseño
+- ✅ Normalización hasta 3FN y análisis de decisiones de diseño
 - ✅ Esquema SQL completo + diagrama ER
-- 🔄 Backend FastAPI e integración con el frontend Flutter
+- ✅ Backend FastAPI integrado con el frontend Flutter
 
-### Fase 3 — Cierre, Pruebas y Despliegue ⏳
+### Fase 3 — Cierre, Pruebas y Despliegue ✅
 
-> **Estado:** Pendiente
+> **Estado:** Entregada
 
-Pruebas unitarias/integración (PyTest + Postman), rendimiento (p95 <500ms), seguridad (DevSecOps), containerización con Docker, despliegue en Azure Container Apps, Manual Técnico y presentación final.
+Pruebas automatizadas del backend y de la aplicación con integración continua en GitHub Actions, auditoría de seguridad (DevSecOps), containerización con Docker y despliegue de demostración en una máquina virtual de Azure. Quedan como proyección las pruebas de carga (p95 <500ms) y el despliegue permanente en Azure Container Apps.
 
 ---
 
@@ -416,8 +416,8 @@ pip install -r requirements.txt
 | `flutter` no se reconoce como comando | Flutter no está en el PATH | `setx PATH "%PATH%;%USERPROFILE%\flutter\bin"` y abrir una terminal nueva |
 | La API no puede entrar a la base (`password authentication failed`) | El volumen `pgdata` se creó con otra contraseña que la del `.env` | `docker exec agecare-db psql -U agecare -c "ALTER USER agecare WITH PASSWORD '<la del .env>';"` o borrar el volumen con `docker compose down -v` (pierde los datos) |
 
-> 🚧 **Pendiente (más adelante):** el **OCR de recetas** está en desarrollo; cuando
-> se use, necesita el binario `tesseract` en el sistema
+> ℹ️ El **OCR de recetas** usa Tesseract. La imagen de Docker ya lo trae instalado;
+> para correr el backend sin Docker hace falta el binario `tesseract` en el sistema
 > (`sudo apt-get install -y tesseract-ocr tesseract-ocr-spa`).
 
 #### Pruebas del backend
@@ -616,7 +616,7 @@ código dice que hace.
 | 🗄️ Modelo de Datos | Esquema ER completo de PostgreSQL + diccionario de datos | ✅ Fase 2 |
 | 🧪 Guía de Pruebas | Ver [Instalación y Ejecución](#️-instalación-y-ejecución) → *Backend en local sin Docker* | ✅ Fase 2 |
 | 📊 Diagramas UML | Casos de uso, clases y secuencia | 🔄 En progreso |
-| 📖 Manual Técnico | Guía de despliegue y operación | ⏳ Pendiente |
+| 📖 Manual Técnico | Guía de despliegue y operación: este README, sección [Instalación y Ejecución](#️-instalación-y-ejecución) | ✅ Cierre |
 | 🎤 Presentación Final | Presentación para comisión evaluadora | ⏳ Pendiente |
 
 ---

@@ -97,7 +97,7 @@ class _ShiftCard extends StatelessWidget {
                         fontSize: 16,
                         color: status.color)),
               ),
-              Text(DateFormat('EEEE d MMM', 'es').format(DateTime.now()),
+              Text(DateFormat('EEE d MMM', 'es').format(DateTime.now()),
                   style: const TextStyle(color: AppColors.textSecondary)),
             ],
           ),

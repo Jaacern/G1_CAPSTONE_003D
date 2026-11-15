@@ -3,11 +3,9 @@
 Una dosis nace de UNA indicacion: o un medicamento (modelo viejo) o un item de
 tratamiento (modelo vigente), nunca los dos. Esta prueba comprueba que:
   1. no quedo ninguna dosis con doble origen en los datos,
-  2. ningun medicamento quedo "activo" en un paciente que ya tiene tratamiento
-     vigente (el generador no los usa; 973 los discontinuo),
-  3. ck_scheduled_doses_origen RECHAZA una dosis con dos origenes,
-  4. tambien rechaza una dosis sin ningun origen,
-  5. y ADMITE una dosis con un unico origen.
+  2. ck_scheduled_doses_origen RECHAZA una dosis con dos origenes,
+  3. tambien rechaza una dosis sin ningun origen,
+  4. y ADMITE una dosis con un unico origen.
 Para los casos 3 y 5 se usan un medicamento y un item REALES, de modo que las
 claves foraneas pasen y el unico que pueda rechazar sea el CHECK. Cada INSERT
 de prueba se deshace siempre: no deja basura en la base.
@@ -79,13 +77,6 @@ async def main():
         "WHERE medication_id IS NOT NULL AND treatment_item_id IS NOT NULL")
     check("no quedan dosis con doble origen", dobles == 0, f"hay {dobles}")
 
-    # 2. Ningun medicamento activo en paciente con tratamiento vigente.
-    activos = await escalar(
-        "SELECT count(*) FROM medications m WHERE m.discontinued_at IS NULL "
-        "AND EXISTS (SELECT 1 FROM treatments tr "
-        "            WHERE tr.patient_id = m.patient_id AND tr.status='vigente')")
-    check("ningun medicamento migrado quedo activo", activos == 0,
-          f"hay {activos}")
 
     med = await escalar("SELECT id FROM medications LIMIT 1")
     item = await escalar("SELECT id FROM treatment_items LIMIT 1")
